@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: libertaphonix_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Tanger12345
+      POSTGRES_DB: libertaphonix
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - libertaphonix_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: libertaphonix_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - libertaphonix_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: libertaphonix_backend
+    ports:
+      - "5000:5000"
+      - "5555:5555"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:Tanger12345@postgres:5432/libertaphonix?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=305c28d0c5bddb1886e61aa860d20d91673e1efb6026510f52560840f3971a6dec4be8b2c1831489a6c1e127ed2acec69d2412b148b67c49ac5a53fc5e226e62f217dd3bfda1de1ee22b27a77fac915234625e71465b5e5dd8b45cacff4027ed7a33a0bae89bebd4c322adbadb3e23e5399e6c7cc7e6efd66a41741ebb96c607199b78b281a34a5ee8f2e407cce0eb3f7ef1581bf5a79cdc805fad3503c35467eacb51d38eaf72abb7ec69faeba110b65612b81f057dadbb0fc86b9d1f4b6e6fd91860206d36d737c2fca3acd63714fd0cad374f0b607002be432e26a00b5bb78b70e7de26b1a380081ccf71bd85209ff109708bb63b2954fdbda7c683e6a944
+      - NEXTAUTH_SECRET=5idNwNywDZArIDziCw9kkZLBtKca7uq5FeIUbG/LYXwT0V9EZ7ruebj+zeU=
+      - NEXTAUTH_URL=http://localhost:3000
+      - CORS_ORIGIN=http://localhost:3000
+      - ECOMANAGER_WEBHOOK_SECRET=your-ecomanager-webhook-secret
+      - MAYSTRO_WEBHOOK_SECRET=your-maystro-webhook-secret
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - libertaphonix_network
+    restart: unless-stopped
+    command: ["npm", "run", "dev"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: libertaphonix_frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:5000
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=5idNwNywDZArIDziCw9kkZLBtKca7uq5FeIUbG/LYXwT0V9EZ7ruebj+zeU=
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - libertaphonix_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  libertaphonix_network:
+    driver: bridge
