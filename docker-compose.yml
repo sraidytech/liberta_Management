@@ -63,6 +63,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=development
+      - BACKEND_INTERNAL_URL=http://backend:5000
       - NEXT_PUBLIC_API_URL=http://localhost:5000
       - NEXTAUTH_URL=http://localhost:3000
       - NEXTAUTH_SECRET=5idNwNywDZArIDziCw9kkZLBtKca7uq5FeIUbG/LYXwT0V9EZ7ruebj+zeU=

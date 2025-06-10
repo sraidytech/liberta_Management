@@ -147,6 +147,7 @@ model OrderItem {
   id          String @id @default(cuid())
   orderId     String
   productId   String
+  sku         String?
   title       String
   quantity    Int
   unitPrice   Float

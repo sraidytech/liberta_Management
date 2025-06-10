@@ -8,6 +8,7 @@ import { createServer } from 'http';
 import { config, validateConfig } from '@/config/app';
 import { connectDatabase } from '@/config/database';
 import redis from '@/config/redis';
+import { SyncService } from '@/services/sync.service';
 
 // Import routes
 import authRoutes from '@/modules/auth/auth.routes';
@@ -28,6 +29,7 @@ class App {
   public app: express.Application;
   public server: any;
   public io: Server;
+  private syncService!: SyncService;
 
   constructor() {
     this.app = express();
@@ -44,6 +46,7 @@ class App {
     this.initializeRoutes();
     this.initializeErrorHandling();
     this.initializeSocketIO();
+    this.initializeSyncService();
   }
 
   private initializeMiddlewares(): void {
@@ -144,6 +147,24 @@ class App {
     (global as any).io = this.io;
   }
 
+  private initializeSyncService(): void {
+    this.syncService = new SyncService(redis);
+    
+    // Start auto sync in production or when explicitly enabled
+    if (config.nodeEnv === 'production' || process.env.ENABLE_AUTO_SYNC === 'true') {
+      // Start auto sync with 15-minute intervals
+      this.syncService.startAutoSync(15).catch(error => {
+        console.error('❌ Failed to start auto sync:', error);
+      });
+      console.log('🔄 Auto sync service started');
+    } else {
+      console.log('🔄 Auto sync service initialized (manual mode)');
+    }
+
+    // Make sync service available globally for manual triggers
+    (global as any).syncService = this.syncService;
+  }
+
   public async start(): Promise<void> {
     try {
       // Validate configuration
@@ -152,11 +173,16 @@ class App {
       // Connect to database
       await connectDatabase();
 
+      // Test Redis connection
+      await redis.ping();
+      console.log('✅ Redis connected');
+
       // Start server
       this.server.listen(config.port, () => {
         console.log(`🚀 Server running on port ${config.port}`);
         console.log(`🌍 Environment: ${config.nodeEnv}`);
         console.log(`📡 CORS enabled for: ${config.corsOrigin}`);
+        console.log(`🔄 Sync service ready`);
       });
     } catch (error) {
       console.error('❌ Failed to start server:', error);

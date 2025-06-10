@@ -1,61 +1,48 @@
 import { Router } from 'express';
+import { OrdersController } from './orders.controller';
+import { authMiddleware, requireAdmin } from '@/common/middleware/auth';
 
 const router = Router();
+const ordersController = new OrdersController();
 
-// Placeholder routes for orders
-router.get('/', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: {
-      message: 'Orders routes not implemented yet',
-      code: 'NOT_IMPLEMENTED',
-      statusCode: 501,
-    },
-  });
+// Authentication is already applied at the app level
+
+// Get all orders with pagination and filtering
+router.get('/', async (req, res) => {
+  await ordersController.getOrders(req, res);
 });
 
-router.post('/', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: {
-      message: 'Create order not implemented yet',
-      code: 'NOT_IMPLEMENTED',
-      statusCode: 501,
-    },
-  });
+// Get dashboard statistics
+router.get('/stats', async (req, res) => {
+  await ordersController.getDashboardStats(req, res);
 });
 
-router.get('/:id', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: {
-      message: 'Get order not implemented yet',
-      code: 'NOT_IMPLEMENTED',
-      statusCode: 501,
-    },
-  });
+// Admin-only routes (must be before /:id route)
+router.get('/test-ecomanager', requireAdmin as any, async (req, res) => {
+  await ordersController.testEcoManagerIntegration(req, res);
 });
 
-router.put('/:id', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: {
-      message: 'Update order not implemented yet',
-      code: 'NOT_IMPLEMENTED',
-      statusCode: 501,
-    },
-  });
+router.post('/sync', requireAdmin as any, async (req, res) => {
+  await ordersController.syncOrders(req, res);
 });
 
-router.delete('/:id', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: {
-      message: 'Delete order not implemented yet',
-      code: 'NOT_IMPLEMENTED',
-      statusCode: 501,
-    },
-  });
+router.delete('/delete-all', requireAdmin as any, async (req, res) => {
+  await ordersController.deleteAllOrders(req, res);
+});
+
+// Get single order by ID (must be after specific routes)
+router.get('/:id', async (req, res) => {
+  await ordersController.getOrder(req, res);
+});
+
+// Update order status
+router.put('/:id/status', async (req, res) => {
+  await ordersController.updateOrderStatus(req, res);
+});
+
+// Assign agent to order
+router.put('/:id/assign', async (req, res) => {
+  await ordersController.assignAgent(req, res);
 });
 
 export default router;

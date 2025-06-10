@@ -5,6 +5,7 @@ const nextConfig = {
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
   },
+  // Removed rewrites - using direct API calls instead
 }
 
 module.exports = nextConfig
