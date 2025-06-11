@@ -43,6 +43,7 @@ services:
       - CORS_ORIGIN=http://localhost:3000
       - ECOMANAGER_WEBHOOK_SECRET=your-ecomanager-webhook-secret
       - MAYSTRO_WEBHOOK_SECRET=your-maystro-webhook-secret
+      - MAYSTRO_API_KEY=33ab96ca7b3b640a82793f252cded720b1788c09
     depends_on:
       - postgres
       - redis

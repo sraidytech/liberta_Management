@@ -125,9 +125,13 @@ model Order {
   storeIdentifier  String?
 
   // Maystro integration
-  trackingNumber   String?
-  shippingStatus   String?
-  maystroOrderId   String?
+  trackingNumber      String?
+  shippingStatus      String?
+  maystroOrderId      String?
+  alertedAt           DateTime?
+  alertReason         String?
+  abortReason         String?
+  additionalMetaData  Json?
 
   // Timestamps
   orderDate DateTime @default(now())

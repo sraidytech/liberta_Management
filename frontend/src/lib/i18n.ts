@@ -105,6 +105,7 @@ export interface Translations {
   failedToFetchOrders: string;
   successfullySynced: string;
   failedToSyncOrders: string;
+  failedStores: string;
   orderStatusUpdatedSuccessfully: string;
   failedToUpdateOrderStatus: string;
   
@@ -127,6 +128,12 @@ export interface Translations {
   updating: string;
   updateStatus: string;
   warning: string;
+  
+  // Shipping Status
+  shippingStatus: string;
+  trackingNumber: string;
+  syncShippingStatus: string;
+  testMaystroIntegration: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -235,6 +242,7 @@ export const translations: Record<Language, Translations> = {
     failedToFetchOrders: 'Failed to fetch orders',
     successfullySynced: 'Successfully synced',
     failedToSyncOrders: 'Failed to sync orders',
+    failedStores: 'Failed stores',
     orderStatusUpdatedSuccessfully: 'Order status updated successfully',
     failedToUpdateOrderStatus: 'Failed to update order status',
     
@@ -257,6 +265,12 @@ export const translations: Record<Language, Translations> = {
     updating: 'Updating...',
     updateStatus: 'Update Status',
     warning: 'Warning',
+    
+    // Shipping Status
+    shippingStatus: 'Shipping Status',
+    trackingNumber: 'Tracking Number',
+    syncShippingStatus: 'Sync Shipping Status',
+    testMaystroIntegration: 'Test Maystro Integration',
   },
   fr: {
     // Common
@@ -363,6 +377,7 @@ export const translations: Record<Language, Translations> = {
     failedToFetchOrders: 'Échec de récupération des commandes',
     successfullySynced: 'Synchronisé avec succès',
     failedToSyncOrders: 'Échec de synchronisation des commandes',
+    failedStores: 'Magasins échoués',
     orderStatusUpdatedSuccessfully: 'Statut de commande mis à jour avec succès',
     failedToUpdateOrderStatus: 'Échec de mise à jour du statut de commande',
     
@@ -385,6 +400,12 @@ export const translations: Record<Language, Translations> = {
     updating: 'Mise à jour...',
     updateStatus: 'Mettre à Jour',
     warning: 'Attention',
+    
+    // Shipping Status
+    shippingStatus: 'Statut de Livraison',
+    trackingNumber: 'Numéro de Suivi',
+    syncShippingStatus: 'Synchroniser Statut de Livraison',
+    testMaystroIntegration: 'Tester Intégration Maystro',
   },
 };
 

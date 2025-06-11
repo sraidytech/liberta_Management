@@ -26,8 +26,46 @@ router.post('/sync', requireAdmin as any, async (req, res) => {
   await ordersController.syncOrders(req, res);
 });
 
+router.post('/sync-all-stores', requireAdmin as any, async (req, res) => {
+  await ordersController.syncAllStores(req, res);
+});
+
 router.delete('/delete-all', requireAdmin as any, async (req, res) => {
   await ordersController.deleteAllOrders(req, res);
+});
+
+// Maystro integration routes
+router.post('/sync-shipping', requireAdmin as any, async (req, res) => {
+  await ordersController.syncShippingStatus(req, res);
+});
+
+router.get('/test-maystro', requireAdmin as any, async (req, res) => {
+  await ordersController.testMaystroIntegration(req, res);
+});
+
+router.get('/debug-maystro', requireAdmin as any, async (req, res) => {
+  await ordersController.debugMaystroApi(req, res);
+});
+
+// Maystro webhook management routes
+router.get('/maystro/webhook-types', requireAdmin as any, async (req, res) => {
+  await ordersController.getMaystroWebhookTypes(req, res);
+});
+
+router.get('/maystro/webhooks', requireAdmin as any, async (req, res) => {
+  await ordersController.getMaystroWebhooks(req, res);
+});
+
+router.post('/maystro/webhooks', requireAdmin as any, async (req, res) => {
+  await ordersController.createMaystroWebhook(req, res);
+});
+
+router.delete('/maystro/webhooks/:id', requireAdmin as any, async (req, res) => {
+  await ordersController.deleteMaystroWebhook(req, res);
+});
+
+router.post('/maystro/test-webhook', requireAdmin as any, async (req, res) => {
+  await ordersController.sendTestMaystroWebhook(req, res);
 });
 
 // Get single order by ID (must be after specific routes)

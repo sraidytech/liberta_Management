@@ -15,6 +15,13 @@ interface Order {
   reference: string;
   ecoManagerId?: string;
   status: string;
+  shippingStatus?: string;
+  trackingNumber?: string;
+  maystroOrderId?: string;
+  alertedAt?: string;
+  alertReason?: string;
+  abortReason?: string;
+  additionalMetaData?: any;
   total: number;
   orderDate: string;
   createdAt: string;
@@ -66,6 +73,27 @@ const statusColors = {
   DELIVERED: 'bg-emerald-100 text-emerald-800',
   CANCELLED: 'bg-red-100 text-red-800',
   RETURNED: 'bg-gray-100 text-gray-800'
+};
+
+const shippingStatusColors = {
+  'CRÉÉ': 'bg-blue-100 text-blue-800',
+  'DEMANDE DE RAMASSAGE': 'bg-yellow-100 text-yellow-800',
+  'EN COURS': 'bg-purple-100 text-purple-800',
+  'EN ATTENTE DE TRANSIT': 'bg-orange-100 text-orange-800',
+  'EN TRANSIT POUR EXPÉDITION': 'bg-indigo-100 text-indigo-800',
+  'EN TRANSIT POUR RETOUR': 'bg-red-100 text-red-800',
+  'EN ATTENTE': 'bg-gray-100 text-gray-800',
+  'EN RUPTURE DE STOCK': 'bg-red-100 text-red-800',
+  'PRÊT À EXPÉDIER': 'bg-green-100 text-green-800',
+  'ASSIGNÉ': 'bg-blue-100 text-blue-800',
+  'EXPÉDIÉ': 'bg-indigo-100 text-indigo-800',
+  'ALERTÉ': 'bg-yellow-100 text-yellow-800',
+  'LIVRÉ': 'bg-emerald-100 text-emerald-800',
+  'REPORTÉ': 'bg-orange-100 text-orange-800',
+  'ANNULÉ': 'bg-red-100 text-red-800',
+  'PRÊT À RETOURNER': 'bg-gray-100 text-gray-800',
+  'PRIS PAR LE MAGASIN': 'bg-green-100 text-green-800',
+  'NON REÇU': 'bg-red-100 text-red-800'
 };
 
 export default function OrdersPage() {
@@ -155,32 +183,44 @@ export default function OrdersPage() {
     }
   };
 
-  // Sync orders from EcoManager
+  // Sync orders from all active stores
   const syncOrders = async (fullSync = false) => {
     try {
       setSyncing(true);
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
-      const response = await fetch(`${apiUrl}/api/v1/orders/sync`, {
+      const response = await fetch(`${apiUrl}/api/v1/orders/sync-all-stores`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          storeIdentifier: 'NATU', // Default store, should be configurable
           fullSync
         })
       });
 
       if (response.ok) {
         const data = await response.json();
+        const { totalSyncedCount, storesProcessed, results } = data.data;
+        
+        // Show detailed success message
+        const successfulStores = results.filter((r: any) => r.success);
+        const failedStores = results.filter((r: any) => !r.success);
+        
+        let message = `${t('successfullySynced')} ${totalSyncedCount} ${t('orders')} from ${successfulStores.length}/${storesProcessed} stores`;
+        
+        if (failedStores.length > 0) {
+          message += `\n${t('failedStores')}: ${failedStores.map((s: any) => s.storeName).join(', ')}`;
+        }
+        
         showToast({
-          type: 'success',
+          type: totalSyncedCount > 0 ? 'success' : 'warning',
           title: t('success'),
-          message: `${t('successfullySynced')} ${data.data.syncedCount} ${t('orders')}`
+          message
         });
+        
         fetchOrders();
         fetchStats();
       } else {
@@ -295,6 +335,95 @@ export default function OrdersPage() {
     }
   };
 
+  // Sync shipping status from Maystro
+  const syncShippingStatus = async () => {
+    try {
+      setSyncing(true);
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/v1/orders/sync-shipping`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        showToast({
+          type: 'success',
+          title: t('success'),
+          message: `${data.message}`
+        });
+        
+        // Refresh the orders
+        fetchOrders();
+      } else {
+        const error = await response.json();
+        showToast({
+          type: 'error',
+          title: t('error'),
+          message: error.error?.message || 'Failed to sync shipping status'
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing shipping status:', error);
+      showToast({
+        type: 'error',
+        title: t('error'),
+        message: 'Failed to sync shipping status'
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  // Test Maystro integration
+  const testMaystroIntegration = async () => {
+    try {
+      setSyncing(true);
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/v1/orders/test-maystro`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        showToast({
+          type: 'success',
+          title: t('success'),
+          message: data.message
+        });
+        
+        // Log detailed results to console for inspection
+        console.log('Maystro Test Results:', data.data);
+      } else {
+        const error = await response.json();
+        showToast({
+          type: 'error',
+          title: t('error'),
+          message: error.error?.message || 'Failed to test Maystro integration'
+        });
+      }
+    } catch (error) {
+      console.error('Error testing Maystro integration:', error);
+      showToast({
+        type: 'error',
+        title: t('error'),
+        message: 'Failed to test Maystro integration'
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   // Update order status
   const updateOrderStatus = async (orderId: string, status: string, notes?: string) => {
     try {
@@ -394,6 +523,21 @@ export default function OrdersPage() {
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               Delete All Orders
+            </Button>
+            <Button
+              onClick={syncShippingStatus}
+              disabled={syncing}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {syncing ? t('syncing') : t('syncShippingStatus')}
+            </Button>
+            <Button
+              onClick={testMaystroIntegration}
+              disabled={syncing}
+              variant="outline"
+              className="border-purple-600 text-purple-600 hover:bg-purple-50"
+            >
+              {t('testMaystroIntegration')}
             </Button>
           </div>
         </div>
@@ -545,6 +689,9 @@ export default function OrdersPage() {
                     {t('status')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {t('shippingStatus')}
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     {t('agent')}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -561,13 +708,13 @@ export default function OrdersPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                       {t('loading')}
                     </td>
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
                       {t('noOrdersFound')}
                     </td>
                   </tr>
@@ -612,6 +759,22 @@ export default function OrdersPage() {
                            order.status === 'RETURNED' ? t('returned') :
                            order.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {order.shippingStatus ? (
+                          <div>
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${shippingStatusColors[order.shippingStatus as keyof typeof shippingStatusColors] || 'bg-gray-100 text-gray-800'}`}>
+                              {order.shippingStatus}
+                            </span>
+                            {order.trackingNumber && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {t('trackingNumber')}: {order.trackingNumber}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {order.assignedAgent ? (

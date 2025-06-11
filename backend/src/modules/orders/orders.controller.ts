@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { EcoManagerService } from '@/services/ecomanager.service';
+import { getMaystroService } from '@/services/maystro.service';
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -581,16 +582,18 @@ export class OrdersController {
         ecoOrders = await ecoService.fetchAllOrders();
       } else {
         // Incremental sync - fetch new orders only
-        const lastOrder = await prisma.order.findFirst({
-          where: {
-            storeIdentifier,
-            source: 'ECOMANAGER',
-            ecoManagerId: { not: null }
-          },
-          orderBy: { ecoManagerId: 'desc' }
-        });
+        // Get the highest EcoManager ID by converting to integer for proper sorting
+        const lastOrderResult = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+          SELECT "ecoManagerId"
+          FROM "orders"
+          WHERE "storeIdentifier" = ${storeIdentifier}
+            AND "source" = 'ECOMANAGER'
+            AND "ecoManagerId" IS NOT NULL
+          ORDER BY CAST("ecoManagerId" AS INTEGER) DESC
+          LIMIT 1
+        `;
 
-        const lastOrderId = lastOrder?.ecoManagerId ? parseInt(lastOrder.ecoManagerId) : 0;
+        const lastOrderId = lastOrderResult.length > 0 ? parseInt(lastOrderResult[0].ecoManagerId) : 0;
         console.log(`Last synced EcoManager order ID: ${lastOrderId}`);
         
         ecoOrders = await ecoService.fetchNewOrders(lastOrderId);
@@ -691,6 +694,216 @@ export class OrdersController {
         success: false,
         error: {
           message: 'Failed to sync orders from EcoManager'
+        }
+      });
+    }
+  }
+
+  /**
+   * Sync orders from all active stores
+   */
+  async syncAllStores(req: Request, res: Response) {
+    try {
+      const { fullSync = false } = req.body;
+
+      // Get all active API configurations
+      const activeConfigs = await prisma.apiConfiguration.findMany({
+        where: { isActive: true }
+      });
+
+      if (activeConfigs.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'No active store configurations found'
+          }
+        });
+      }
+
+      console.log(`Starting sync for ${activeConfigs.length} active stores...`);
+
+      const results = [];
+      let totalSyncedCount = 0;
+      let totalFetchedCount = 0;
+
+      // Process each store sequentially to avoid overwhelming the APIs
+      for (const apiConfig of activeConfigs) {
+        try {
+          console.log(`\n🏪 Processing store: ${apiConfig.storeName} (${apiConfig.storeIdentifier})`);
+
+          // Initialize EcoManager service for this store
+          const ecoService = new EcoManagerService({
+            storeName: apiConfig.storeName,
+            storeIdentifier: apiConfig.storeIdentifier,
+            apiToken: apiConfig.apiToken,
+            baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+          }, redis);
+
+          // Test connection first
+          const connectionTest = await ecoService.testConnection();
+          if (!connectionTest) {
+            console.log(`❌ Failed to connect to ${apiConfig.storeName} API`);
+            results.push({
+              storeIdentifier: apiConfig.storeIdentifier,
+              storeName: apiConfig.storeName,
+              success: false,
+              error: 'Failed to connect to EcoManager API',
+              syncedCount: 0,
+              totalFetched: 0
+            });
+            continue;
+          }
+
+          let syncedCount = 0;
+          let ecoOrders: any[] = [];
+
+          if (fullSync) {
+            // Full sync - fetch all orders
+            ecoOrders = await ecoService.fetchAllOrders();
+          } else {
+            // Incremental sync - fetch new orders only
+            // Get the highest EcoManager ID by converting to integer for proper sorting
+            const lastOrderResult = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+              SELECT "ecoManagerId"
+              FROM "orders"
+              WHERE "storeIdentifier" = ${apiConfig.storeIdentifier}
+                AND "source" = 'ECOMANAGER'
+                AND "ecoManagerId" IS NOT NULL
+              ORDER BY CAST("ecoManagerId" AS INTEGER) DESC
+              LIMIT 1
+            `;
+
+            const lastOrderId = lastOrderResult.length > 0 ? parseInt(lastOrderResult[0].ecoManagerId) : 0;
+            console.log(`Last synced EcoManager order ID for ${apiConfig.storeName}: ${lastOrderId}`);
+            
+            ecoOrders = await ecoService.fetchNewOrders(lastOrderId);
+          }
+
+          console.log(`Processing ${ecoOrders.length} orders for ${apiConfig.storeName}...`);
+
+          // Process orders in smaller batches
+          const batchSize = 10;
+          for (let i = 0; i < ecoOrders.length; i += batchSize) {
+            const batch = ecoOrders.slice(i, i + batchSize);
+            console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(ecoOrders.length/batchSize)} for ${apiConfig.storeName} (${batch.length} orders)`);
+            
+            for (const ecoOrder of batch) {
+              try {
+                // Check if order already exists
+                const existingOrder = await prisma.order.findUnique({
+                  where: { ecoManagerId: ecoOrder.id.toString() }
+                });
+
+                if (!existingOrder) {
+                  // Create new order
+                  const orderData = ecoService.mapOrderToDatabase(ecoOrder);
+                  
+                  // Handle customer creation separately
+                  let customer = await prisma.customer.findFirst({
+                    where: { telephone: orderData.customerData.telephone }
+                  });
+
+                  if (!customer) {
+                    customer = await prisma.customer.create({
+                      data: {
+                        fullName: orderData.customerData.fullName,
+                        telephone: orderData.customerData.telephone,
+                        wilaya: orderData.customerData.wilaya,
+                        commune: orderData.customerData.commune,
+                        totalOrders: 1
+                      }
+                    });
+                  } else {
+                    // Update total orders count
+                    await prisma.customer.update({
+                      where: { id: customer.id },
+                      data: { totalOrders: { increment: 1 } }
+                    });
+                  }
+
+                  // Remove customerData and add customerId
+                  const { customerData, ...finalOrderData } = orderData;
+                  finalOrderData.customerId = customer.id;
+
+                  await prisma.order.create({
+                    data: finalOrderData
+                  });
+                  syncedCount++;
+                  
+                  if (syncedCount % 10 === 0) {
+                    console.log(`Synced ${syncedCount} orders for ${apiConfig.storeName} so far...`);
+                  }
+                }
+              } catch (orderError) {
+                console.error(`Error processing order ${ecoOrder.id} for ${apiConfig.storeName}:`, orderError);
+                // Continue with next order
+              }
+            }
+          }
+
+          // Update API configuration usage
+          await prisma.apiConfiguration.update({
+            where: { id: apiConfig.id },
+            data: {
+              requestCount: {
+                increment: Math.ceil(ecoOrders.length / 100) // Approximate API calls made
+              },
+              lastUsed: new Date()
+            }
+          });
+
+          // Save sync status
+          if (ecoOrders.length > 0) {
+            const lastOrderId = Math.max(...ecoOrders.map(o => o.id));
+            await ecoService.saveSyncStatus(lastOrderId, syncedCount);
+          }
+
+          results.push({
+            storeIdentifier: apiConfig.storeIdentifier,
+            storeName: apiConfig.storeName,
+            success: true,
+            syncedCount,
+            totalFetched: ecoOrders.length,
+            syncType: fullSync ? 'full' : 'incremental'
+          });
+
+          totalSyncedCount += syncedCount;
+          totalFetchedCount += ecoOrders.length;
+
+          console.log(`✅ Completed sync for ${apiConfig.storeName}: ${syncedCount} orders synced`);
+
+        } catch (storeError) {
+          console.error(`Error syncing store ${apiConfig.storeName}:`, storeError);
+          results.push({
+            storeIdentifier: apiConfig.storeIdentifier,
+            storeName: apiConfig.storeName,
+            success: false,
+            error: storeError instanceof Error ? storeError.message : 'Unknown error',
+            syncedCount: 0,
+            totalFetched: 0
+          });
+        }
+      }
+
+      console.log(`\n🎉 All stores sync completed. Total synced: ${totalSyncedCount} orders`);
+
+      res.json({
+        success: true,
+        data: {
+          totalSyncedCount,
+          totalFetchedCount,
+          syncType: fullSync ? 'full' : 'incremental',
+          storesProcessed: activeConfigs.length,
+          results
+        },
+        message: `Successfully synced ${totalSyncedCount} orders from ${activeConfigs.length} stores`
+      });
+    } catch (error) {
+      console.error('Sync all stores error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to sync orders from all stores'
         }
       });
     }
@@ -867,6 +1080,235 @@ export class OrdersController {
         success: false,
         error: {
           message: 'Failed to delete all orders',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Sync shipping status from Maystro
+   */
+  async syncShippingStatus(req: Request, res: Response) {
+    try {
+      const { orderReferences } = req.body;
+
+      const maystroService = getMaystroService(redis);
+      const result = await maystroService.syncShippingStatus(orderReferences);
+
+      res.json({
+        success: true,
+        data: result,
+        message: `Shipping status sync completed: ${result.updated} updated, ${result.errors} errors`
+      });
+    } catch (error) {
+      console.error('Sync shipping status error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to sync shipping status',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Test Maystro API connection
+   */
+  async testMaystroIntegration(req: Request, res: Response) {
+    try {
+      const maystroService = getMaystroService(redis);
+      const result = await maystroService.testConnection();
+
+      res.json({
+        success: result.success,
+        data: result,
+        message: result.message
+      });
+    } catch (error) {
+      console.error('Test Maystro integration error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to test Maystro integration',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Debug Maystro API response
+   */
+  async debugMaystroApi(req: Request, res: Response) {
+    try {
+      const maystroService = getMaystroService(redis);
+      const result = await maystroService.debugApiResponse(10);
+
+      res.json({
+        success: true,
+        data: result,
+        message: 'Debug data fetched successfully'
+      });
+    } catch (error) {
+      console.error('Debug Maystro API error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to debug Maystro API',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Get Maystro webhook types
+   */
+  async getMaystroWebhookTypes(req: Request, res: Response) {
+    try {
+      const maystroService = getMaystroService(redis);
+      const webhookTypes = await maystroService.getWebhookTypes();
+
+      res.json({
+        success: true,
+        data: webhookTypes
+      });
+    } catch (error) {
+      console.error('Get Maystro webhook types error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch webhook types',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Get configured Maystro webhooks
+   */
+  async getMaystroWebhooks(req: Request, res: Response) {
+    try {
+      const maystroService = getMaystroService(redis);
+      const webhooks = await maystroService.getWebhooks();
+
+      res.json({
+        success: true,
+        data: webhooks
+      });
+    } catch (error) {
+      console.error('Get Maystro webhooks error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch webhooks',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Create Maystro webhook
+   */
+  async createMaystroWebhook(req: Request, res: Response) {
+    try {
+      const { endpoint, triggerTypeId } = req.body;
+
+      if (!endpoint || !triggerTypeId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Endpoint and trigger type ID are required'
+          }
+        });
+      }
+
+      const maystroService = getMaystroService(redis);
+      const webhook = await maystroService.createWebhook(endpoint, triggerTypeId);
+
+      res.json({
+        success: true,
+        data: webhook,
+        message: 'Webhook created successfully'
+      });
+    } catch (error) {
+      console.error('Create Maystro webhook error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to create webhook',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Delete Maystro webhook
+   */
+  async deleteMaystroWebhook(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const maystroService = getMaystroService(redis);
+      const success = await maystroService.deleteWebhook(id);
+
+      if (success) {
+        res.json({
+          success: true,
+          message: 'Webhook deleted successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: {
+            message: 'Failed to delete webhook'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Delete Maystro webhook error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to delete webhook',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
+   * Send test webhook
+   */
+  async sendTestMaystroWebhook(req: Request, res: Response) {
+    try {
+      const maystroService = getMaystroService(redis);
+      const success = await maystroService.sendTestWebhook();
+
+      if (success) {
+        res.json({
+          success: true,
+          message: 'Test webhook sent successfully'
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: {
+            message: 'Failed to send test webhook'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Send test Maystro webhook error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to send test webhook',
           details: error instanceof Error ? error.message : 'Unknown error'
         }
       });

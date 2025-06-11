@@ -122,6 +122,54 @@ export function OrderDetailsModal({ order, isOpen, onClose, onStatusUpdate }: Or
                     </span>
                   </div>
                   
+                  {order.shippingStatus && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{t('shippingStatus')}:</span>
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                        {order.shippingStatus}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {order.trackingNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">{t('trackingNumber')}:</span>
+                      <span className="font-semibold">{order.trackingNumber}</span>
+                    </div>
+                  )}
+                  
+                  {order.maystroOrderId && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Maystro ID:</span>
+                      <span className="font-mono text-sm">{order.maystroOrderId}</span>
+                    </div>
+                  )}
+                  
+                  {order.alertedAt && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Alerted At:</span>
+                      <span className="text-sm">{formatDate(order.alertedAt)}</span>
+                    </div>
+                  )}
+                  
+                  {order.alertReason && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Alert Reason:</span>
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                        {order.alertReason}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {order.abortReason && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Abort Reason:</span>
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                        {order.abortReason}
+                      </span>
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between">
                     <span className="text-gray-600">{t('total')}:</span>
                     <span className="font-semibold">{formatCurrency(order.total)}</span>
@@ -196,6 +244,91 @@ export function OrderDetailsModal({ order, isOpen, onClose, onStatusUpdate }: Or
                       </div>
                     )}
                   </div>
+                </Card>
+              )}
+
+              {/* Maystro Metadata */}
+              {order.additionalMetaData && (
+                <Card className="p-6 lg:col-span-2">
+                  <div className="flex items-center mb-4">
+                    <Package className="w-5 h-5 text-indigo-600 mr-2" />
+                    <h3 className="text-lg font-semibold">Maystro Metadata</h3>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {order.additionalMetaData.customer_name && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Customer Name:</span>
+                        <p className="font-semibold">{order.additionalMetaData.customer_name}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.customer_phone && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Customer Phone:</span>
+                        <p className="font-semibold">{order.additionalMetaData.customer_phone}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.destination_text && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Destination:</span>
+                        <p className="font-semibold">{order.additionalMetaData.destination_text}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.product_name && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Product Name:</span>
+                        <p className="font-semibold">{order.additionalMetaData.product_name}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.product_price && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Product Price:</span>
+                        <p className="font-semibold">{formatCurrency(order.additionalMetaData.product_price)}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.wilaya && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Wilaya:</span>
+                        <p className="font-semibold">{order.additionalMetaData.wilaya}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.commune_name && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Commune:</span>
+                        <p className="font-semibold">{order.additionalMetaData.commune_name}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.ordered_at && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Ordered At:</span>
+                        <p className="font-semibold">{formatDate(order.additionalMetaData.ordered_at)}</p>
+                      </div>
+                    )}
+                    
+                    {order.additionalMetaData.delivered_at && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <span className="text-sm text-gray-600">Delivered At:</span>
+                        <p className="font-semibold">{formatDate(order.additionalMetaData.delivered_at)}</p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Raw JSON for debugging */}
+                  <details className="mt-4">
+                    <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+                      View Raw Metadata (Debug)
+                    </summary>
+                    <pre className="mt-2 p-3 bg-gray-100 rounded-lg text-xs overflow-auto max-h-40">
+                      {JSON.stringify(order.additionalMetaData, null, 2)}
+                    </pre>
+                  </details>
                 </Card>
               )}
 
