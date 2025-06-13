@@ -30,6 +30,10 @@ router.post('/sync-all-stores', requireAdmin as any, async (req, res) => {
   await ordersController.syncAllStores(req, res);
 });
 
+router.post('/test-sync-any-status', requireAdmin as any, async (req, res) => {
+  await ordersController.testSyncAnyStatus(req, res);
+});
+
 router.delete('/delete-all', requireAdmin as any, async (req, res) => {
   await ordersController.deleteAllOrders(req, res);
 });

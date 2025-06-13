@@ -166,18 +166,296 @@ export class EcoManagerService {
   }
 
   /**
-   * Fetch new orders since last sync
+   * Find the page containing the lastOrderId using binary search
+   * Since EcoManager orders are sorted by ID descending (newest first),
+   * we need to find the exact page where lastOrderId exists
+   */
+  async findPageWithOrderId(lastOrderId: number): Promise<number> {
+    console.log(`Finding page containing order ID ${lastOrderId} for ${this.config.storeName}...`);
+    
+    let left = 1;
+    let right = 2000; // Start with reasonable upper bound
+    let targetPage = 1;
+
+    // First, find the approximate range by checking exponentially increasing pages
+    let testPage = 1;
+    let maxId = 0;
+    let minId = 0;
+
+    console.log(`Scanning for order ID ${lastOrderId} range...`);
+    
+    while (testPage <= 100) {
+      try {
+        const orders = await this.fetchOrdersPage(testPage, this.BATCH_SIZE);
+
+        if (!orders || orders.length === 0) {
+          console.log(`No more orders found at page ${testPage}`);
+          right = testPage - 1;
+          break;
+        }
+
+        maxId = orders[0].id; // Highest ID on page (newest)
+        minId = orders[orders.length - 1].id; // Lowest ID on page (oldest)
+
+        console.log(`${this.config.storeName} Page ${testPage} ID range: ${maxId} - ${minId}`);
+
+        // Check if our target ID is in this range
+        if (lastOrderId >= minId && lastOrderId <= maxId) {
+          console.log(`Found target order ID ${lastOrderId} on page ${testPage}!`);
+          return testPage;
+        }
+
+        // If our target ID is higher than the max on this page, we need to go to earlier pages
+        if (lastOrderId > maxId) {
+          console.log(`Target ID ${lastOrderId} is higher than page ${testPage} max (${maxId}), checking earlier pages...`);
+          right = testPage - 1;
+          break;
+        }
+
+        // If our target ID is lower than the min on this page, continue to later pages
+        if (lastOrderId < minId) {
+          console.log(`Target ID ${lastOrderId} is lower than page ${testPage} min (${minId}), continuing to later pages...`);
+          left = testPage + 1;
+          testPage = testPage * 2; // Exponential search
+        }
+
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+      } catch (error) {
+        console.error(`Error during page scan for ${this.config.storeName} at page ${testPage}:`, error instanceof Error ? error.message : 'Unknown error');
+        break;
+      }
+    }
+
+    // Now do binary search in the identified range
+    console.log(`Binary searching between pages ${left} and ${right}...`);
+    
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      
+      try {
+        const orders = await this.fetchOrdersPage(mid, this.BATCH_SIZE);
+
+        if (!orders || orders.length === 0) {
+          right = mid - 1;
+          continue;
+        }
+
+        const firstId = orders[0].id;
+        const lastId = orders[orders.length - 1].id;
+
+        console.log(`${this.config.storeName} Binary search page ${mid} ID range: ${firstId} - ${lastId}`);
+
+        // Check if our target ID is in this range
+        if (lastOrderId >= lastId && lastOrderId <= firstId) {
+          console.log(`Found target order ID ${lastOrderId} on page ${mid}!`);
+          return mid;
+        }
+
+        if (lastOrderId > firstId) {
+          // Target is in earlier pages (lower page numbers)
+          right = mid - 1;
+        } else {
+          // Target is in later pages (higher page numbers)
+          left = mid + 1;
+        }
+
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+      } catch (error) {
+        console.error(`Error during binary search for ${this.config.storeName} at page ${mid}:`, error instanceof Error ? error.message : 'Unknown error');
+        break;
+      }
+    }
+
+    // If not found exactly, start from the closest page
+    targetPage = Math.max(1, left - 1);
+    console.log(`Could not find exact page for order ID ${lastOrderId}, starting from page ${targetPage}`);
+    return targetPage;
+  }
+
+  /**
+   * Get existing order IDs from database (like Google Sheets getExistingOrderIds)
+   */
+  async getExistingOrderIds(): Promise<Set<number>> {
+    try {
+      console.log(`Fetching existing order IDs for ${this.config.storeName} from database...`);
+      
+      // Use raw query to get all ecoManagerIds for this store
+      const existingOrders = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+        SELECT "ecoManagerId"
+        FROM "orders"
+        WHERE "storeIdentifier" = ${this.config.storeIdentifier}
+          AND "source" = 'ECOMANAGER'
+          AND "ecoManagerId" IS NOT NULL
+      `;
+
+      const existingIds = new Set<number>();
+      existingOrders.forEach(order => {
+        const id = parseInt(order.ecoManagerId);
+        if (!isNaN(id)) {
+          existingIds.add(id);
+        }
+      });
+
+      console.log(`Loaded ${existingIds.size} existing order IDs for ${this.config.storeName} from database`);
+      return existingIds;
+    } catch (error) {
+      console.error(`Error getting existing order IDs for ${this.config.storeName}:`, error);
+      return new Set<number>();
+    }
+  }
+
+  /**
+   * Fetch new orders using EXACT Google Sheets strategy
    */
   async fetchNewOrders(lastOrderId: number): Promise<EcoManagerOrder[]> {
     const newOrders: EcoManagerOrder[] = [];
+    let consecutiveEmptyPages = 0;
+    const maxEmptyPages = 3;
+
+    console.log(`Fetching new "En dispatch" orders for ${this.config.storeName}...`);
+
+    // Get existing order IDs from database (like Google Sheets)
+    const existingOrderIds = await this.getExistingOrderIds();
+
+    // Get cached page info
+    const pageInfo = await this.getPageInfo();
+    let currentLastPage = pageInfo?.lastPage || 1;
+
+    // Check pages around cached position (±50 pages like Google Sheets)
+    const startPage = Math.max(1, currentLastPage - 50);
+    const endPage = currentLastPage + 50;
+
+    console.log(`Checking pages ${startPage} to ${endPage} for ${this.config.storeName}...`);
+
+    let newLastPage = currentLastPage;
+
+    // Scan all pages in range (like Google Sheets)
+    for (let page = startPage; page <= endPage; page++) {
+      try {
+        console.log(`Fetching ${this.config.storeName} page ${page}...`);
+        const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
+
+        if (!orders || orders.length === 0) {
+          consecutiveEmptyPages++;
+          console.log(`Empty page received (${consecutiveEmptyPages}/${maxEmptyPages})`);
+          if (consecutiveEmptyPages >= maxEmptyPages && page > currentLastPage) {
+            console.log(`Stopping scan after ${maxEmptyPages} empty pages`);
+            break;
+          }
+          continue;
+        }
+
+        consecutiveEmptyPages = 0;
+        if (page > newLastPage) {
+          newLastPage = page;
+        }
+
+        const firstId = orders[0].id;
+        const lastId = orders[orders.length - 1].id;
+        
+        console.log(`Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
+
+        // Filter for "En dispatch" orders that don't exist in database (EXACT Google Sheets logic)
+        const newDispatchOrders = orders.filter(order =>
+          order.order_state_name === 'En dispatch' &&
+          !existingOrderIds.has(order.id) // Check if order ID doesn't exist in database
+        );
+
+        if (newDispatchOrders.length > 0) {
+          newOrders.push(...newDispatchOrders);
+          console.log(`Found ${newDispatchOrders.length} new dispatch orders on page ${page}`);
+          
+          // Show details of found orders
+          newDispatchOrders.forEach(order => {
+            console.log(`  - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
+          });
+        }
+
+        // Save page info for next run
+        await this.savePageInfo(page, firstId, lastId);
+
+        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+      } catch (error) {
+        console.error(`Error fetching page ${page}:`, error);
+        continue;
+      }
+    }
+
+    // Update last page if changed
+    if (newLastPage !== currentLastPage) {
+      console.log(`Updating last page for ${this.config.storeName} from ${currentLastPage} to ${newLastPage}`);
+      const lastPageOrders = await this.fetchOrdersPage(newLastPage, this.BATCH_SIZE);
+      if (lastPageOrders && lastPageOrders.length > 0) {
+        await this.savePageInfo(newLastPage, lastPageOrders[lastPageOrders.length - 1].id, lastPageOrders[0].id);
+      }
+    }
+
+    console.log(`Found ${newOrders.length} new "En dispatch" orders for ${this.config.storeName}`);
+    return newOrders;
+  }
+
+  /**
+   * Find starting page for first run (scan all pages)
+   */
+  async findStartingPageForFirstRun(lastOrderId: number): Promise<number> {
+    console.log(`Finding optimal starting page for ${this.config.storeName}...`);
+    
+    let left = 1;
+    let right = Math.ceil(20000 / this.BATCH_SIZE);
+    let targetPage = 1;
+
+    while (left <= right) {
+      const mid = Math.floor((left + right) / 2);
+      
+      try {
+        const orders = await this.fetchOrdersPage(mid, this.BATCH_SIZE);
+
+        if (!orders || orders.length === 0) {
+          right = mid - 1;
+          continue;
+        }
+
+        const firstId = orders[0].id;
+        const lastId = orders[orders.length - 1].id;
+
+        console.log(`${this.config.storeName} Page ${mid} ID range: ${firstId} - ${lastId}`);
+
+        if (lastId < lastOrderId) {
+          left = mid + 1;
+        } else if (firstId > lastOrderId) {
+          right = mid - 1;
+          targetPage = mid;
+        } else {
+          targetPage = mid;
+          break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+      } catch (error) {
+        console.error(`Error during binary search for ${this.config.storeName} at page ${mid}:`, error instanceof Error ? error.message : 'Unknown error');
+        break;
+      }
+    }
+
+    const finalPage = targetPage || Math.max(1, right);
+    console.log(`Starting ${this.config.storeName} from calculated page ${finalPage}`);
+    return finalPage;
+  }
+
+  /**
+   * Fetch new orders with any status (for testing/debugging)
+   */
+  async fetchNewOrdersAnyStatus(lastOrderId: number, maxOrders: number = 100): Promise<EcoManagerOrder[]> {
+    const newOrders: EcoManagerOrder[] = [];
     let page = 1;
     let consecutiveEmptyPages = 0;
-    const maxEmptyPages = 5; // Increased to be more thorough
-    let foundNewOrders = false;
+    const maxEmptyPages = 3;
 
-    console.log(`Fetching new "En dispatch" orders for ${this.config.storeName} since ID ${lastOrderId}...`);
+    console.log(`Fetching new orders (any status) for ${this.config.storeName} since ID ${lastOrderId}...`);
 
-    while (consecutiveEmptyPages < maxEmptyPages && page <= 20) { // Reduced pages but more thorough
+    while (consecutiveEmptyPages < maxEmptyPages && newOrders.length < maxOrders) {
       try {
         const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
 
@@ -187,44 +465,40 @@ export class EcoManagerService {
           continue;
         }
 
-        // Filter for "En dispatch" status first
-        const dispatchOrders = orders.filter(order => order.order_state_name === 'En dispatch');
-        
-        // Then filter for orders newer than lastOrderId
-        const filteredOrders = dispatchOrders.filter(order => order.id > lastOrderId);
+        console.log(`${this.config.storeName} Page ${page}: ${orders.length} orders, ID range: ${orders[0].id} - ${orders[orders.length-1].id}`);
+
+        // Show status distribution
+        const statusCounts: { [key: string]: number } = {};
+        orders.forEach(order => {
+          statusCounts[order.order_state_name] = (statusCounts[order.order_state_name] || 0) + 1;
+        });
+        console.log(`${this.config.storeName} Page ${page} statuses:`, statusCounts);
+
+        // Filter for orders newer than lastOrderId (any status)
+        const filteredOrders = orders.filter(order => order.id > lastOrderId);
         
         if (filteredOrders.length > 0) {
           newOrders.push(...filteredOrders);
           consecutiveEmptyPages = 0;
-          foundNewOrders = true;
-          console.log(`Found ${filteredOrders.length} new "En dispatch" orders on page ${page} for ${this.config.storeName}`);
+          console.log(`Found ${filteredOrders.length} new orders (any status) on page ${page} for ${this.config.storeName}`);
         } else {
-          // Check if we have any "En dispatch" orders on this page
-          if (dispatchOrders.length > 0) {
-            console.log(`Found ${dispatchOrders.length} "En dispatch" orders on page ${page}, but all are older than ${lastOrderId}`);
-          }
           consecutiveEmptyPages++;
         }
 
-        // If we found new orders but this page has none, continue a bit more
-        if (foundNewOrders && filteredOrders.length === 0) {
-          consecutiveEmptyPages = Math.min(consecutiveEmptyPages, 2);
+        // Break if we got less than batch size (last page)
+        if (orders.length < this.BATCH_SIZE) {
+          console.log(`Reached last page for ${this.config.storeName}`);
+          break;
         }
 
         page++;
       } catch (error) {
-        console.error(`Error fetching new orders page ${page} for ${this.config.storeName}:`, error);
-        // Don't throw error, just stop fetching more pages
-        console.log(`Stopping sync at page ${page} due to error. Will process ${newOrders.length} orders found so far.`);
+        console.error(`Error fetching orders page ${page} for ${this.config.storeName}:`, error);
         break;
       }
     }
 
-    if (page > 20) {
-      console.log(`Reached maximum page limit (20). Will process ${newOrders.length} orders found so far.`);
-    }
-
-    console.log(`Found ${newOrders.length} new "En dispatch" orders for ${this.config.storeName}`);
+    console.log(`Found ${newOrders.length} new orders (any status) for ${this.config.storeName}`);
     return newOrders;
   }
 
@@ -280,6 +554,33 @@ export class EcoManagerService {
     };
 
     return statusMap[ecoStatus] || 'PENDING';
+  }
+
+  /**
+   * Save page info to cache (like Google Sheets script)
+   */
+  async savePageInfo(lastPage: number, firstId: number, lastId: number): Promise<void> {
+    const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
+    const pageInfo = {
+      lastPage,
+      firstId,
+      lastId,
+      timestamp: new Date().toISOString(),
+      storeName: this.config.storeName
+    };
+
+    await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7); // 7 days
+    console.log(`Saved page info for ${this.config.storeName}:`, pageInfo);
+  }
+
+  /**
+   * Get last page info from cache
+   */
+  async getPageInfo(): Promise<any> {
+    const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
+    const pageData = await this.redis.get(pageInfoKey);
+    
+    return pageData ? JSON.parse(pageData) : null;
   }
 
   /**

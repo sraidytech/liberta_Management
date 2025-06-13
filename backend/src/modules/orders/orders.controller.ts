@@ -48,9 +48,29 @@ export class OrdersController {
       if (search) {
         where.OR = [
           { reference: { contains: search as string, mode: 'insensitive' } },
-          { customer: { fullName: { contains: search as string, mode: 'insensitive' } } },
-          { customer: { telephone: { contains: search as string, mode: 'insensitive' } } },
-          { ecoManagerId: { contains: search as string, mode: 'insensitive' } }
+          { ecoManagerId: { contains: search as string, mode: 'insensitive' } },
+          { trackingNumber: { contains: search as string, mode: 'insensitive' } },
+          { maystroOrderId: { contains: search as string, mode: 'insensitive' } },
+          { customer: {
+              OR: [
+                { fullName: { contains: search as string, mode: 'insensitive' } },
+                { telephone: { contains: search as string, mode: 'insensitive' } },
+                { email: { contains: search as string, mode: 'insensitive' } },
+                { wilaya: { contains: search as string, mode: 'insensitive' } },
+                { commune: { contains: search as string, mode: 'insensitive' } }
+              ]
+            }
+          },
+          { items: {
+              some: {
+                OR: [
+                  { title: { contains: search as string, mode: 'insensitive' } },
+                  { sku: { contains: search as string, mode: 'insensitive' } },
+                  { productId: { contains: search as string, mode: 'insensitive' } }
+                ]
+              }
+            }
+          }
         ];
       }
 
@@ -904,6 +924,118 @@ export class OrdersController {
         success: false,
         error: {
           message: 'Failed to sync orders from all stores'
+        }
+      });
+    }
+  }
+
+  /**
+   * Test sync with any status (for debugging)
+   */
+  async testSyncAnyStatus(req: Request, res: Response) {
+    try {
+      const { storeIdentifier, maxOrders = 50 } = req.body;
+
+      if (!storeIdentifier) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Store identifier is required'
+          }
+        });
+      }
+
+      // Get API configuration for the store
+      const apiConfig = await prisma.apiConfiguration.findUnique({
+        where: { storeIdentifier }
+      });
+
+      if (!apiConfig || !apiConfig.isActive) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Store configuration not found or inactive'
+          }
+        });
+      }
+
+      // Initialize EcoManager service
+      const ecoService = new EcoManagerService({
+        storeName: apiConfig.storeName,
+        storeIdentifier: apiConfig.storeIdentifier,
+        apiToken: apiConfig.apiToken,
+        baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+      }, redis);
+
+      // Test connection first
+      const connectionTest = await ecoService.testConnection();
+      if (!connectionTest) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Failed to connect to EcoManager API'
+          }
+        });
+      }
+
+      // Get the highest EcoManager ID
+      const lastOrderResult = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+        SELECT "ecoManagerId"
+        FROM "orders"
+        WHERE "storeIdentifier" = ${storeIdentifier}
+          AND "source" = 'ECOMANAGER'
+          AND "ecoManagerId" IS NOT NULL
+        ORDER BY CAST("ecoManagerId" AS INTEGER) DESC
+        LIMIT 1
+      `;
+
+      const lastOrderId = lastOrderResult.length > 0 ? parseInt(lastOrderResult[0].ecoManagerId) : 0;
+      console.log(`Last synced EcoManager order ID for ${apiConfig.storeName}: ${lastOrderId}`);
+      
+      // Fetch orders with any status
+      const ecoOrders = await (ecoService as any).fetchNewOrdersAnyStatus(lastOrderId, maxOrders);
+
+      console.log(`Found ${ecoOrders.length} orders with any status for ${apiConfig.storeName}`);
+
+      // Group orders by status
+      const statusGroups: { [key: string]: any[] } = {};
+      ecoOrders.forEach((order: any) => {
+        if (!statusGroups[order.order_state_name]) {
+          statusGroups[order.order_state_name] = [];
+        }
+        statusGroups[order.order_state_name].push(order);
+      });
+
+      const statusSummary = Object.entries(statusGroups).map(([status, orders]) => ({
+        status,
+        count: orders.length,
+        sampleOrders: orders.slice(0, 3).map(o => ({
+          id: o.id,
+          reference: o.reference,
+          customer: o.full_name,
+          total: o.total,
+          created_at: o.created_at
+        }))
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          storeName: apiConfig.storeName,
+          storeIdentifier: apiConfig.storeIdentifier,
+          lastSyncedOrderId: lastOrderId,
+          totalOrdersFound: ecoOrders.length,
+          statusSummary,
+          message: `Found ${ecoOrders.length} orders with various statuses`
+        }
+      });
+
+    } catch (error) {
+      console.error('Test sync any status error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to test sync with any status'
         }
       });
     }

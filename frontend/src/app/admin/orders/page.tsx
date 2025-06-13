@@ -113,7 +113,7 @@ export default function OrdersPage() {
   const [limit, setLimit] = useState(25);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortBy, setSortBy] = useState('orderDate');
   const [sortOrder, setSortOrder] = useState('desc');
 
   // Fetch dashboard stats
@@ -242,6 +242,7 @@ export default function OrdersPage() {
       setSyncing(false);
     }
   };
+
 
   // Test EcoManager integration
   const testEcoManagerIntegration = async () => {
@@ -381,48 +382,6 @@ export default function OrdersPage() {
     }
   };
 
-  // Test Maystro integration
-  const testMaystroIntegration = async () => {
-    try {
-      setSyncing(true);
-      const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      
-      const response = await fetch(`${apiUrl}/api/v1/orders/test-maystro`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        showToast({
-          type: 'success',
-          title: t('success'),
-          message: data.message
-        });
-        
-        // Log detailed results to console for inspection
-        console.log('Maystro Test Results:', data.data);
-      } else {
-        const error = await response.json();
-        showToast({
-          type: 'error',
-          title: t('error'),
-          message: error.error?.message || 'Failed to test Maystro integration'
-        });
-      }
-    } catch (error) {
-      console.error('Error testing Maystro integration:', error);
-      showToast({
-        type: 'error',
-        title: t('error'),
-        message: 'Failed to test Maystro integration'
-      });
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   // Update order status
   const updateOrderStatus = async (orderId: string, status: string, notes?: string) => {
@@ -530,14 +489,6 @@ export default function OrdersPage() {
               className="bg-purple-600 hover:bg-purple-700"
             >
               {syncing ? t('syncing') : t('syncShippingStatus')}
-            </Button>
-            <Button
-              onClick={testMaystroIntegration}
-              disabled={syncing}
-              variant="outline"
-              className="border-purple-600 text-purple-600 hover:bg-purple-50"
-            >
-              {t('testMaystroIntegration')}
             </Button>
           </div>
         </div>
