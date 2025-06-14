@@ -307,7 +307,7 @@ export class EcoManagerService {
   }
 
   /**
-   * Fetch new orders using EXACT Google Sheets strategy
+   * Fetch new orders using OPTIMIZED strategy
    */
   async fetchNewOrders(lastOrderId: number): Promise<EcoManagerOrder[]> {
     const newOrders: EcoManagerOrder[] = [];
@@ -315,24 +315,26 @@ export class EcoManagerService {
     const maxEmptyPages = 3;
 
     console.log(`Fetching new "En dispatch" orders for ${this.config.storeName}...`);
-
-    // Get existing order IDs from database (like Google Sheets)
-    const existingOrderIds = await this.getExistingOrderIds();
+    console.log(`Last synced EcoManager order ID for ${this.config.storeName}: ${lastOrderId}`);
 
     // Get cached page info
     const pageInfo = await this.getPageInfo();
     let currentLastPage = pageInfo?.lastPage || 1;
 
-    // Check pages around cached position (±50 pages like Google Sheets)
-    const startPage = Math.max(1, currentLastPage - 50);
-    const endPage = currentLastPage + 50;
-
-    console.log(`Checking pages ${startPage} to ${endPage} for ${this.config.storeName}...`);
+    // OPTIMIZATION 1: Scan -10 pages backward and forward until max page found
+    const backwardRange = 10;
+    const startPage = Math.max(1, currentLastPage - backwardRange);
+    
+    console.log(`Scanning ${this.config.storeName} from page ${startPage} backward (-10) and forward until max page...`);
 
     let newLastPage = currentLastPage;
+    let foundNewOrders = false;
 
-    // Scan all pages in range (like Google Sheets)
-    for (let page = startPage; page <= endPage; page++) {
+    // OPTIMIZATION 2: Scan forward from current last page until max page found
+    let page = currentLastPage;
+    console.log(`Starting forward scan from page ${page}...`);
+    
+    while (consecutiveEmptyPages < maxEmptyPages) {
       try {
         console.log(`Fetching ${this.config.storeName} page ${page}...`);
         const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
@@ -340,10 +342,11 @@ export class EcoManagerService {
         if (!orders || orders.length === 0) {
           consecutiveEmptyPages++;
           console.log(`Empty page received (${consecutiveEmptyPages}/${maxEmptyPages})`);
-          if (consecutiveEmptyPages >= maxEmptyPages && page > currentLastPage) {
-            console.log(`Stopping scan after ${maxEmptyPages} empty pages`);
+          if (consecutiveEmptyPages >= maxEmptyPages) {
+            console.log(`Stopping forward scan after ${maxEmptyPages} empty pages`);
             break;
           }
+          page++;
           continue;
         }
 
@@ -357,14 +360,12 @@ export class EcoManagerService {
         
         console.log(`Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
 
-        // Filter for "En dispatch" orders that don't exist in database (EXACT Google Sheets logic)
-        const newDispatchOrders = orders.filter(order =>
-          order.order_state_name === 'En dispatch' &&
-          !existingOrderIds.has(order.id) // Check if order ID doesn't exist in database
-        );
+        // OPTIMIZATION 3: Use database query instead of loading all IDs into memory
+        const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
 
         if (newDispatchOrders.length > 0) {
           newOrders.push(...newDispatchOrders);
+          foundNewOrders = true;
           console.log(`Found ${newDispatchOrders.length} new dispatch orders on page ${page}`);
           
           // Show details of found orders
@@ -377,8 +378,47 @@ export class EcoManagerService {
         await this.savePageInfo(page, firstId, lastId);
 
         await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+        page++;
       } catch (error) {
         console.error(`Error fetching page ${page}:`, error);
+        page++;
+        continue;
+      }
+    }
+
+    // OPTIMIZATION 4: Always scan backward 10 pages from current last page
+    console.log(`Scanning backward from page ${currentLastPage - 1} to ${startPage}...`);
+    
+    for (let backPage = currentLastPage - 1; backPage >= startPage; backPage--) {
+      try {
+        console.log(`Fetching ${this.config.storeName} page ${backPage}...`);
+        const orders = await this.fetchOrdersPage(backPage, this.BATCH_SIZE);
+
+        if (!orders || orders.length === 0) {
+          continue;
+        }
+
+        const firstId = orders[0].id;
+        const lastId = orders[orders.length - 1].id;
+        
+        console.log(`Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
+
+        const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
+
+        if (newDispatchOrders.length > 0) {
+          newOrders.push(...newDispatchOrders);
+          foundNewOrders = true;
+          console.log(`Found ${newDispatchOrders.length} new dispatch orders on page ${backPage}`);
+          
+          // Show details of found orders
+          newDispatchOrders.forEach(order => {
+            console.log(`  - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
+          });
+        }
+
+        await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+      } catch (error) {
+        console.error(`Error fetching page ${backPage}:`, error);
         continue;
       }
     }
@@ -394,6 +434,34 @@ export class EcoManagerService {
 
     console.log(`Found ${newOrders.length} new "En dispatch" orders for ${this.config.storeName}`);
     return newOrders;
+  }
+
+  /**
+   * OPTIMIZATION 3: Filter new dispatch orders using database queries instead of loading all IDs
+   */
+  private async filterNewDispatchOrders(orders: EcoManagerOrder[], lastOrderId: number): Promise<EcoManagerOrder[]> {
+    // Filter for "En dispatch" orders first
+    const dispatchOrders = orders.filter(order => order.order_state_name === 'En dispatch');
+    
+    if (dispatchOrders.length === 0) {
+      return [];
+    }
+
+    // Get the IDs of these specific orders from database
+    const orderIds = dispatchOrders.map(order => order.id.toString());
+    
+    const existingOrders = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+      SELECT "ecoManagerId"
+      FROM "orders"
+      WHERE "storeIdentifier" = ${this.config.storeIdentifier}
+        AND "source" = 'ECOMANAGER'
+        AND "ecoManagerId" = ANY(${orderIds})
+    `;
+
+    const existingIds = new Set(existingOrders.map(order => order.ecoManagerId));
+
+    // Return orders that don't exist in database
+    return dispatchOrders.filter(order => !existingIds.has(order.id.toString()));
   }
 
   /**

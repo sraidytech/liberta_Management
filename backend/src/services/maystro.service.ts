@@ -39,9 +39,9 @@ export class MaystroService {
   private axiosInstance: any;
   private redis: Redis;
   private config: MaystroConfig;
-  private readonly RATE_LIMIT_DELAY = 100; // 100ms between requests
+  private readonly RATE_LIMIT_DELAY = 50; // 50ms between requests for faster processing
   private readonly MAX_RETRIES = 3;
-  private readonly BATCH_SIZE = 250; // Maystro supports up to 250 per page
+  private readonly BATCH_SIZE = 20; // Use default page size as per API docs (20 orders per page)
 
   // Status mapping from Maystro API documentation
   private readonly STATUS_MAPPING: { [key: number]: string } = {
@@ -75,7 +75,7 @@ export class MaystroService {
         'Accept': 'application/json',
         'Content-Type': 'application/json'
       },
-      timeout: 30000 // 30 seconds timeout
+      timeout: 120000 // 2 minutes timeout for large fetches
     });
 
     // Add request interceptor for rate limiting
@@ -111,15 +111,17 @@ export class MaystroService {
   }
 
   /**
-   * Fetch orders from Maystro API with pagination
+   * Fetch orders from Maystro API with pagination - OPTIMIZED for API docs format
    */
-  async fetchOrders(limit: number = 250, nextUrl?: string): Promise<{
+  async fetchOrders(page: number = 1, nextUrl?: string): Promise<{
     orders: MaystroOrder[];
     nextUrl?: string;
     totalCount: number;
+    currentPage: number;
   }> {
     try {
-      const url = nextUrl || `/api/stores/orders/?limit=${limit}`;
+      // Use nextUrl if provided, otherwise construct URL with page parameter
+      const url = nextUrl || `/api/stores/orders/?page=${page}`;
       
       console.log(`🔄 Fetching Maystro orders from: ${url}`);
       
@@ -133,7 +135,8 @@ export class MaystroService {
       return {
         orders: data.list.results,
         nextUrl: data.list.next,
-        totalCount: data.list.count || 0
+        totalCount: data.list.count || 0,
+        currentPage: page
       };
     } catch (error: any) {
       console.error('❌ Error fetching Maystro orders:', error.message);
@@ -146,34 +149,64 @@ export class MaystroService {
   }
 
   /**
-   * Fetch all orders with pagination
+   * Fetch all orders with CONCURRENT pagination - SUPER FAST
    */
-  async fetchAllOrders(maxOrders: number = 5000): Promise<MaystroOrder[]> {
-    let allOrders: MaystroOrder[] = [];
-    let nextUrl: string | undefined;
-    let fetchedCount = 0;
+  async fetchAllOrders(maxOrders: number = 3000): Promise<MaystroOrder[]> {
+    const maxPages = Math.ceil(maxOrders / 20); // 20 orders per page
+    const concurrency = 10; // Fetch 10 pages concurrently
+    
+    console.log(`🚀 Starting CONCURRENT fetch of up to ${maxOrders} Maystro orders (${maxPages} pages, ${concurrency} concurrent)...`);
 
     try {
-      do {
-        const result = await this.fetchOrders(this.BATCH_SIZE, nextUrl);
-        allOrders = allOrders.concat(result.orders);
-        nextUrl = result.nextUrl;
-        fetchedCount += result.orders.length;
-
-        console.log(`📦 Fetched ${fetchedCount} orders from Maystro so far...`);
-
-        // Rate limiting
-        if (nextUrl) {
-          await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+      const allOrders: MaystroOrder[] = [];
+      
+      // Process pages in batches of 10 concurrent requests
+      for (let batchStart = 1; batchStart <= maxPages; batchStart += concurrency) {
+        const batchEnd = Math.min(batchStart + concurrency - 1, maxPages);
+        const pagePromises: Promise<any>[] = [];
+        
+        // Create concurrent requests for this batch
+        for (let page = batchStart; page <= batchEnd; page++) {
+          pagePromises.push(
+            this.fetchOrders(page).catch(error => {
+              console.log(`⚠️  Page ${page} failed: ${error.message}`);
+              return { orders: [], currentPage: page }; // Return empty on error
+            })
+          );
         }
+        
+        // Wait for all pages in this batch
+        console.log(`📦 Fetching pages ${batchStart}-${batchEnd} concurrently...`);
+        const batchResults = await Promise.all(pagePromises);
+        
+        // Collect orders from successful pages
+        let batchOrderCount = 0;
+        batchResults.forEach(result => {
+          if (result.orders && result.orders.length > 0) {
+            allOrders.push(...result.orders);
+            batchOrderCount += result.orders.length;
+          }
+        });
+        
+        console.log(`✅ Batch ${Math.ceil(batchStart/concurrency)} complete: ${batchOrderCount} orders (Total: ${allOrders.length})`);
+        
+        // Break if we have enough orders
+        if (allOrders.length >= maxOrders) {
+          break;
+        }
+        
+        // Small delay between batches to be nice to the API
+        if (batchEnd < maxPages) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
 
-      } while (nextUrl && allOrders.length < maxOrders);
-
-      console.log(`✅ Total Maystro orders fetched: ${allOrders.length}`);
-      return allOrders.slice(0, maxOrders);
+      const finalOrders = allOrders.slice(0, maxOrders);
+      console.log(`🎉 CONCURRENT fetch complete: ${finalOrders.length} orders in ~${Math.ceil(maxPages/concurrency)} batches`);
+      return finalOrders;
 
     } catch (error: any) {
-      console.error('❌ Error in fetchAllOrders:', error.message);
+      console.error('❌ Error in concurrent fetchAllOrders:', error.message);
       throw error;
     }
   }
@@ -459,6 +492,164 @@ export class MaystroService {
     } catch (error: any) {
       console.error('❌ Error in syncShippingStatus:', error.message);
       throw error;
+    }
+  }
+
+  /**
+   * Sync orders from Maystro to database - SUPER FAST with concurrent fetching
+   */
+  async syncOrders(): Promise<{ success: boolean; message: string; stats?: any }> {
+    const startTime = Date.now();
+    console.log('🚀 Starting SUPER FAST Maystro order sync...');
+
+    try {
+      // Step 1: Fetch orders from Maystro API (CONCURRENT - much faster!)
+      console.log('📡 Fetching orders from Maystro API with concurrent requests...');
+      const maystroOrders = await this.fetchAllOrders(3000); // Reduced to 3000 for speed
+      
+      if (maystroOrders.length === 0) {
+        return {
+          success: true,
+          message: 'No orders found in Maystro API',
+          stats: { processed: 0, created: 0, updated: 0, duration: Date.now() - startTime }
+        };
+      }
+
+      console.log(`📦 Retrieved ${maystroOrders.length} orders from Maystro in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
+
+      // Step 2: Get existing orders from database (optimized query)
+      console.log('🔍 Checking existing orders in database...');
+      const dbStartTime = Date.now();
+      
+      // Only get orders from last 30 days to speed up query
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const existingOrders = await prisma.order.findMany({
+        select: {
+          maystroOrderId: true,
+          id: true
+        },
+        where: {
+          maystroOrderId: { not: null },
+          createdAt: { gte: thirtyDaysAgo } // Only recent orders
+        }
+      });
+
+      // Create a Map for O(1) lookup performance
+      const existingOrderMap = new Map(
+        existingOrders.map((order: any) => [order.maystroOrderId, order.id])
+      );
+
+      console.log(`💾 Found ${existingOrders.length} existing recent Maystro orders in ${((Date.now() - dbStartTime) / 1000).toFixed(1)}s`);
+
+      // Step 3: Process orders efficiently
+      const ordersToCreate: any[] = [];
+      const ordersToUpdate: any[] = [];
+
+      for (const maystroOrder of maystroOrders) {
+        const existingOrderId = existingOrderMap.get(maystroOrder.instance_uuid || maystroOrder.id);
+        
+        if (existingOrderId) {
+          // Update existing order - only update Maystro-specific fields
+          ordersToUpdate.push({
+            id: existingOrderId,
+            maystroOrderId: maystroOrder.instance_uuid || maystroOrder.id,
+            shippingStatus: this.mapStatus(maystroOrder.status),
+            trackingNumber: maystroOrder.tracking_number || maystroOrder.display_id,
+            alertedAt: maystroOrder.alerted_at ? new Date(maystroOrder.alerted_at) : null,
+            alertReason: maystroOrder.alert_reason,
+            abortReason: maystroOrder.abort_reason,
+            additionalMetaData: {
+              maystro_id: maystroOrder.id,
+              instance_uuid: maystroOrder.instance_uuid,
+              display_id: maystroOrder.display_id,
+              customer_name: maystroOrder.customer_name,
+              customer_phone: maystroOrder.customer_phone,
+              destination_text: maystroOrder.destination_text,
+              product_name: maystroOrder.product_name,
+              product_price: maystroOrder.product_price,
+              commune: maystroOrder.commune,
+              wilaya: maystroOrder.wilaya,
+              commune_name: maystroOrder.commune_name
+            },
+            updatedAt: new Date()
+          });
+        } else {
+          // Skip creating new orders - we only sync existing ones for Maystro
+          console.log(`⚠️ Skipping new order creation for ${maystroOrder.external_order_id} - order must exist first`);
+        }
+      }
+
+      // Step 4: Update existing orders ONLY (SUPER FAST)
+      let updatedCount = 0;
+      const saveStartTime = Date.now();
+
+      if (ordersToUpdate.length > 0) {
+        console.log(`🔄 Updating ${ordersToUpdate.length} existing orders with status, alerts, and tracking...`);
+        
+        // Process updates concurrently in batches of 50 for optimal performance
+        const batchSize = 50;
+        const updatePromises: Promise<any>[] = [];
+        
+        for (let i = 0; i < ordersToUpdate.length; i += batchSize) {
+          const batch = ordersToUpdate.slice(i, i + batchSize);
+          
+          const batchPromises = batch.map(orderUpdate =>
+            prisma.order.update({
+              where: { id: orderUpdate.id },
+              data: {
+                shippingStatus: orderUpdate.shippingStatus,
+                trackingNumber: orderUpdate.trackingNumber,
+                alertedAt: orderUpdate.alertedAt,
+                alertReason: orderUpdate.alertReason,
+                abortReason: orderUpdate.abortReason,
+                additionalMetaData: orderUpdate.additionalMetaData,
+                updatedAt: orderUpdate.updatedAt
+              }
+            }).then(() => {
+              updatedCount++;
+            }).catch(error => {
+              console.error(`❌ Error updating order ${orderUpdate.id}:`, error.message);
+            })
+          );
+          
+          updatePromises.push(...batchPromises);
+        }
+        
+        // Wait for all updates to complete
+        await Promise.all(updatePromises);
+        console.log(`💾 Database updates completed in ${((Date.now() - saveStartTime) / 1000).toFixed(1)}s`);
+      } else {
+        console.log(`ℹ️ No orders to update`);
+      }
+
+      const duration = Date.now() - startTime;
+      const stats = {
+        processed: maystroOrders.length,
+        updated: updatedCount,
+        duration: duration
+      };
+
+      console.log(`🎉 SUPER FAST Maystro sync completed in ${(duration / 1000).toFixed(1)}s`);
+      console.log(`📊 Stats: ${stats.processed} processed, ${stats.updated} updated`);
+
+      return {
+        success: true,
+        message: `Successfully synced ${stats.processed} Maystro orders (${stats.updated} updated) in ${(duration / 1000).toFixed(1)}s`,
+        stats
+      };
+
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
+      console.error('❌ Maystro sync failed:', error.message);
+      console.error(`⏱️  Failed after ${(duration / 1000).toFixed(1)}s`);
+      
+      return {
+        success: false,
+        message: `Maystro sync failed: ${error.message}`,
+        stats: { duration }
+      };
     }
   }
 

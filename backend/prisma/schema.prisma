@@ -201,6 +201,7 @@ model ApiConfiguration {
   storeName     String
   storeIdentifier String @unique
   apiToken      String
+  baseUrl       String
   isActive      Boolean  @default(true)
   requestCount  Int      @default(0)
   lastUsed      DateTime?

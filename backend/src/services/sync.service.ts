@@ -108,7 +108,7 @@ export class SyncService {
       storeName: apiConfig.storeName,
       storeIdentifier: apiConfig.storeIdentifier,
       apiToken: apiConfig.apiToken,
-      baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+      baseUrl: (apiConfig as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
     }, this.redis);
 
     // Test connection
@@ -211,7 +211,7 @@ export class SyncService {
         storeName: config.storeName,
         storeIdentifier: config.storeIdentifier,
         apiToken: '', // Not needed for status check
-        baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: (config as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
       }, this.redis);
 
       const lastSyncStatus = await ecoService.getLastSyncStatus();
@@ -258,7 +258,7 @@ export class SyncService {
         storeName: apiConfig.storeName,
         storeIdentifier: apiConfig.storeIdentifier,
         apiToken: apiConfig.apiToken,
-        baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: (apiConfig as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
       }, this.redis);
 
       // Delete existing orders for this store

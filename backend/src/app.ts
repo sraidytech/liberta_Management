@@ -19,6 +19,7 @@ import customerRoutes from '@/modules/customers/customers.routes';
 import webhookRoutes from '@/modules/webhooks/webhooks.routes';
 import notificationRoutes from '@/modules/notifications/notifications.routes';
 import analyticsRoutes from '@/modules/analytics/analytics.routes';
+import storesRoutes from '@/modules/stores/stores.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -100,6 +101,7 @@ class App {
     this.app.use('/api/v1/webhooks', webhookRoutes); // No auth for webhooks
     this.app.use('/api/v1/notifications', authMiddleware, notificationRoutes);
     this.app.use('/api/v1/analytics', authMiddleware, analyticsRoutes);
+    this.app.use('/api/v1/stores', authMiddleware, storesRoutes);
 
     // Root route
     this.app.get('/', (req, res) => {
