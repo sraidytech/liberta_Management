@@ -4,6 +4,8 @@ import jwt from 'jsonwebtoken';
 import { config } from '@/config/app';
 import prisma from '@/config/database';
 import { LoginRequest, RegisterRequest, AuthResponse } from '@/types';
+import { AgentAssignmentService } from '@/services/agent-assignment.service';
+import redis from '@/config/redis';
 
 class AuthController {
   async login(req: Request, res: Response): Promise<void> {
@@ -69,6 +71,18 @@ class AuthController {
         config.jwtSecret,
         { expiresIn: '24h' }
       );
+
+      // If user is AGENT_SUIVI, mark them as active for assignments
+      if (user.role === 'AGENT_SUIVI') {
+        try {
+          const assignmentService = new AgentAssignmentService(redis);
+          await assignmentService.markAgentAsActive(user.id);
+          console.log(`✅ Agent ${user.name || user.agentCode || user.email} marked as active for assignments`);
+        } catch (error) {
+          console.error('Error marking agent as active:', error);
+          // Don't fail login if this fails
+        }
+      }
 
       const { password: _, ...userWithoutPassword } = user;
 

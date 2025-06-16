@@ -1,16 +1,17 @@
 'use client';
 
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Users, 
-  ShoppingCart, 
-  Store, 
-  BarChart3, 
-  Settings, 
+import {
+  Users,
+  ShoppingCart,
+  Store,
+  BarChart3,
+  Settings,
   Bell,
   Search,
   Menu,
@@ -18,7 +19,8 @@ import {
   LogOut,
   User,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  UserCheck
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -27,6 +29,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const { t, language } = useLanguage();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const pathname = usePathname();
@@ -55,6 +58,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Store,
       href: '/admin/stores',
       active: pathname === '/admin/stores'
+    },
+    {
+      name: language === 'fr' ? 'Attribution des Agents' : 'Agent Assignment',
+      icon: UserCheck,
+      href: '/admin/assignments',
+      active: pathname === '/admin/assignments'
     },
     {
       name: language === 'fr' ? 'Paramètres' : 'Settings',
@@ -151,7 +160,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     <p className="text-sm font-semibold text-gray-900 truncate">Admin</p>
                     <p className="text-xs text-gray-500 truncate">contact@libertaphoenix.com</p>
                   </div>
-                  <button className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors">
+                  <button
+                    onClick={logout}
+                    className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
+                    title="Logout"
+                  >
                     <LogOut className="w-4 h-4" />
                   </button>
                 </>

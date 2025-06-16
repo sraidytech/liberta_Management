@@ -9,6 +9,7 @@ import { config, validateConfig } from '@/config/app';
 import { connectDatabase } from '@/config/database';
 import redis from '@/config/redis';
 import { SyncService } from '@/services/sync.service';
+import { AgentAssignmentService } from '@/services/agent-assignment.service';
 
 // Import routes
 import authRoutes from '@/modules/auth/auth.routes';
@@ -20,6 +21,7 @@ import webhookRoutes from '@/modules/webhooks/webhooks.routes';
 import notificationRoutes from '@/modules/notifications/notifications.routes';
 import analyticsRoutes from '@/modules/analytics/analytics.routes';
 import storesRoutes from '@/modules/stores/stores.routes';
+import assignmentRoutes from '@/modules/assignments/assignment.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -31,6 +33,7 @@ class App {
   public server: any;
   public io: Server;
   private syncService!: SyncService;
+  private assignmentService!: AgentAssignmentService;
 
   constructor() {
     this.app = express();
@@ -48,6 +51,7 @@ class App {
     this.initializeErrorHandling();
     this.initializeSocketIO();
     this.initializeSyncService();
+    this.initializeAssignmentService();
   }
 
   private initializeMiddlewares(): void {
@@ -102,6 +106,7 @@ class App {
     this.app.use('/api/v1/notifications', authMiddleware, notificationRoutes);
     this.app.use('/api/v1/analytics', authMiddleware, analyticsRoutes);
     this.app.use('/api/v1/stores', authMiddleware, storesRoutes);
+    this.app.use('/api/v1/assignments', authMiddleware, assignmentRoutes);
 
     // Root route
     this.app.get('/', (req, res) => {
@@ -128,10 +133,17 @@ class App {
         console.log(`👤 User ${userId} joined their room`);
       });
 
-      // Join agents to agent room
-      socket.on('join_agents', () => {
+      // Join agents to agent room with activity tracking
+      socket.on('join_agents', async (data: { userId: string, role: string }) => {
         socket.join('agents');
-        console.log(`👥 Agent joined agents room`);
+        
+        // Track agent activity if they're AGENT_SUIVI
+        if (data.role === 'AGENT_SUIVI' && this.assignmentService) {
+          await this.assignmentService.updateAgentActivity(data.userId, socket.id);
+          console.log(`👥 AGENT_SUIVI ${data.userId} joined and marked as online`);
+        } else {
+          console.log(`👥 Agent ${data.userId} joined agents room`);
+        }
       });
 
       // Join managers to manager room
@@ -140,8 +152,54 @@ class App {
         console.log(`👔 Manager joined managers room`);
       });
 
-      socket.on('disconnect', () => {
+      // Handle agent activity updates
+      socket.on('agent_activity', async (userId: string) => {
+        if (this.assignmentService) {
+          await this.assignmentService.updateAgentActivity(userId);
+        }
+      });
+
+      // Handle manual assignment requests
+      socket.on('request_assignment', async (data: { managerId: string }) => {
+        try {
+          if (this.assignmentService) {
+            const result = await this.assignmentService.autoAssignUnassignedOrders();
+            
+            // Notify managers about assignment results
+            this.io.to('managers').emit('assignment_completed', {
+              managerId: data.managerId,
+              result: result
+            });
+            
+            // Notify agents about new assignments
+            this.io.to('agents').emit('new_assignments', {
+              count: result.successfulAssignments
+            });
+          }
+        } catch (error) {
+          console.error('Manual assignment error:', error);
+          this.io.to(`user_${data.managerId}`).emit('assignment_error', {
+            message: 'Failed to assign orders'
+          });
+        }
+      });
+
+      socket.on('disconnect', async () => {
         console.log(`🔌 User disconnected: ${socket.id}`);
+        
+        // Find which agent disconnected and mark them offline
+        if (this.assignmentService) {
+          const agentKeys = await redis.keys('socket:agent:*');
+          for (const key of agentKeys) {
+            const storedSocketId = await redis.get(key);
+            if (storedSocketId === socket.id) {
+              const agentId = key.replace('socket:agent:', '');
+              await this.assignmentService.setAgentOffline(agentId);
+              console.log(`👥 AGENT_SUIVI ${agentId} marked as offline`);
+              break;
+            }
+          }
+        }
       });
     });
 
@@ -165,6 +223,33 @@ class App {
 
     // Make sync service available globally for manual triggers
     (global as any).syncService = this.syncService;
+  }
+
+  private initializeAssignmentService(): void {
+    this.assignmentService = new AgentAssignmentService(redis);
+    
+    // Make assignment service available globally
+    (global as any).assignmentService = this.assignmentService;
+    
+    // Start periodic assignment check (every 5 minutes)
+    setInterval(async () => {
+      try {
+        const result = await this.assignmentService.autoAssignUnassignedOrders();
+        if (result.successfulAssignments > 0) {
+          console.log(`🎯 Periodic assignment: ${result.successfulAssignments} orders assigned`);
+          
+          // Notify agents about new assignments
+          this.io.to('agents').emit('new_assignments', {
+            count: result.successfulAssignments,
+            source: 'periodic'
+          });
+        }
+      } catch (error) {
+        console.error('Periodic assignment error:', error);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    console.log('🎯 Agent assignment service initialized');
   }
 
   public async start(): Promise<void> {

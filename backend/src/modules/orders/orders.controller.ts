@@ -219,7 +219,7 @@ export class OrdersController {
   async updateOrderStatus(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { status, notes } = req.body;
+      const { status, notes, noteType, customNote } = req.body;
       const userId = (req as any).user?.id;
 
       if (!status) {
@@ -256,12 +256,38 @@ export class OrdersController {
         });
       }
 
+      // Prepare structured notes
+      let structuredNotes = null;
+      if (notes || noteType || customNote) {
+        // Get existing notes or initialize empty array
+        const existingNotes = existingOrder.notes ? JSON.parse(existingOrder.notes) : [];
+        
+        // Create new note entry
+        const newNote = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          agentId: userId,
+          agentName: (req as any).user?.name || 'Unknown Agent',
+          type: noteType || 'CUSTOM',
+          note: notes || customNote || '',
+          statusChange: {
+            from: existingOrder.status,
+            to: status
+          }
+        };
+        
+        // Add new note to existing notes
+        existingNotes.push(newNote);
+        structuredNotes = JSON.stringify(existingNotes);
+      }
+
       // Update order
       const updatedOrder = await prisma.order.update({
         where: { id },
         data: {
           status,
-          ...(notes && { internalNotes: notes }),
+          ...(structuredNotes && { notes: structuredNotes }),
+          ...(notes && { internalNotes: notes }), // Keep backward compatibility
           updatedAt: new Date()
         },
         include: {

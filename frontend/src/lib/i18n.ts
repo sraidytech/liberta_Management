@@ -134,6 +134,43 @@ export interface Translations {
   trackingNumber: string;
   syncShippingStatus: string;
   testMaystroIntegration: string;
+  
+  // Agent Dashboard
+  agentDashboard: string;
+  manageAssignedOrders: string;
+  agentAssignedOrders: string;
+  agentPendingOrders: string;
+  completedToday: string;
+  capacity: string;
+  myAssignedOrders: string;
+  noOrdersAssigned: string;
+  ordersWillAppearHere: string;
+  refresh: string;
+  startProcessing: string;
+  confirmOrder: string;
+  cancelOrder: string;
+  close: string;
+  reference: string;
+  wilaya: string;
+  commune: string;
+  qty: string;
+  
+  // Additional Agent Interface
+  editStatus: string;
+  allStatus: string;
+  
+  // Manual Assignment
+  assign: string;
+  reassign: string;
+  assignOrder: string;
+  selectAgent: string;
+  noAgentsAvailable: string;
+  agentOnline: string;
+  agentOffline: string;
+  agentCapacity: string;
+  todaysOrders: string;
+  orderAssignedSuccessfully: string;
+  failedToAssignOrder: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -271,6 +308,43 @@ export const translations: Record<Language, Translations> = {
     trackingNumber: 'Tracking Number',
     syncShippingStatus: 'Sync Shipping Status',
     testMaystroIntegration: 'Test Maystro Integration',
+    
+    // Agent Dashboard
+    agentDashboard: 'Agent Dashboard',
+    manageAssignedOrders: 'Manage your assigned orders',
+    agentAssignedOrders: 'Assigned Orders',
+    agentPendingOrders: 'Pending Orders',
+    completedToday: 'Completed Today',
+    capacity: 'Capacity',
+    myAssignedOrders: 'My Assigned Orders',
+    noOrdersAssigned: 'No orders assigned yet',
+    ordersWillAppearHere: 'Orders will appear here when assigned to you',
+    refresh: 'Refresh',
+    startProcessing: 'Start Processing',
+    confirmOrder: 'Confirm Order',
+    cancelOrder: 'Cancel Order',
+    close: 'Close',
+    reference: 'Reference',
+    wilaya: 'Wilaya',
+    commune: 'Commune',
+    qty: 'Qty',
+    
+    // Additional Agent Interface
+    editStatus: 'Edit Status',
+    allStatus: 'All Status',
+    
+    // Manual Assignment
+    assign: 'Assign',
+    reassign: 'Reassign',
+    assignOrder: 'Assign Order',
+    selectAgent: 'Select an agent to assign this order',
+    noAgentsAvailable: 'No agents available',
+    agentOnline: 'Online',
+    agentOffline: 'Offline',
+    agentCapacity: 'capacity',
+    todaysOrders: 'Today',
+    orderAssignedSuccessfully: 'Order assigned successfully',
+    failedToAssignOrder: 'Failed to assign order',
   },
   fr: {
     // Common
@@ -406,6 +480,43 @@ export const translations: Record<Language, Translations> = {
     trackingNumber: 'Numéro de Suivi',
     syncShippingStatus: 'Synchroniser Statut de Livraison',
     testMaystroIntegration: 'Tester Intégration Maystro',
+    
+    // Agent Dashboard
+    agentDashboard: 'Tableau de Bord Agent',
+    manageAssignedOrders: 'Gérez vos commandes assignées',
+    agentAssignedOrders: 'Commandes Assignées',
+    agentPendingOrders: 'Commandes En Attente',
+    completedToday: 'Terminées Aujourd\'hui',
+    capacity: 'Capacité',
+    myAssignedOrders: 'Mes Commandes Assignées',
+    noOrdersAssigned: 'Aucune commande assignée pour le moment',
+    ordersWillAppearHere: 'Les commandes apparaîtront ici quand elles vous seront assignées',
+    refresh: 'Actualiser',
+    startProcessing: 'Commencer le Traitement',
+    confirmOrder: 'Confirmer la Commande',
+    cancelOrder: 'Annuler la Commande',
+    close: 'Fermer',
+    reference: 'Référence',
+    wilaya: 'Wilaya',
+    commune: 'Commune',
+    qty: 'Qté',
+    
+    // Additional Agent Interface
+    editStatus: 'Modifier Statut',
+    allStatus: 'Tous Statuts',
+    
+    // Manual Assignment
+    assign: 'Assigner',
+    reassign: 'Réassigner',
+    assignOrder: 'Assigner Commande',
+    selectAgent: 'Sélectionner un agent pour assigner cette commande',
+    noAgentsAvailable: 'Aucun agent disponible',
+    agentOnline: 'En ligne',
+    agentOffline: 'Hors ligne',
+    agentCapacity: 'capacité',
+    todaysOrders: 'Aujourd\'hui',
+    orderAssignedSuccessfully: 'Commande assignée avec succès',
+    failedToAssignOrder: 'Échec de l\'assignation de la commande',
   },
 };
 

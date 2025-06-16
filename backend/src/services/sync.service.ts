@@ -1,15 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { EcoManagerService } from './ecomanager.service';
+import { AgentAssignmentService } from './agent-assignment.service';
 
 const prisma = new PrismaClient();
 
 export class SyncService {
   private redis: Redis;
   private isRunning: boolean = false;
+  private assignmentService: AgentAssignmentService;
 
   constructor(redis: Redis) {
     this.redis = redis;
+    this.assignmentService = new AgentAssignmentService(redis);
   }
 
   /**
@@ -148,10 +151,20 @@ export class SyncService {
           if (!existingOrder) {
             // Create new order
             const orderData = ecoService.mapOrderToDatabase(ecoOrder);
-            await prisma.order.create({
+            const newOrder = await prisma.order.create({
               data: orderData
             });
             syncedCount++;
+
+            // Attempt to assign the new order immediately
+            try {
+              const assignmentResult = await this.assignmentService.assignOrder(newOrder.id);
+              if (assignmentResult.success) {
+                console.log(`✅ Order ${newOrder.reference} assigned to ${assignmentResult.assignedAgentName}`);
+              }
+            } catch (assignmentError) {
+              console.log(`⚠️ Could not assign order ${newOrder.reference} immediately, will be picked up by periodic assignment`);
+            }
           }
         } catch (orderError) {
           console.error(`Error processing order ${ecoOrder.id}:`, orderError);
@@ -281,10 +294,20 @@ export class SyncService {
         for (const ecoOrder of batch) {
           try {
             const orderData = ecoService.mapOrderToDatabase(ecoOrder);
-            await prisma.order.create({
+            const newOrder = await prisma.order.create({
               data: orderData
             });
             syncedCount++;
+
+            // Attempt to assign the new order immediately
+            try {
+              const assignmentResult = await this.assignmentService.assignOrder(newOrder.id);
+              if (assignmentResult.success) {
+                console.log(`✅ Order ${newOrder.reference} assigned to ${assignmentResult.assignedAgentName}`);
+              }
+            } catch (assignmentError) {
+              console.log(`⚠️ Could not assign order ${newOrder.reference} immediately`);
+            }
           } catch (orderError) {
             console.error(`Error processing order ${ecoOrder.id}:`, orderError);
             errorCount++;

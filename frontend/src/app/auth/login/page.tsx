@@ -2,6 +2,7 @@
 
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Mail, Lock, Sparkles, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
@@ -9,7 +10,7 @@ import { useState } from 'react';
 
 export default function LoginPage() {
   const { t } = useLanguage();
-  const router = useRouter();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,37 +23,15 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error?.message || 'Login failed');
-      }
-
-      if (data.success) {
-        // Store the token
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        
-        // Redirect based on role
-        if (data.data.user.role === 'ADMIN') {
-          router.push('/admin');
-        } else {
-          router.push('/dashboard');
-        }
-      } else {
-        throw new Error(data.error?.message || 'Login failed');
+      console.log('🔐 Attempting login...');
+      const success = await login(email, password);
+      
+      if (!success) {
+        setError('Invalid email or password');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.message || 'An error occurred during login');
+      console.error('❌ Login error:', error);
+      setError('Network error. Please try again.');
     } finally {
       setIsLoading(false);
     }
