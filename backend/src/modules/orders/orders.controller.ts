@@ -260,7 +260,21 @@ export class OrdersController {
       let structuredNotes = null;
       if (notes || noteType || customNote) {
         // Get existing notes or initialize empty array
-        const existingNotes = existingOrder.notes ? JSON.parse(existingOrder.notes) : [];
+        let existingNotes = [];
+        if (existingOrder.notes) {
+          try {
+            // Try to parse as JSON (new format)
+            existingNotes = JSON.parse(existingOrder.notes);
+            // Ensure it's an array
+            if (!Array.isArray(existingNotes)) {
+              existingNotes = [];
+            }
+          } catch (e) {
+            // If parsing fails, it's legacy text format - start fresh with empty array
+            // Legacy notes will not be migrated to maintain clean agent-only history
+            existingNotes = [];
+          }
+        }
         
         // Create new note entry
         const newNote = {

@@ -373,162 +373,151 @@ export function OrderDetailsModal({ order, isOpen, onClose, onStatusUpdate }: Or
                 </div>
               </Card>
 
-              {/* Agent Notes History Section */}
-              {order.notes && (
-                <Card className="p-6 lg:col-span-2">
-                  <div className="flex items-center mb-4">
-                    <User className="w-5 h-5 text-purple-600 mr-2" />
-                    <h3 className="text-lg font-semibold">Agent Notes & History</h3>
-                  </div>
-                  
-                  <div className="space-y-3 max-h-60 overflow-y-auto">
-                    {(() => {
-                      try {
-                        const notesHistory = JSON.parse(order.notes);
-                        const noteOptions = [
-                          { value: 'CLIENT_NO_RESPONSE_1', label: 'Client (PAS DE REPONSE 1)' },
-                          { value: 'CLIENT_NO_RESPONSE_2', label: 'Client (PAS DE REPONSE 2)' },
-                          { value: 'CLIENT_NO_RESPONSE_3', label: 'Client (PAS DE REPONSE 3)' },
-                          { value: 'CLIENT_NO_RESPONSE_4_SMS', label: 'Client (PAS DE REPONSE 4+SMS)' },
-                          { value: 'CLIENT_POSTPONED', label: 'CLIENT (REPORTER)' },
-                          { value: 'CLIENT_CANCELLED', label: 'CLIENT (ANNULE)' },
-                          { value: 'RELAUNCHED', label: 'Relancé' },
-                          { value: 'REFUND', label: 'Remboursement' },
-                          { value: 'EXCHANGE', label: 'Echange' },
-                          { value: 'POSTPONED_TO_DATE', label: 'Reporté à une date' },
-                          { value: 'APPROVED_TO_DATE', label: 'Approuvé à une date' },
-                          { value: 'PROBLEM_CLIENT_DELIVERY', label: 'Problem (client / livreur)' },
-                          { value: 'PROBLEM_ORDER', label: 'Problem (commande)' },
-                          { value: 'DELIVERED_PENDING', label: 'Livrée (en attente de finalisation)' },
-                          { value: 'CUSTOM', label: 'Note personnalisée' }
-                        ];
-                        
-                        return notesHistory
-                          .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-                          .map((note: any, index: number) => (
-                          <div key={note.id || index} className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-l-4 border-purple-500 shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
-                              <div className="flex items-center space-x-2">
-                                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                                  <User className="w-4 h-4 text-purple-600" />
-                                </div>
-                                <div>
-                                  <span className="text-sm font-semibold text-purple-700">
-                                    {note.agentName || 'Agent'}
-                                  </span>
-                                  <div className="text-xs text-gray-500">
-                                    {new Date(note.timestamp).toLocaleString('fr-FR', {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric',
-                                      hour: '2-digit',
-                                      minute: '2-digit'
-                                    })}
+              {/* Agent Notes History Section - Only show agent-created notes */}
+              {(() => {
+                let agentNotes = [];
+                try {
+                  if (order.notes) {
+                    const parsedNotes = JSON.parse(order.notes);
+                    if (Array.isArray(parsedNotes)) {
+                      agentNotes = parsedNotes;
+                    }
+                  }
+                } catch (e) {
+                  // Legacy notes are not shown in agent history
+                  agentNotes = [];
+                }
+                
+                return (
+                  <Card className="p-6 lg:col-span-2">
+                    <div className="flex items-center mb-4">
+                      <User className="w-5 h-5 text-purple-600 mr-2" />
+                      <h3 className="text-lg font-semibold">Historique des Notes</h3>
+                      <span className="ml-2 text-sm text-gray-500">
+                        ({agentNotes.length} {agentNotes.length === 1 ? 'note' : 'notes'})
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {agentNotes.length > 0 ? (
+                        (() => {
+                          const noteOptions = [
+                            { value: 'CLIENT_NO_RESPONSE_1', label: 'Client (PAS DE REPONSE 1)' },
+                            { value: 'CLIENT_NO_RESPONSE_2', label: 'Client (PAS DE REPONSE 2)' },
+                            { value: 'CLIENT_NO_RESPONSE_3', label: 'Client (PAS DE REPONSE 3)' },
+                            { value: 'CLIENT_NO_RESPONSE_4_SMS', label: 'Client (PAS DE REPONSE 4+SMS)' },
+                            { value: 'CLIENT_POSTPONED', label: 'CLIENT (REPORTER)' },
+                            { value: 'CLIENT_CANCELLED', label: 'CLIENT (ANNULE)' },
+                            { value: 'RELAUNCHED', label: 'Relancé' },
+                            { value: 'REFUND', label: 'Remboursement' },
+                            { value: 'EXCHANGE', label: 'Echange' },
+                            { value: 'POSTPONED_TO_DATE', label: 'Reporté à une date' },
+                            { value: 'APPROVED_TO_DATE', label: 'Approuvé à une date' },
+                            { value: 'PROBLEM_CLIENT_DELIVERY', label: 'Problem (client / livreur)' },
+                            { value: 'PROBLEM_ORDER', label: 'Problem (commande)' },
+                            { value: 'DELIVERED_PENDING', label: 'Livrée (en attente de finalisation)' },
+                            { value: 'CUSTOM', label: 'Note personnalisée' }
+                          ];
+                          
+                          return agentNotes
+                            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                            .map((note: any, index: number) => (
+                            <div key={note.id || index} className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border-l-4 border-purple-500 shadow-sm">
+                              <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-purple-600" />
+                                  </div>
+                                  <div>
+                                    <span className="text-sm font-semibold text-purple-700">
+                                      {note.agentName || 'Agent'}
+                                    </span>
+                                    <div className="text-xs text-gray-500">
+                                      {new Date(note.timestamp).toLocaleString('fr-FR', {
+                                        year: 'numeric',
+                                        month: 'short',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </div>
                                   </div>
                                 </div>
+                                {note.statusChange && (
+                                  <div className="text-xs bg-white px-2 py-1 rounded-full border">
+                                    <span className="text-red-600">{note.statusChange.from}</span>
+                                    <span className="mx-1">→</span>
+                                    <span className="text-green-600">{note.statusChange.to}</span>
+                                  </div>
+                                )}
                               </div>
-                              {note.statusChange && (
-                                <div className="text-xs bg-white px-2 py-1 rounded-full border">
-                                  <span className="text-red-600">{note.statusChange.from}</span>
-                                  <span className="mx-1">→</span>
-                                  <span className="text-green-600">{note.statusChange.to}</span>
+                              
+                              {note.type && note.type !== 'CUSTOM' && (
+                                <div className="mb-2">
+                                  <span className="inline-block px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
+                                    {noteOptions.find(opt => opt.value === note.type)?.label || note.type}
+                                  </span>
+                                </div>
+                              )}
+                              
+                              {note.note && (
+                                <div className="bg-white p-3 rounded-md border border-gray-200">
+                                  <p className="text-sm text-gray-700 leading-relaxed">{note.note}</p>
                                 </div>
                               )}
                             </div>
-                            
-                            {note.type && note.type !== 'CUSTOM' && (
-                              <div className="mb-2">
-                                <span className="inline-block px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
-                                  {noteOptions.find(opt => opt.value === note.type)?.label || note.type}
-                                </span>
-                              </div>
-                            )}
-                            
-                            {note.note && (
-                              <div className="bg-white p-3 rounded-md border border-gray-200">
-                                <p className="text-sm text-gray-700 leading-relaxed">{note.note}</p>
-                              </div>
-                            )}
-                          </div>
-                        ));
-                      } catch (e) {
-                        // Fallback for old format notes
-                        return (
-                          <div className="p-4 bg-gray-50 rounded-lg border-l-4 border-gray-400">
-                            <div className="flex items-center mb-2">
-                              <User className="w-4 h-4 text-gray-600 mr-2" />
-                              <span className="text-sm font-medium text-gray-700">Legacy Note</span>
-                            </div>
-                            <p className="text-sm text-gray-600">{order.notes}</p>
-                          </div>
-                        );
-                      }
-                    })()}
-                  </div>
-                  
-                  {/* Summary Stats */}
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <div className="text-lg font-bold text-blue-600">
-                          {(() => {
-                            try {
-                              return JSON.parse(order.notes).length;
-                            } catch (e) {
-                              return 1;
-                            }
-                          })()}
+                          ));
+                        })()
+                      ) : (
+                        <div className="text-center py-8">
+                          <User className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-500 text-sm">Aucune note d'agent disponible</p>
+                          <p className="text-gray-400 text-xs mt-1">Les notes apparaîtront ici lorsque les agents ajouteront des commentaires</p>
                         </div>
-                        <div className="text-xs text-blue-600">Total Notes</div>
-                      </div>
-                      <div className="bg-green-50 p-3 rounded-lg">
-                        <div className="text-lg font-bold text-green-600">
-                          {(() => {
-                            try {
-                              const notes = JSON.parse(order.notes);
-                              return new Set(notes.map((n: any) => n.agentId)).size;
-                            } catch (e) {
-                              return 1;
-                            }
-                          })()}
-                        </div>
-                        <div className="text-xs text-green-600">Agents</div>
-                      </div>
-                      <div className="bg-purple-50 p-3 rounded-lg">
-                        <div className="text-lg font-bold text-purple-600">
-                          {(() => {
-                            try {
-                              const notes = JSON.parse(order.notes);
-                              return notes.filter((n: any) => n.statusChange).length;
-                            } catch (e) {
-                              return 0;
-                            }
-                          })()}
-                        </div>
-                        <div className="text-xs text-purple-600">Status Changes</div>
-                      </div>
-                      <div className="bg-orange-50 p-3 rounded-lg">
-                        <div className="text-lg font-bold text-orange-600">
-                          {(() => {
-                            try {
-                              const notes = JSON.parse(order.notes);
-                              const latest = notes[notes.length - 1];
-                              if (latest) {
-                                const hoursAgo = Math.floor((Date.now() - new Date(latest.timestamp).getTime()) / (1000 * 60 * 60));
-                                return hoursAgo < 24 ? `${hoursAgo}h` : `${Math.floor(hoursAgo / 24)}d`;
-                              }
-                              return 'N/A';
-                            } catch (e) {
-                              return 'N/A';
-                            }
-                          })()}
-                        </div>
-                        <div className="text-xs text-orange-600">Last Activity</div>
-                      </div>
+                      )}
                     </div>
-                  </div>
-                </Card>
-              )}
+                  
+                    {/* Summary Stats */}
+                    {agentNotes.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-200">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                          <div className="bg-blue-50 p-3 rounded-lg">
+                            <div className="text-lg font-bold text-blue-600">
+                              {agentNotes.length}
+                            </div>
+                            <div className="text-xs text-blue-600">Total Notes</div>
+                          </div>
+                          <div className="bg-green-50 p-3 rounded-lg">
+                            <div className="text-lg font-bold text-green-600">
+                              {new Set(agentNotes.map((n: any) => n.agentId)).size}
+                            </div>
+                            <div className="text-xs text-green-600">Agents</div>
+                          </div>
+                          <div className="bg-purple-50 p-3 rounded-lg">
+                            <div className="text-lg font-bold text-purple-600">
+                              {agentNotes.filter((n: any) => n.statusChange).length}
+                            </div>
+                            <div className="text-xs text-purple-600">Status Changes</div>
+                          </div>
+                          <div className="bg-orange-50 p-3 rounded-lg">
+                            <div className="text-lg font-bold text-orange-600">
+                              {(() => {
+                                const latest = agentNotes[agentNotes.length - 1];
+                                if (latest) {
+                                  const hoursAgo = Math.floor((Date.now() - new Date(latest.timestamp).getTime()) / (1000 * 60 * 60));
+                                  return hoursAgo < 24 ? `${hoursAgo}h` : `${Math.floor(hoursAgo / 24)}d`;
+                                }
+                                return 'N/A';
+                              })()}
+                            </div>
+                            <div className="text-xs text-orange-600">Last Activity</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })()}
             </div>
 
             {/* Status Update Section */}
