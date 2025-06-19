@@ -36,6 +36,15 @@ router.post('/reassign/:orderId', async (req, res) => {
 });
 
 /**
+ * @route POST /api/v1/assignments/bulk-reassign
+ * @desc Bulk reassignment of orders with percentage distribution
+ * @access ADMIN, TEAM_MANAGER
+ */
+router.post('/bulk-reassign', async (req, res) => {
+  await assignmentController.bulkReassignOrders(req, res);
+});
+
+/**
  * @route POST /api/v1/assignments/manual/:orderId
  * @desc Manually assign an order to a specific agent
  * @access ADMIN, TEAM_MANAGER

@@ -171,6 +171,51 @@ export interface Translations {
   todaysOrders: string;
   orderAssignedSuccessfully: string;
   failedToAssignOrder: string;
+  
+  // Agent Assignment Dashboard
+  agentAssignmentDashboard: string;
+  triggerAssignment: string;
+  assigning: string;
+  bulkReassignment: string;
+  totalAgents: string;
+  onlineAgents: string;
+  offlineAgents: string;
+  unassignedOrders: string;
+  assignedOrders: string;
+  agentWorkloads: string;
+  code: string;
+  utilization: string;
+  progress: string;
+  noAgentsFound: string;
+  howAssignmentWorks: string;
+  
+  // Bulk Reassignment Modal
+  bulkOrderReassignment: string;
+  orderSelection: string;
+  lastNOrdersGlobally: string;
+  lastNOrdersFromSpecificAgents: string;
+  numberOfOrders: string;
+  sourceAgents: string;
+  targetAgentsDistribution: string;
+  addAgent: string;
+  remove: string;
+  totalPercentage: string;
+  distributionPreviewRoundRobin: string;
+  assignmentPattern: string;
+  alternating: string;
+  repeating: string;
+  ordersWillBeDistributedAlternating: string;
+  noTargetAgentsAdded: string;
+  clickAddAgentToStart: string;
+  startBulkReassignment: string;
+  processing: string;
+  validationError: string;
+  orderCountMustBeGreaterThanZero: string;
+  pleaseAddAtLeastOneTargetAgent: string;
+  targetAgentPercentagesMustSumTo100: string;
+  pleaseSelectAtLeastOneSourceAgent: string;
+  loadingAgents: string;
+  then: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -345,6 +390,51 @@ export const translations: Record<Language, Translations> = {
     todaysOrders: 'Today',
     orderAssignedSuccessfully: 'Order assigned successfully',
     failedToAssignOrder: 'Failed to assign order',
+    
+    // Agent Assignment Dashboard
+    agentAssignmentDashboard: 'Agent Assignment Dashboard',
+    triggerAssignment: 'Trigger Assignment',
+    assigning: 'Assigning...',
+    bulkReassignment: 'Bulk Reassignment',
+    totalAgents: 'Total Agents',
+    onlineAgents: 'Online Agents',
+    offlineAgents: 'Offline Agents',
+    unassignedOrders: 'Unassigned Orders',
+    assignedOrders: 'Assigned Orders',
+    agentWorkloads: 'Agent Workloads',
+    code: 'Code',
+    utilization: 'Utilization',
+    progress: 'Progress',
+    noAgentsFound: 'No agents found',
+    howAssignmentWorks: 'How Assignment Works',
+    
+    // Bulk Reassignment Modal
+    bulkOrderReassignment: 'Bulk Order Reassignment',
+    orderSelection: 'Order Selection',
+    lastNOrdersGlobally: 'Last N orders globally (by creation date)',
+    lastNOrdersFromSpecificAgents: 'Last N orders from specific agents',
+    numberOfOrders: 'Number of orders',
+    sourceAgents: 'Source Agents',
+    targetAgentsDistribution: 'Target Agents & Distribution',
+    addAgent: 'Add Agent',
+    remove: 'Remove',
+    totalPercentage: 'Total Percentage',
+    distributionPreviewRoundRobin: 'Distribution Preview (Round-Robin)',
+    assignmentPattern: 'Assignment Pattern',
+    alternating: 'Alternating',
+    repeating: 'repeating',
+    ordersWillBeDistributedAlternating: 'Orders will be distributed in this alternating pattern, not in blocks',
+    noTargetAgentsAdded: 'No target agents added. Click "Add Agent" to start.',
+    clickAddAgentToStart: 'Click "Add Agent" to start.',
+    startBulkReassignment: 'Start Bulk Reassignment',
+    processing: 'Processing...',
+    validationError: 'Validation Error',
+    orderCountMustBeGreaterThanZero: 'Order count must be greater than 0',
+    pleaseAddAtLeastOneTargetAgent: 'Please add at least one target agent',
+    targetAgentPercentagesMustSumTo100: 'Target agent percentages must sum to 100%',
+    pleaseSelectAtLeastOneSourceAgent: 'Please select at least one source agent',
+    loadingAgents: 'Loading agents...',
+    then: 'then',
   },
   fr: {
     // Common
@@ -517,6 +607,51 @@ export const translations: Record<Language, Translations> = {
     todaysOrders: 'Aujourd\'hui',
     orderAssignedSuccessfully: 'Commande assignée avec succès',
     failedToAssignOrder: 'Échec de l\'assignation de la commande',
+    
+    // Agent Assignment Dashboard
+    agentAssignmentDashboard: 'Tableau de Bord d\'Affectation des Agents',
+    triggerAssignment: 'Déclencher l\'Affectation',
+    assigning: 'Affectation en cours...',
+    bulkReassignment: 'Réaffectation en Masse',
+    totalAgents: 'Total Agents',
+    onlineAgents: 'Agents En Ligne',
+    offlineAgents: 'Agents Hors Ligne',
+    unassignedOrders: 'Commandes Non Assignées',
+    assignedOrders: 'Commandes Assignées',
+    agentWorkloads: 'Charges de Travail des Agents',
+    code: 'Code',
+    utilization: 'Utilisation',
+    progress: 'Progrès',
+    noAgentsFound: 'Aucun agent trouvé',
+    howAssignmentWorks: 'Comment Fonctionne l\'Affectation',
+    
+    // Bulk Reassignment Modal
+    bulkOrderReassignment: 'Réaffectation en Masse des Commandes',
+    orderSelection: 'Sélection des Commandes',
+    lastNOrdersGlobally: 'Dernières N commandes globalement (par date de création)',
+    lastNOrdersFromSpecificAgents: 'Dernières N commandes d\'agents spécifiques',
+    numberOfOrders: 'Nombre de commandes',
+    sourceAgents: 'Agents Sources',
+    targetAgentsDistribution: 'Agents Cibles et Distribution',
+    addAgent: 'Ajouter Agent',
+    remove: 'Supprimer',
+    totalPercentage: 'Pourcentage Total',
+    distributionPreviewRoundRobin: 'Aperçu de Distribution (Round-Robin)',
+    assignmentPattern: 'Modèle d\'Affectation',
+    alternating: 'Alternance',
+    repeating: 'répétition',
+    ordersWillBeDistributedAlternating: 'Les commandes seront distribuées selon ce modèle d\'alternance, pas en blocs',
+    noTargetAgentsAdded: 'Aucun agent cible ajouté. Cliquez sur "Ajouter Agent" pour commencer.',
+    clickAddAgentToStart: 'Cliquez sur "Ajouter Agent" pour commencer.',
+    startBulkReassignment: 'Démarrer la Réaffectation en Masse',
+    processing: 'Traitement en cours...',
+    validationError: 'Erreur de Validation',
+    orderCountMustBeGreaterThanZero: 'Le nombre de commandes doit être supérieur à 0',
+    pleaseAddAtLeastOneTargetAgent: 'Veuillez ajouter au moins un agent cible',
+    targetAgentPercentagesMustSumTo100: 'Les pourcentages des agents cibles doivent totaliser 100%',
+    pleaseSelectAtLeastOneSourceAgent: 'Veuillez sélectionner au moins un agent source',
+    loadingAgents: 'Chargement des agents...',
+    then: 'puis',
   },
 };
 

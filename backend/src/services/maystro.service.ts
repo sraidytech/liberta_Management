@@ -445,18 +445,27 @@ export class MaystroService {
         
         await Promise.all(batch.map(async (orderUpdate) => {
           try {
+            // Prepare update data
+            const updateData: any = {
+              shippingStatus: orderUpdate.shippingStatus,
+              maystroOrderId: orderUpdate.maystroOrderId,
+              trackingNumber: orderUpdate.trackingNumber,
+              alertedAt: orderUpdate.alertedAt,
+              alertReason: orderUpdate.alertReason,
+              abortReason: orderUpdate.abortReason,
+              additionalMetaData: orderUpdate.additionalMetaData,
+              updatedAt: new Date()
+            };
+
+            // 🎯 AUTO-UPDATE: If shipping status is "LIVRÉ", automatically set order status to "DELIVERED"
+            if (orderUpdate.shippingStatus === 'LIVRÉ') {
+              updateData.status = 'DELIVERED';
+              console.log(`🚚 Auto-updating order ${orderUpdate.reference} status to DELIVERED (shipping status: LIVRÉ)`);
+            }
+
             await prisma.order.update({
               where: { id: orderUpdate.id },
-              data: {
-                shippingStatus: orderUpdate.shippingStatus,
-                maystroOrderId: orderUpdate.maystroOrderId,
-                trackingNumber: orderUpdate.trackingNumber,
-                alertedAt: orderUpdate.alertedAt,
-                alertReason: orderUpdate.alertReason,
-                abortReason: orderUpdate.abortReason,
-                additionalMetaData: orderUpdate.additionalMetaData,
-                updatedAt: new Date()
-              } as any // Type assertion to bypass TypeScript error until Prisma client is updated
+              data: updateData
             });
 
             results.updated++;
@@ -715,13 +724,22 @@ export class MaystroService {
           if (order) {
             const shippingStatus = this.mapStatus(status);
             
+            // Prepare update data
+            const updateData: any = {
+              shippingStatus,
+              trackingNumber: display_id_order,
+              updatedAt: new Date()
+            };
+
+            // 🎯 AUTO-UPDATE: If shipping status is "LIVRÉ", automatically set order status to "DELIVERED"
+            if (shippingStatus === 'LIVRÉ') {
+              updateData.status = 'DELIVERED';
+              console.log(`🚚 Auto-updating order ${external_order_id} status to DELIVERED (shipping status: LIVRÉ) via webhook`);
+            }
+            
             await prisma.order.update({
               where: { id: order.id },
-              data: {
-                shippingStatus,
-                trackingNumber: display_id_order,
-                updatedAt: new Date()
-              }
+              data: updateData
             });
 
             // Create webhook event record

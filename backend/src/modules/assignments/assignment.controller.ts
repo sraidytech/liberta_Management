@@ -144,6 +144,208 @@ export class AssignmentController {
   }
 
   /**
+   * Bulk reassignment of orders with percentage distribution
+   */
+  async bulkReassignOrders(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      const userRole = (req as any).user?.role;
+      const {
+        selectionType, // 'global' or 'agents'
+        orderCount,
+        sourceAgentIds, // for 'agents' type
+        targetAgents // array of { agentId, percentage }
+      } = req.body;
+
+      // Only allow ADMIN and TEAM_MANAGER to bulk reassign orders
+      if (!['ADMIN', 'TEAM_MANAGER'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            message: 'Insufficient permissions to bulk reassign orders'
+          }
+        });
+      }
+
+      // Validate input
+      if (!selectionType || !orderCount || !targetAgents || !Array.isArray(targetAgents)) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Missing required parameters: selectionType, orderCount, targetAgents'
+          }
+        });
+      }
+
+      // Validate percentage distribution
+      const totalPercentage = targetAgents.reduce((sum, agent) => sum + agent.percentage, 0);
+      if (Math.abs(totalPercentage - 100) > 0.01) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Target agent percentages must sum to 100%'
+          }
+        });
+      }
+
+      // Get orders to reassign based on selection type
+      let ordersToReassign;
+      if (selectionType === 'global') {
+        // Get last N orders globally by creation date
+        ordersToReassign = await prisma.order.findMany({
+          where: {
+            assignedAgentId: { not: null } // Only assigned orders can be reassigned
+          },
+          orderBy: {
+            orderDate: 'desc'
+          },
+          take: orderCount,
+          include: {
+            assignedAgent: true
+          }
+        });
+      } else if (selectionType === 'agents') {
+        // Get last N orders from specific agents
+        if (!sourceAgentIds || !Array.isArray(sourceAgentIds) || sourceAgentIds.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: {
+              message: 'sourceAgentIds is required for agent-based selection'
+            }
+          });
+        }
+
+        ordersToReassign = await prisma.order.findMany({
+          where: {
+            assignedAgentId: { in: sourceAgentIds }
+          },
+          orderBy: {
+            orderDate: 'desc'
+          },
+          take: orderCount,
+          include: {
+            assignedAgent: true
+          }
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Invalid selectionType. Must be "global" or "agents"'
+          }
+        });
+      }
+
+      if (ordersToReassign.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            message: 'No orders found to reassign'
+          }
+        });
+      }
+
+      // Distribute orders using round-robin based on percentages
+      const reassignmentResults = [];
+      
+      // Calculate the ratio for round-robin distribution
+      // Find the greatest common divisor to get the simplest ratio
+      const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+      const percentages = targetAgents.map(agent => Math.round(agent.percentage));
+      let commonDivisor = percentages[0];
+      for (let i = 1; i < percentages.length; i++) {
+        commonDivisor = gcd(commonDivisor, percentages[i]);
+      }
+      
+      // Create the distribution pattern (ratio)
+      const distributionPattern = percentages.map(p => p / commonDivisor);
+      const totalRatioUnits = distributionPattern.reduce((sum, ratio) => sum + ratio, 0);
+      
+      // Create the assignment sequence
+      const assignmentSequence = [];
+      for (let i = 0; i < targetAgents.length; i++) {
+        for (let j = 0; j < distributionPattern[i]; j++) {
+          assignmentSequence.push(i);
+        }
+      }
+      
+      // Assign orders using the round-robin pattern
+      for (let orderIndex = 0; orderIndex < ordersToReassign.length; orderIndex++) {
+        const order = ordersToReassign[orderIndex];
+        const agentIndex = assignmentSequence[orderIndex % assignmentSequence.length];
+        const targetAgent = targetAgents[agentIndex];
+        
+        try {
+          const result = await assignmentService.reassignOrder(order.id, targetAgent.agentId, userId);
+          reassignmentResults.push({
+            orderId: order.id,
+            orderReference: order.reference,
+            fromAgent: order.assignedAgent?.name || 'Unknown',
+            toAgentId: targetAgent.agentId,
+            toAgentName: targetAgent.agentName,
+            success: result.success,
+            message: result.message
+          });
+        } catch (error) {
+          reassignmentResults.push({
+            orderId: order.id,
+            orderReference: order.reference,
+            fromAgent: order.assignedAgent?.name || 'Unknown',
+            toAgentId: targetAgent.agentId,
+            toAgentName: targetAgent.agentName,
+            success: false,
+            message: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      const successfulReassignments = reassignmentResults.filter(r => r.success).length;
+      const failedReassignments = reassignmentResults.filter(r => !r.success).length;
+
+      // Emit socket events if available
+      const io = (global as any).io;
+      if (io && successfulReassignments > 0) {
+        io.to('managers').emit('bulk_reassignment_completed', {
+          managerId: userId,
+          totalOrders: ordersToReassign.length,
+          successful: successfulReassignments,
+          failed: failedReassignments
+        });
+        
+        // Notify affected agents
+        for (const targetAgent of targetAgents) {
+          const agentReassignments = reassignmentResults.filter(r => r.toAgentId === targetAgent.agentId && r.success);
+          if (agentReassignments.length > 0) {
+            io.to(`user_${targetAgent.agentId}`).emit('bulk_orders_assigned', {
+              count: agentReassignments.length,
+              source: 'bulk_reassignment'
+            });
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        data: {
+          totalOrders: ordersToReassign.length,
+          successfulReassignments,
+          failedReassignments,
+          results: reassignmentResults
+        },
+        message: `Bulk reassignment completed: ${successfulReassignments} orders reassigned successfully, ${failedReassignments} failed`
+      });
+    } catch (error) {
+      console.error('Bulk reassignment error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to perform bulk reassignment'
+        }
+      });
+    }
+  }
+
+  /**
    * Manually assign an order to a specific agent
    */
   async manualAssignOrder(req: Request, res: Response) {
