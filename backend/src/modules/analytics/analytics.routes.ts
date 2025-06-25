@@ -22,4 +22,24 @@ router.get('/agents', requireAdmin as any, async (req, res) => {
   await analyticsController.getAgentPerformance(req, res);
 });
 
+// Sales and revenue reports
+router.get('/sales', requireAdmin as any, async (req, res) => {
+  await analyticsController.getSalesReports(req, res);
+});
+
+// Detailed agent reports
+router.get('/agents/detailed', requireAdmin as any, async (req, res) => {
+  await analyticsController.getDetailedAgentReports(req, res);
+});
+
+// Geographic reports (orders by city/wilaya)
+router.get('/geographic', requireAdmin as any, async (req, res) => {
+  await analyticsController.getGeographicReports(req, res);
+});
+
+// Customer analytics
+router.get('/customers', requireAdmin as any, async (req, res) => {
+  await analyticsController.getCustomerReports(req, res);
+});
+
 export default router;

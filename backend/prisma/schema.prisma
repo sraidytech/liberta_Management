@@ -31,6 +31,8 @@ model User {
   agentActivities  AgentActivity[]
   notifications    Notification[]
   createdApiConfigs ApiConfiguration[] @relation("CreatedBy")
+  commissionRates  AgentCommissionRate[] @relation("AgentCommissionRates")
+  productConfirmationRates AgentProductConfirmationRate[] @relation("AgentProductConfirmationRates")
 
   // NextAuth.js fields
   emailVerified DateTime?
@@ -289,4 +291,62 @@ enum NotificationType {
 enum WebhookSource {
   ECOMANAGER
   MAYSTRO
+}
+
+model ProductCommission {
+  id                    String   @id @default(cuid())
+  productName          String   @unique
+  packQuantity         Int      // 1, 2, or 4
+  commissionCriteria   Json     // Flexible JSON structure for all commission rules
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@map("product_commissions")
+}
+
+model AgentCommissionRate {
+  id                String   @id @default(cuid())
+  agentId           String
+  confirmationRate  Float    // Manually set confirmation rate
+  period            String   // 'weekly' or 'monthly'
+  startDate         DateTime
+  endDate           DateTime
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  agent User @relation("AgentCommissionRates", fields: [agentId], references: [id])
+  
+  @@unique([agentId, period, startDate])
+  @@map("agent_commission_rates")
+}
+
+model AgentProductConfirmationRate {
+  id                String   @id @default(cuid())
+  agentId           String
+  productName       String   // Product name (normalized, not SKU)
+  confirmationRate  Float    // Confirmation rate for this agent-product combination
+  startDate         DateTime // Flexible start date
+  endDate           DateTime // Flexible end date
+  metadata          Json?    // Extensible metadata for future features (tags, notes, etc.)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  agent User @relation("AgentProductConfirmationRates", fields: [agentId], references: [id])
+  
+  @@unique([agentId, productName, startDate])
+  @@map("agent_product_confirmation_rates")
+}
+
+model DefaultCommissionSettings {
+  id                    String   @id @default(cuid())
+  name                  String   @unique // "default" for the main settings
+  settings              Json     // All commission settings in flexible JSON structure
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@map("default_commission_settings")
 }

@@ -216,6 +216,37 @@ export interface Translations {
   pleaseSelectAtLeastOneSourceAgent: string;
   loadingAgents: string;
   then: string;
+  
+  // Commission Settings
+  commissionSettings: string;
+  configureDefaultCommissionValues: string;
+  baseCommission: string;
+  commissionForReaching1500Orders: string;
+  baseCommissionDA: string;
+  confirmationRateBonuses: string;
+  additionalBonusesBasedOnConfirmationRates: string;
+  rate78Bonus: string;
+  rate80Bonus: string;
+  rate82Bonus: string;
+  upsellBonus: string;
+  bonusForAchievingUpsellTargets: string;
+  upsellBonusDA: string;
+  minimumUpsellRate: string;
+  packBonuses: string;
+  bonusesForPackQuantityAchievements: string;
+  pack2BonusDA: string;
+  pack4BonusDA: string;
+  minRate: string;
+  unsavedChanges: string;
+  youHaveUnsavedChanges: string;
+  clickSaveChangesToApply: string;
+  reset: string;
+  saveChanges: string;
+  saving: string;
+  commissionSettingsUpdatedSuccessfully: string;
+  failedToUpdateCommissionSettings: string;
+  errorFetchingCommissionSettings: string;
+  settingsResetToLastSavedValues: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -435,6 +466,37 @@ export const translations: Record<Language, Translations> = {
     pleaseSelectAtLeastOneSourceAgent: 'Please select at least one source agent',
     loadingAgents: 'Loading agents...',
     then: 'then',
+    
+    // Commission Settings
+    commissionSettings: 'Commission Settings',
+    configureDefaultCommissionValues: 'Configure default commission values and thresholds',
+    baseCommission: 'Base Commission',
+    commissionForReaching1500Orders: 'Commission for reaching 1500+ orders',
+    baseCommissionDA: 'Base Commission (DA)',
+    confirmationRateBonuses: 'Confirmation Rate Bonuses',
+    additionalBonusesBasedOnConfirmationRates: 'Additional bonuses based on confirmation rates',
+    rate78Bonus: '78%+ Rate Bonus (DA)',
+    rate80Bonus: '80%+ Rate Bonus (DA)',
+    rate82Bonus: '82%+ Rate Bonus (DA)',
+    upsellBonus: 'Upsell Bonus',
+    bonusForAchievingUpsellTargets: 'Bonus for achieving upsell targets',
+    upsellBonusDA: 'Upsell Bonus (DA)',
+    minimumUpsellRate: 'Minimum Upsell Rate (%)',
+    packBonuses: 'Pack Bonuses',
+    bonusesForPackQuantityAchievements: 'Bonuses for pack quantity achievements',
+    pack2BonusDA: 'Pack 2 Bonus (DA)',
+    pack4BonusDA: 'Pack 4 Bonus (DA)',
+    minRate: 'Min Rate (%)',
+    unsavedChanges: 'Unsaved Changes',
+    youHaveUnsavedChanges: 'You have unsaved changes. Click "Save Changes" to apply them.',
+    clickSaveChangesToApply: 'Click "Save Changes" to apply them.',
+    reset: 'Reset',
+    saveChanges: 'Save Changes',
+    saving: 'Saving...',
+    commissionSettingsUpdatedSuccessfully: 'Commission settings updated successfully!',
+    failedToUpdateCommissionSettings: 'Failed to update commission settings',
+    errorFetchingCommissionSettings: 'Error fetching commission settings',
+    settingsResetToLastSavedValues: 'Settings reset to last saved values',
   },
   fr: {
     // Common
@@ -652,6 +714,37 @@ export const translations: Record<Language, Translations> = {
     pleaseSelectAtLeastOneSourceAgent: 'Veuillez sélectionner au moins un agent source',
     loadingAgents: 'Chargement des agents...',
     then: 'puis',
+    
+    // Commission Settings
+    commissionSettings: 'Paramètres de Commission',
+    configureDefaultCommissionValues: 'Configurer les valeurs de commission par défaut et les seuils',
+    baseCommission: 'Commission de Base',
+    commissionForReaching1500Orders: 'Commission pour atteindre 1500+ commandes',
+    baseCommissionDA: 'Commission de Base (DA)',
+    confirmationRateBonuses: 'Bonus de Taux de Confirmation',
+    additionalBonusesBasedOnConfirmationRates: 'Bonus supplémentaires basés sur les taux de confirmation',
+    rate78Bonus: 'Bonus Taux 78%+ (DA)',
+    rate80Bonus: 'Bonus Taux 80%+ (DA)',
+    rate82Bonus: 'Bonus Taux 82%+ (DA)',
+    upsellBonus: 'Bonus Upsell',
+    bonusForAchievingUpsellTargets: 'Bonus pour atteindre les objectifs d\'upsell',
+    upsellBonusDA: 'Bonus Upsell (DA)',
+    minimumUpsellRate: 'Taux Upsell Minimum (%)',
+    packBonuses: 'Bonus Pack',
+    bonusesForPackQuantityAchievements: 'Bonus pour les réalisations de quantité de pack',
+    pack2BonusDA: 'Bonus Pack 2 (DA)',
+    pack4BonusDA: 'Bonus Pack 4 (DA)',
+    minRate: 'Taux Min (%)',
+    unsavedChanges: 'Modifications Non Sauvegardées',
+    youHaveUnsavedChanges: 'Vous avez des modifications non sauvegardées. Cliquez sur "Sauvegarder" pour les appliquer.',
+    clickSaveChangesToApply: 'Cliquez sur "Sauvegarder" pour les appliquer.',
+    reset: 'Réinitialiser',
+    saveChanges: 'Sauvegarder',
+    saving: 'Sauvegarde...',
+    commissionSettingsUpdatedSuccessfully: 'Paramètres de commission mis à jour avec succès !',
+    failedToUpdateCommissionSettings: 'Échec de la mise à jour des paramètres de commission',
+    errorFetchingCommissionSettings: 'Erreur lors de la récupération des paramètres de commission',
+    settingsResetToLastSavedValues: 'Paramètres réinitialisés aux dernières valeurs sauvegardées',
   },
 };
 

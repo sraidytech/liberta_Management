@@ -20,7 +20,9 @@ import {
   User,
   ChevronLeft,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  Calculator,
+  FileText
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -64,6 +66,18 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: UserCheck,
       href: '/admin/assignments',
       active: pathname === '/admin/assignments'
+    },
+    {
+      name: language === 'fr' ? 'Gestion des Commissions' : 'Commission Management',
+      icon: Calculator,
+      href: '/admin/commissions',
+      active: pathname === '/admin/commissions'
+    },
+    {
+      name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',
+      icon: FileText,
+      href: '/admin/reports',
+      active: pathname === '/admin/reports'
     },
     {
       name: language === 'fr' ? 'Paramètres' : 'Settings',

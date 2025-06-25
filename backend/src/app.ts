@@ -22,6 +22,8 @@ import notificationRoutes from '@/modules/notifications/notifications.routes';
 import analyticsRoutes from '@/modules/analytics/analytics.routes';
 import storesRoutes from '@/modules/stores/stores.routes';
 import assignmentRoutes from '@/modules/assignments/assignment.routes';
+import commissionRoutes from '@/modules/commissions/commission.routes';
+import defaultCommissionSettingsRoutes from '@/modules/commissions/default-commission-settings.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -107,6 +109,8 @@ class App {
     this.app.use('/api/v1/analytics', authMiddleware, analyticsRoutes);
     this.app.use('/api/v1/stores', authMiddleware, storesRoutes);
     this.app.use('/api/v1/assignments', authMiddleware, assignmentRoutes);
+    this.app.use('/api/v1/commissions', commissionRoutes); // Commission routes have their own auth middleware
+    this.app.use('/api/v1/commissions/default-settings', defaultCommissionSettingsRoutes); // Default commission settings routes
 
     // Root route
     this.app.get('/', (req, res) => {
