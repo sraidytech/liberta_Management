@@ -3,6 +3,7 @@
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
+import PasswordChangeModal from '@/components/admin/password-change-modal';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -22,7 +23,8 @@ import {
   ChevronRight,
   UserCheck,
   Calculator,
-  FileText
+  FileText,
+  Key
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -34,6 +36,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const pathname = usePathname();
 
   const sidebarItems = [
@@ -171,16 +174,25 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               {!sidebarCollapsed && (
                 <>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">Admin</p>
-                    <p className="text-xs text-gray-500 truncate">contact@libertaphoenix.com</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{user?.name || 'Admin'}</p>
+                    <p className="text-xs text-gray-500 truncate">{user?.email || 'admin@libertaphoenix.com'}</p>
                   </div>
-                  <button
-                    onClick={logout}
-                    className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
-                    title="Logout"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center space-x-1">
+                    <button
+                      onClick={() => setShowPasswordModal(true)}
+                      className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-blue-500 transition-colors"
+                      title={language === 'fr' ? 'Changer mon mot de passe' : 'Change My Password'}
+                    >
+                      <Key className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={logout}
+                      className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-red-500 transition-colors"
+                      title="Logout"
+                    >
+                      <LogOut className="w-4 h-4" />
+                    </button>
+                  </div>
                 </>
               )}
             </div>
@@ -246,6 +258,21 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           {children}
         </main>
       </div>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && user && (
+        <PasswordChangeModal
+          isOpen={showPasswordModal}
+          onClose={() => setShowPasswordModal(false)}
+          user={{
+            id: user.id,
+            name: user.name || '',
+            email: user.email,
+            role: user.role
+          }}
+          isOwnPassword={true}
+        />
+      )}
     </div>
   );
 }

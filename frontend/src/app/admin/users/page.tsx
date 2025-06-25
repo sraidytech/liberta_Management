@@ -4,6 +4,7 @@ import { useLanguage } from '@/lib/language-context';
 import AdminLayout from '@/components/admin/admin-layout';
 import { useToast } from '@/components/ui/toast';
 import { Pagination } from '@/components/ui/pagination';
+import PasswordChangeModal from '@/components/admin/password-change-modal';
 import { useState, useEffect } from 'react';
 import {
   Users,
@@ -22,7 +23,8 @@ import {
   MoreVertical,
   Eye,
   Lock,
-  Unlock
+  Unlock,
+  Key
 } from 'lucide-react';
 
 interface User {
@@ -48,6 +50,7 @@ export default function UserManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -203,6 +206,13 @@ export default function UserManagement() {
 
   useEffect(() => {
     fetchUsers();
+    
+    // Set up periodic refresh every 30 seconds to update online status
+    const interval = setInterval(() => {
+      fetchUsers();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const getRoleLabel = (role: string) => {
@@ -478,6 +488,16 @@ export default function UserManagement() {
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowPasswordModal(true);
+                        }}
+                        className="p-2 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-100 transition-all duration-200 shadow-sm hover:shadow-md"
+                        title={language === 'fr' ? 'Changer le mot de passe' : 'Change Password'}
+                      >
+                        <Key className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => toggleUserStatus(user.id, user.isActive, user.role)}
                         disabled={actionLoading === user.id}
                         className="p-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50"
@@ -600,6 +620,19 @@ export default function UserManagement() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Password Change Modal */}
+      {showPasswordModal && selectedUser && (
+        <PasswordChangeModal
+          isOpen={showPasswordModal}
+          onClose={() => {
+            setShowPasswordModal(false);
+            setSelectedUser(null);
+          }}
+          user={selectedUser}
+          isOwnPassword={false}
+        />
       )}
     </AdminLayout>
   );

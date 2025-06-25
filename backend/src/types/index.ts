@@ -132,6 +132,16 @@ export interface AuthResponse {
   refreshToken?: string;
 }
 
+export interface ChangeUserPasswordRequest {
+  userId: string;
+  newPassword: string;
+}
+
+export interface ChangeOwnPasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 // Analytics types
 export interface AgentPerformanceMetrics {
   agentId: string;

@@ -652,8 +652,17 @@ export class AgentAssignmentService {
    */
   async setAgentOffline(agentId: string): Promise<void> {
     try {
-      // Remove socket connection
+      // Remove socket connection and activity tracking
       await this.redis.del(`socket:agent:${agentId}`);
+      await this.redis.del(`activity:agent:${agentId}`);
+      
+      // Update database availability to OFFLINE
+      await prisma.user.update({
+        where: { id: agentId },
+        data: { availability: 'OFFLINE' }
+      });
+      
+      console.log(`✅ Agent ${agentId} marked as offline`);
       
       // Optionally redistribute ASSIGNED orders to other online agents
       await this.redistributeAgentOrders(agentId);

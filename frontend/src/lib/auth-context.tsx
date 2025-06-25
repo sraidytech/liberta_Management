@@ -47,11 +47,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  // Update user activity periodically when authenticated
+  useEffect(() => {
+    if (!user || !token) return;
+
+    const updateActivity = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        await fetch(`${apiUrl}/api/v1/auth/profile`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      } catch (error) {
+        // Silently fail - this is just for activity tracking
+        console.debug('Activity update failed:', error);
+      }
+    };
+
+    // Update activity immediately
+    updateActivity();
+
+    // Set up periodic activity updates every 5 minutes
+    const activityInterval = setInterval(updateActivity, 5 * 60 * 1000);
+
+    return () => clearInterval(activityInterval);
+  }, [user, token]);
+
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       console.log('🔐 Attempting login for:', email);
       
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiUrl}/api/v1/auth/login`, {
         method: 'POST',
         headers: {

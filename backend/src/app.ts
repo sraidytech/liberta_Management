@@ -7,6 +7,7 @@ import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { config, validateConfig } from '@/config/app';
 import { connectDatabase } from '@/config/database';
+import prisma from '@/config/database';
 import redis from '@/config/redis';
 import { SyncService } from '@/services/sync.service';
 import { AgentAssignmentService } from '@/services/agent-assignment.service';
@@ -253,7 +254,64 @@ class App {
       }
     }, 5 * 60 * 1000); // 5 minutes
     
+    // Start periodic cleanup of inactive users (every 5 minutes)
+    setInterval(async () => {
+      try {
+        await this.cleanupInactiveUsers();
+      } catch (error) {
+        console.error('Periodic cleanup error:', error);
+      }
+    }, 5 * 60 * 1000); // 5 minutes
+    
     console.log('🎯 Agent assignment service initialized');
+  }
+
+  private async cleanupInactiveUsers(): Promise<void> {
+    try {
+      const ACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+      const now = new Date();
+
+      // Get all users who are marked as ONLINE in the database
+      const onlineUsers = await prisma.user.findMany({
+        where: { availability: 'ONLINE' },
+        select: { id: true, name: true, email: true, role: true }
+      });
+
+      for (const user of onlineUsers) {
+        // Check if user has recent activity in Redis
+        const activityKey = `activity:agent:${user.id}`;
+        const lastActivity = await redis.get(activityKey);
+        
+        let shouldMarkOffline = false;
+        
+        if (!lastActivity) {
+          shouldMarkOffline = true;
+        } else {
+          const lastActivityTime = new Date(lastActivity);
+          const timeDiff = now.getTime() - lastActivityTime.getTime();
+          
+          if (timeDiff > ACTIVITY_TIMEOUT) {
+            shouldMarkOffline = true;
+          }
+        }
+
+        if (shouldMarkOffline) {
+          // Mark user as offline in database
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { availability: 'OFFLINE' }
+          });
+
+          // Clean up Redis keys
+          await redis.del(`socket:agent:${user.id}`);
+          await redis.del(`activity:agent:${user.id}`);
+
+          console.log(`🔄 Marked inactive user ${user.name || user.email} as offline`);
+        }
+      }
+    } catch (error) {
+      console.error('Error in cleanup inactive users:', error);
+    }
   }
 
   public async start(): Promise<void> {

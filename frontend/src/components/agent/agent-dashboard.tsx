@@ -67,10 +67,26 @@ export default function AgentDashboard() {
     
     try {
       const token = localStorage.getItem('token');
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
       console.log('🔍 Fetching agent dashboard data for user:', user.id);
       console.log('📡 API URL:', `${apiBaseUrl}/api/v1/orders?assignedAgentId=${user.id}`);
+      
+      // Fetch user profile to get current availability status
+      const profileResponse = await fetch(`${apiBaseUrl}/api/v1/auth/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json();
+        if (profileData.success && profileData.data.availability) {
+          setAvailability(profileData.data.availability);
+          console.log('✅ Current availability status:', profileData.data.availability);
+        }
+      }
       
       // Fetch assigned orders for this agent
       const ordersResponse = await fetch(`${apiBaseUrl}/api/v1/orders?assignedAgentId=${user.id}`, {
@@ -147,7 +163,7 @@ export default function AgentDashboard() {
     
     try {
       const token = localStorage.getItem('token');
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
       const response = await fetch(`${apiBaseUrl}/api/v1/assignments/agent/${user.id}/availability`, {
         method: 'PUT',
@@ -174,7 +190,7 @@ export default function AgentDashboard() {
   const updateOrderStatus = async (orderId: string, newStatus: string, notes?: string) => {
     try {
       const token = localStorage.getItem('token');
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
       const response = await fetch(`${apiBaseUrl}/api/v1/orders/${orderId}/status`, {
         method: 'PUT',

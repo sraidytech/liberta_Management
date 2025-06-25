@@ -2,10 +2,36 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateAgentCode } from '@/utils/helpers';
+import redis from '@/config/redis';
 
 const prisma = new PrismaClient();
 
 export class UsersController {
+  // Check if an agent is online based on recent activity
+  private async isAgentOnline(agentId: string): Promise<boolean> {
+    try {
+      const ACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes in milliseconds
+      
+      // Check last activity timestamp - this is the primary indicator
+      const activityKey = `activity:agent:${agentId}`;
+      const lastActivity = await redis.get(activityKey);
+      
+      if (!lastActivity) {
+        return false;
+      }
+
+      const lastActivityTime = new Date(lastActivity);
+      const now = new Date();
+      const timeDiff = now.getTime() - lastActivityTime.getTime();
+
+      // User is online if they have recent activity (within 15 minutes)
+      return timeDiff <= ACTIVITY_TIMEOUT;
+    } catch (error) {
+      console.error('Error checking agent online status:', error);
+      return false;
+    }
+  }
+
   // Get all users
   async getUsers(req: Request, res: Response) {
     try {
@@ -28,9 +54,43 @@ export class UsersController {
         }
       });
 
+      // Check real online status for each user
+      const usersWithRealStatus = await Promise.all(
+        users.map(async (user) => {
+          let realAvailability = user.availability;
+          
+          // For agents, check real online status from Redis
+          if (user.role === 'AGENT_SUIVI' || user.role === 'AGENT_CALL_CENTER') {
+            const isOnline = await this.isAgentOnline(user.id);
+            realAvailability = isOnline ? 'ONLINE' : 'OFFLINE';
+          }
+          // For admins and managers, check if they have recent activity
+          else if (user.role === 'ADMIN' || user.role === 'TEAM_MANAGER') {
+            const activityKey = `activity:agent:${user.id}`;
+            const lastActivity = await redis.get(activityKey);
+            
+            if (lastActivity) {
+              const lastActivityTime = new Date(lastActivity);
+              const now = new Date();
+              const timeDiff = now.getTime() - lastActivityTime.getTime();
+              const ACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+              
+              realAvailability = timeDiff <= ACTIVITY_TIMEOUT ? 'ONLINE' : 'OFFLINE';
+            } else {
+              realAvailability = 'OFFLINE';
+            }
+          }
+
+          return {
+            ...user,
+            availability: realAvailability
+          };
+        })
+      );
+
       res.json({
         success: true,
-        data: users
+        data: usersWithRealStatus
       });
     } catch (error) {
       console.error('Get users error:', error);
