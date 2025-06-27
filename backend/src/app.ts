@@ -11,6 +11,7 @@ import prisma from '@/config/database';
 import redis from '@/config/redis';
 import { SyncService } from '@/services/sync.service';
 import { AgentAssignmentService } from '@/services/agent-assignment.service';
+import { SchedulerService } from '@/services/scheduler.service';
 
 // Import routes
 import authRoutes from '@/modules/auth/auth.routes';
@@ -25,11 +26,14 @@ import storesRoutes from '@/modules/stores/stores.routes';
 import assignmentRoutes from '@/modules/assignments/assignment.routes';
 import commissionRoutes from '@/modules/commissions/commission.routes';
 import defaultCommissionSettingsRoutes from '@/modules/commissions/default-commission-settings.routes';
+import activityLogsRoutes from '@/modules/activity-logs/activity-logs.routes';
+import schedulerRoutes from '@/modules/scheduler/scheduler.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
 import { notFound } from '@/common/middleware/notFound';
 import { authMiddleware } from '@/common/middleware/auth';
+import { activityLogger, errorLogger } from '@/common/middleware/activity-logger';
 
 class App {
   public app: express.Application;
@@ -37,6 +41,7 @@ class App {
   public io: Server;
   private syncService!: SyncService;
   private assignmentService!: AgentAssignmentService;
+  private schedulerService!: SchedulerService;
 
   constructor() {
     this.app = express();
@@ -55,6 +60,7 @@ class App {
     this.initializeSocketIO();
     this.initializeSyncService();
     this.initializeAssignmentService();
+    this.initializeSchedulerService();
   }
 
   private initializeMiddlewares(): void {
@@ -96,6 +102,9 @@ class App {
         environment: config.nodeEnv,
       });
     });
+
+    // Activity logging middleware (after auth routes but before other routes)
+    this.app.use('/api/v1', activityLogger);
   }
 
   private initializeRoutes(): void {
@@ -112,6 +121,8 @@ class App {
     this.app.use('/api/v1/assignments', authMiddleware, assignmentRoutes);
     this.app.use('/api/v1/commissions', commissionRoutes); // Commission routes have their own auth middleware
     this.app.use('/api/v1/commissions/default-settings', defaultCommissionSettingsRoutes); // Default commission settings routes
+    this.app.use('/api/v1/activity-logs', activityLogsRoutes); // Activity logs routes have their own auth middleware
+    this.app.use('/api/v1/scheduler', schedulerRoutes); // Scheduler routes for background job management
 
     // Root route
     this.app.get('/', (req, res) => {
@@ -124,6 +135,7 @@ class App {
   }
 
   private initializeErrorHandling(): void {
+    this.app.use(errorLogger);
     this.app.use(notFound);
     this.app.use(errorHandler);
   }
@@ -264,6 +276,24 @@ class App {
     }, 5 * 60 * 1000); // 5 minutes
     
     console.log('🎯 Agent assignment service initialized');
+  }
+
+  private initializeSchedulerService(): void {
+    this.schedulerService = new SchedulerService(redis);
+    
+    // Start scheduler in production or when explicitly enabled
+    if (config.nodeEnv === 'production' || process.env.ENABLE_SCHEDULER === 'true') {
+      // Start the production scheduler
+      this.schedulerService.startScheduler().catch(error => {
+        console.error('❌ Failed to start scheduler:', error);
+      });
+      console.log('📅 Production scheduler started');
+    } else {
+      console.log('📅 Scheduler service initialized (manual mode)');
+    }
+
+    // Make scheduler service available globally for manual triggers
+    (global as any).schedulerService = this.schedulerService;
   }
 
   private async cleanupInactiveUsers(): Promise<void> {

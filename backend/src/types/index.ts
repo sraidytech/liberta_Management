@@ -1,4 +1,4 @@
-import { User, Order, Customer, OrderItem, AgentActivity, Notification, ApiConfiguration, WebhookEvent } from '@prisma/client';
+import { User, Order, Customer, OrderItem, AgentActivity, Notification, ApiConfiguration, WebhookEvent, ActivityLog, ActionType, LogLevel } from '@prisma/client';
 
 // Extended types with relations
 export interface UserWithRelations extends User {
@@ -206,3 +206,109 @@ export interface AgentFilters {
   availability?: string;
   isActive?: boolean;
 }
+
+// Activity Log types
+export interface ActivityLogWithUser extends ActivityLog {
+  user?: User;
+}
+
+export interface CreateActivityLogRequest {
+  userId?: string;
+  userName?: string;
+  userRole?: string;
+  sessionId?: string;
+  action: string;
+  actionType: ActionType;
+  description: string;
+  logLevel?: LogLevel;
+  resourceType?: string;
+  resourceId?: string;
+  oldValues?: any;
+  newValues?: any;
+  ipAddress?: string;
+  userAgent?: string;
+  endpoint?: string;
+  httpMethod?: string;
+  statusCode?: number;
+  metadata?: any;
+}
+
+export interface ActivityLogFilters {
+  userId?: string;
+  actionType?: ActionType;
+  logLevel?: LogLevel;
+  resourceType?: string;
+  resourceId?: string;
+  dateFrom?: Date;
+  dateTo?: Date;
+  search?: string;
+}
+
+export interface ActivityLogQuery extends PaginationQuery {
+  filters?: ActivityLogFilters;
+}
+
+// Activity Log Actions - Predefined action constants
+export const ACTIVITY_ACTIONS = {
+  // Authentication
+  LOGIN: 'LOGIN',
+  LOGOUT: 'LOGOUT',
+  PASSWORD_CHANGE: 'PASSWORD_CHANGE',
+  PASSWORD_RESET: 'PASSWORD_RESET',
+  ACCOUNT_ACTIVATION: 'ACCOUNT_ACTIVATION',
+  
+  // User Management
+  USER_CREATE: 'USER_CREATE',
+  USER_UPDATE: 'USER_UPDATE',
+  USER_DELETE: 'USER_DELETE',
+  USER_ACTIVATE: 'USER_ACTIVATE',
+  USER_DEACTIVATE: 'USER_DEACTIVATE',
+  
+  // Order Management
+  ORDER_CREATE: 'ORDER_CREATE',
+  ORDER_UPDATE: 'ORDER_UPDATE',
+  ORDER_DELETE: 'ORDER_DELETE',
+  ORDER_ASSIGN: 'ORDER_ASSIGN',
+  ORDER_UNASSIGN: 'ORDER_UNASSIGN',
+  ORDER_STATUS_CHANGE: 'ORDER_STATUS_CHANGE',
+  
+  // Store Management
+  STORE_CREATE: 'STORE_CREATE',
+  STORE_UPDATE: 'STORE_UPDATE',
+  STORE_DELETE: 'STORE_DELETE',
+  STORE_ACTIVATE: 'STORE_ACTIVATE',
+  STORE_DEACTIVATE: 'STORE_DEACTIVATE',
+  
+  // Assignment Operations
+  BULK_ASSIGNMENT: 'BULK_ASSIGNMENT',
+  MANUAL_ASSIGNMENT: 'MANUAL_ASSIGNMENT',
+  AUTO_ASSIGNMENT: 'AUTO_ASSIGNMENT',
+  ASSIGNMENT_OVERRIDE: 'ASSIGNMENT_OVERRIDE',
+  
+  // Commission Management
+  COMMISSION_RATE_CREATE: 'COMMISSION_RATE_CREATE',
+  COMMISSION_RATE_UPDATE: 'COMMISSION_RATE_UPDATE',
+  COMMISSION_RATE_DELETE: 'COMMISSION_RATE_DELETE',
+  COMMISSION_SETTINGS_UPDATE: 'COMMISSION_SETTINGS_UPDATE',
+  
+  // System Events
+  SYNC_START: 'SYNC_START',
+  SYNC_COMPLETE: 'SYNC_COMPLETE',
+  SYNC_ERROR: 'SYNC_ERROR',
+  WEBHOOK_RECEIVED: 'WEBHOOK_RECEIVED',
+  WEBHOOK_PROCESSED: 'WEBHOOK_PROCESSED',
+  
+  // API Events
+  API_CALL_SUCCESS: 'API_CALL_SUCCESS',
+  API_CALL_ERROR: 'API_CALL_ERROR',
+  API_RATE_LIMIT: 'API_RATE_LIMIT',
+  
+  // Error Events
+  SYSTEM_ERROR: 'SYSTEM_ERROR',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
+  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR'
+} as const;
+
+export type ActivityAction = typeof ACTIVITY_ACTIONS[keyof typeof ACTIVITY_ACTIONS];

@@ -24,7 +24,8 @@ import {
   UserCheck,
   Calculator,
   FileText,
-  Key
+  Key,
+  Activity
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -81,6 +82,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: FileText,
       href: '/admin/reports',
       active: pathname === '/admin/reports'
+    },
+    {
+      name: language === 'fr' ? 'Journaux d\'Activité' : 'Activity Logs',
+      icon: Activity,
+      href: '/admin/activity-logs',
+      active: pathname === '/admin/activity-logs'
     },
     {
       name: language === 'fr' ? 'Paramètres' : 'Settings',

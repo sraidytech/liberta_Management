@@ -1,0 +1,5 @@
+# Please edit this file to reflect the correct migration history for your database.
+# Read more about migration files and how to apply them: https://pris.ly/d/migrate
+
+[migration]
+applied_at = 2025-06-25T18:53:35.000Z

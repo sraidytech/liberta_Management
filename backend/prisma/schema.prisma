@@ -33,6 +33,7 @@ model User {
   createdApiConfigs ApiConfiguration[] @relation("CreatedBy")
   commissionRates  AgentCommissionRate[] @relation("AgentCommissionRates")
   productConfirmationRates AgentProductConfirmationRate[] @relation("AgentProductConfirmationRates")
+  activityLogs     ActivityLog[] @relation("UserActivityLogs")
 
   // NextAuth.js fields
   emailVerified DateTime?
@@ -349,4 +350,68 @@ model DefaultCommissionSettings {
   updatedAt             DateTime @updatedAt
   
   @@map("default_commission_settings")
+}
+
+model ActivityLog {
+  id              String          @id @default(cuid())
+  timestamp       DateTime        @default(now())
+  
+  // User information
+  userId          String?
+  userName        String?
+  userRole        UserRole?
+  sessionId       String?
+  
+  // Action details
+  action          String          // e.g., "LOGIN", "ORDER_UPDATE", "USER_CREATE"
+  actionType      ActionType      // Category of action
+  description     String          // Human-readable description
+  logLevel        LogLevel        @default(INFO)
+  
+  // Resource information
+  resourceType    String?         // e.g., "ORDER", "USER", "STORE"
+  resourceId      String?         // ID of the affected resource
+  
+  // Change tracking
+  oldValues       Json?           // Previous state (for updates)
+  newValues       Json?           // New state (for updates)
+  
+  // Request context
+  ipAddress       String?
+  userAgent       String?
+  endpoint        String?         // API endpoint called
+  httpMethod      String?         // GET, POST, PUT, DELETE
+  statusCode      Int?            // HTTP response status
+  
+  // Additional metadata
+  metadata        Json?           // Flexible field for additional context
+  
+  // Relations
+  user            User?           @relation("UserActivityLogs", fields: [userId], references: [id])
+  
+  @@index([timestamp])
+  @@index([userId])
+  @@index([actionType])
+  @@index([logLevel])
+  @@index([resourceType, resourceId])
+  @@map("activity_logs")
+}
+
+enum ActionType {
+  AUTHENTICATION     // Login, logout, password changes
+  USER_MANAGEMENT    // User CRUD operations
+  ORDER_MANAGEMENT   // Order operations
+  STORE_MANAGEMENT   // Store configuration
+  ASSIGNMENT         // Agent assignments
+  COMMISSION         // Commission settings
+  SYSTEM             // System events, sync operations
+  WEBHOOK            // Webhook events
+  API_CALL           // External API calls
+  ERROR              // Error events
+}
+
+enum LogLevel {
+  INFO
+  WARNING
+  ERROR
 }
