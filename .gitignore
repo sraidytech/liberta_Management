@@ -16,6 +16,23 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+
+# Backend environment files
+backend/.env
+backend/.env.local
+backend/.env.development.local
+backend/.env.test.local
+backend/.env.production.local
+backend/.env.production
+
+# Frontend environment files
+frontend/.env
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/.env.production
 
 # Database
 *.db
@@ -52,8 +69,10 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
-.env
+# Additional environment files
+.env.*
+!.env.example
+!.env.*.example
 
 # next.js build output
 .next
