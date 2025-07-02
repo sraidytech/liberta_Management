@@ -1,5 +1,7 @@
 import { PrismaClient, AgentAvailability, UserRole } from '@prisma/client';
 import { Redis } from 'ioredis';
+import { notificationIntegrationService } from './notification-integration.service';
+import { productAssignmentService } from './product-assignment.service';
 
 const prisma = new PrismaClient();
 
@@ -39,7 +41,10 @@ export class AgentAssignmentService {
       // Check if order exists and is not already assigned
       const order = await prisma.order.findUnique({
         where: { id: orderId },
-        include: { assignedAgent: true }
+        include: {
+          assignedAgent: true,
+          items: true // Include items to get product names
+        }
       });
 
       if (!order) {
@@ -60,19 +65,22 @@ export class AgentAssignmentService {
         };
       }
 
-      // Get available AGENT_SUIVI agents (mandatory assignment - always get agents)
-      const availableAgents = await this.getAvailableAgents();
+      // Get product names from order items
+      const productNames = order.items.map(item => item.title);
+
+      // Get available agents based on product assignments
+      const availableAgents = await this.getAvailableAgentsForProducts(productNames);
 
       if (availableAgents.length === 0) {
         return {
           success: false,
-          message: 'No AGENT_SUIVI users found in the system',
+          message: 'No agents assigned to the products in this order',
           orderId
         };
       }
 
-      // Select agent using round-robin
-      const selectedAgent = await this.selectAgentRoundRobin(availableAgents);
+      // Select agent using round-robin within product-assigned agents
+      const selectedAgent = await this.selectAgentRoundRobinForProducts(availableAgents, productNames);
 
       if (!selectedAgent) {
         return {
@@ -84,6 +92,9 @@ export class AgentAssignmentService {
 
       // Perform the assignment
       await this.performAssignment(orderId, selectedAgent.id);
+
+      // Send notification after successful assignment
+      await notificationIntegrationService.handleOrderAssignment(orderId, selectedAgent.id);
 
       return {
         success: true,
@@ -283,6 +294,116 @@ export class AgentAssignmentService {
   }
 
   /**
+   * Get available agents for specific products
+   */
+  private async getAvailableAgentsForProducts(productNames: string[]): Promise<AgentStatus[]> {
+    if (productNames.length === 0) {
+      return this.getAvailableAgents(); // Fallback to all agents if no products
+    }
+
+    // Get all users assigned to any of these products
+    const assignedUsers = await Promise.all(
+      productNames.map(productName =>
+        productAssignmentService.getUsersAssignedToProduct(productName)
+      )
+    );
+
+    // Flatten and deduplicate user IDs
+    const userIds = [...new Set(assignedUsers.flat().map(user => user.id))];
+
+    if (userIds.length === 0) {
+      return this.getAvailableAgents(); // Fallback to all agents if no assignments
+    }
+
+    // Get all active AGENT_SUIVI users assigned to these products
+    const agents = await prisma.user.findMany({
+      where: {
+        id: { in: userIds },
+        isActive: true,
+        role: 'AGENT_SUIVI'
+      },
+      select: {
+        id: true,
+        name: true,
+        agentCode: true,
+        maxOrders: true,
+        currentOrders: true
+      }
+    });
+
+    const availableAgents: AgentStatus[] = [];
+
+    for (const agent of agents) {
+      // Check if agent has capacity based on TODAY's assignments only
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const todaysAssignedOrdersCount = await prisma.order.count({
+        where: {
+          assignedAgentId: agent.id,
+          assignedAt: {
+            gte: today,
+            lt: tomorrow
+          }
+        }
+      });
+
+      const hasCapacity = todaysAssignedOrdersCount < agent.maxOrders;
+      const isOnline = await this.isAgentOnline(agent.id);
+      
+      availableAgents.push({
+        id: agent.id,
+        name: agent.name || '',
+        agentCode: agent.agentCode || '',
+        isActive: true,
+        isOnline: isOnline,
+        currentOrders: todaysAssignedOrdersCount,
+        maxOrders: agent.maxOrders,
+        hasCapacity: hasCapacity
+      } as AgentStatus & { hasCapacity: boolean });
+    }
+
+    // Sort agents: those with capacity first, then by current orders (ascending)
+    availableAgents.sort((a, b) => {
+      const aHasCapacity = (a as any).hasCapacity;
+      const bHasCapacity = (b as any).hasCapacity;
+      
+      if (aHasCapacity && !bHasCapacity) return -1;
+      if (!aHasCapacity && bHasCapacity) return 1;
+      
+      return a.currentOrders - b.currentOrders;
+    });
+
+    return availableAgents;
+  }
+
+  /**
+   * Round-robin agent selection for specific products
+   */
+  private async selectAgentRoundRobinForProducts(agents: AgentStatus[], productNames: string[]): Promise<AgentStatus | null> {
+    if (agents.length === 0) return null;
+
+    // Create a unique key for this product combination
+    const productKey = productNames.sort().join('|');
+    const roundRobinKey = `${this.ROUND_ROBIN_KEY}:products:${productKey}`;
+
+    // Get the last assigned agent index from Redis for this product combination
+    const lastIndex = await this.redis.get(roundRobinKey);
+    
+    let nextIndex = 0;
+    if (lastIndex !== null) {
+      nextIndex = (parseInt(lastIndex) + 1) % agents.length;
+    }
+
+    // Update the index in Redis
+    await this.redis.set(roundRobinKey, nextIndex.toString());
+
+    return agents[nextIndex];
+  }
+
+  /**
    * Perform the actual assignment in the database
    */
   private async performAssignment(orderId: string, agentId: string, adminId?: string) {
@@ -307,28 +428,18 @@ export class AgentAssignmentService {
         }
       });
 
-      // Create activity log
-      await tx.agentActivity.create({
-        data: {
-          agentId: agentId,
-          orderId: orderId,
-          activityType: 'ORDER_ASSIGNED',
-          description: adminId
-            ? `Order manually assigned by admin (${adminId})`
-            : 'Order automatically assigned via round-robin system'
-        }
-      });
-
-      // Create notification for the agent
-      await tx.notification.create({
-        data: {
-          userId: agentId,
-          orderId: orderId,
-          type: 'ORDER_ASSIGNMENT',
-          title: 'New Order Assigned',
-          message: `Order ${updatedOrder.reference} has been automatically assigned to you`
-        }
-      });
+      // 🚨 OPTIMIZED: Only create activity log for manual assignments to reduce database bloat
+      if (adminId) {
+        await tx.agentActivity.create({
+          data: {
+            agentId: agentId,
+            orderId: orderId,
+            activityType: 'ORDER_ASSIGNED',
+            description: `Order manually assigned by admin (${adminId})`
+          }
+        });
+      }
+      // For automatic assignments, we rely on the order's assignedAt timestamp instead of creating activity records
 
       return updatedOrder;
     });
@@ -408,6 +519,9 @@ export class AgentAssignmentService {
       } else {
         // Assign to agent for the first time
         await this.performAssignment(orderId, agentId, adminId);
+        
+        // Send notification after successful manual assignment
+        await notificationIntegrationService.handleOrderAssignment(orderId, agentId, adminId);
         
         return {
           success: true,
@@ -510,17 +624,18 @@ export class AgentAssignmentService {
         }
       });
 
-      // Create activity log for reassignment
-      await tx.agentActivity.create({
-        data: {
-          agentId: newAgentId,
-          orderId: orderId,
-          activityType: 'ORDER_ASSIGNED',
-          description: adminId
-            ? `Order reassigned by admin (${adminId}) from agent ${oldAgentId}`
-            : `Order reassigned from agent ${oldAgentId}`
-        }
-      });
+      // 🚨 OPTIMIZED: Only create activity log for manual reassignments by admin
+      if (adminId) {
+        await tx.agentActivity.create({
+          data: {
+            agentId: newAgentId,
+            orderId: orderId,
+            activityType: 'ORDER_ASSIGNED',
+            description: `Order reassigned by admin (${adminId}) from agent ${oldAgentId}`
+          }
+        });
+      }
+      // For automatic reassignments, we rely on the order's assignedAt timestamp
     });
   }
 
@@ -664,8 +779,9 @@ export class AgentAssignmentService {
       
       console.log(`✅ Agent ${agentId} marked as offline`);
       
-      // Optionally redistribute ASSIGNED orders to other online agents
-      await this.redistributeAgentOrders(agentId);
+      // 🚨 REMOVED AUTOMATIC REDISTRIBUTION - Only redistribute when explicitly requested by admin
+      // await this.redistributeAgentOrders(agentId);
+      console.log(`📋 Orders remain assigned to ${agentId} - use manual redistribution if needed`);
     } catch (error) {
       console.error('Error setting agent offline:', error);
     }
@@ -888,16 +1004,8 @@ export class AgentAssignmentService {
           }
         });
 
-        // Create notification for new agent
-        await tx.notification.create({
-          data: {
-            userId: newAgentId,
-            orderId: orderId,
-            type: 'ORDER_ASSIGNMENT',
-            title: 'Order Reassigned',
-            message: `Order ${order.reference} has been reassigned to you`
-          }
-        });
+        // ORDER_ASSIGNMENT notifications disabled per user request
+        console.log(`📋 Order reassignment notification disabled for order ${order.reference} reassigned to agent ${newAgentId}`);
       });
 
       return {

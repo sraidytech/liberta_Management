@@ -4,6 +4,8 @@ import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import PasswordChangeModal from '@/components/admin/password-change-modal';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -25,7 +27,8 @@ import {
   Calculator,
   FileText,
   Key,
-  Activity
+  Activity,
+  Package
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -39,6 +42,15 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const pathname = usePathname();
+
+  // Don't render if no user
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   const sidebarItems = [
     {
@@ -78,10 +90,22 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       active: pathname === '/admin/commissions'
     },
     {
+      name: language === 'fr' ? 'Assignation de Produits' : 'Product Assignment',
+      icon: Package,
+      href: '/admin/product-assignments',
+      active: pathname === '/admin/product-assignments'
+    },
+    {
       name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',
       icon: FileText,
       href: '/admin/reports',
       active: pathname === '/admin/reports'
+    },
+    {
+      name: language === 'fr' ? 'Notifications' : 'Notifications',
+      icon: Bell,
+      href: '/admin/notifications',
+      active: pathname === '/admin/notifications'
     },
     {
       name: language === 'fr' ? 'Journaux d\'Activité' : 'Activity Logs',
@@ -98,7 +122,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <NotificationProvider userId={user.id} userRole={user.role}>
+      <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
@@ -246,10 +271,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               </div>
 
               {/* Notifications */}
-              <button className="relative p-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 transition-all duration-200">
-                <Bell className="w-5 h-5 text-gray-600" />
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm"></span>
-              </button>
+              <NotificationBell
+                language={language}
+              />
 
               {/* Profile */}
               <button className="flex items-center space-x-2 p-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 transition-all duration-200">
@@ -280,6 +304,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           isOwnPassword={true}
         />
       )}
-    </div>
+      </div>
+    </NotificationProvider>
   );
 }

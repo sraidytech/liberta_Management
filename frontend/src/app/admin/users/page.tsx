@@ -24,14 +24,17 @@ import {
   Eye,
   Lock,
   Unlock,
-  Key
+  Key,
+  Package,
+  X
 } from 'lucide-react';
+import ProductAssignment from '@/components/admin/product-assignment';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'TEAM_MANAGER' | 'AGENT_SUIVI' | 'AGENT_CALL_CENTER';
+  role: 'ADMIN' | 'TEAM_MANAGER' | 'COORDINATEUR' | 'AGENT_SUIVI' | 'AGENT_CALL_CENTER';
   isActive: boolean;
   agentCode?: string;
   maxOrders: number;
@@ -51,6 +54,7 @@ export default function UserManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showProductAssignmentModal, setShowProductAssignmentModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -219,6 +223,7 @@ export default function UserManagement() {
     const labels = {
       'ADMIN': language === 'fr' ? 'Administrateur' : 'Administrator',
       'TEAM_MANAGER': language === 'fr' ? 'Gestionnaire d\'équipe' : 'Team Manager',
+      'COORDINATEUR': language === 'fr' ? 'Coordinateur' : 'Coordinator',
       'AGENT_SUIVI': language === 'fr' ? 'Agent de suivi' : 'Follow-up Agent',
       'AGENT_CALL_CENTER': language === 'fr' ? 'Agent centre d\'appels' : 'Call Center Agent'
     };
@@ -392,6 +397,7 @@ export default function UserManagement() {
               <option value="all">{language === 'fr' ? 'Tous les rôles' : 'All roles'}</option>
               <option value="ADMIN">{language === 'fr' ? 'Administrateurs' : 'Administrators'}</option>
               <option value="TEAM_MANAGER">{language === 'fr' ? 'Gestionnaires' : 'Managers'}</option>
+              <option value="COORDINATEUR">{language === 'fr' ? 'Coordinateurs' : 'Coordinators'}</option>
               <option value="AGENT_SUIVI">{language === 'fr' ? 'Agents de suivi' : 'Follow-up Agents'}</option>
               <option value="AGENT_CALL_CENTER">{language === 'fr' ? 'Agents centre d\'appels' : 'Call Center Agents'}</option>
             </select>
@@ -496,6 +502,16 @@ export default function UserManagement() {
                         title={language === 'fr' ? 'Changer le mot de passe' : 'Change Password'}
                       >
                         <Key className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowProductAssignmentModal(true);
+                        }}
+                        className="p-2 rounded-xl bg-green-50 text-green-600 hover:bg-green-100 transition-all duration-200 shadow-sm hover:shadow-md"
+                        title={language === 'fr' ? 'Assignation de produits' : 'Product Assignment'}
+                      >
+                        <Package className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => toggleUserStatus(user.id, user.isActive, user.role)}
@@ -634,6 +650,35 @@ export default function UserManagement() {
           isOwnPassword={false}
         />
       )}
+
+      {/* Product Assignment Modal */}
+      {showProductAssignmentModal && selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {language === 'fr' ? 'Assignation de Produits' : 'Product Assignment'} - {selectedUser.name}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowProductAssignmentModal(false);
+                  setSelectedUser(null);
+                }}
+                className="p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <ProductAssignment
+              userId={selectedUser.id}
+              onAssignmentsChange={(assignments) => {
+                console.log('Product assignments updated:', assignments);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
@@ -767,6 +812,7 @@ function CreateUserModal({ isOpen, onClose, onSuccess, language }: {
               className="w-full px-3 py-2 bg-gray-50 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
             >
               <option value="TEAM_MANAGER">{language === 'fr' ? 'Gestionnaire d\'équipe' : 'Team Manager'}</option>
+              <option value="COORDINATEUR">{language === 'fr' ? 'Coordinateur' : 'Coordinator'}</option>
               <option value="AGENT_SUIVI">{language === 'fr' ? 'Agent de suivi' : 'Follow-up Agent'}</option>
               <option value="AGENT_CALL_CENTER">{language === 'fr' ? 'Agent centre d\'appels' : 'Call Center Agent'}</option>
             </select>
@@ -933,6 +979,7 @@ function EditUserModal({ isOpen, onClose, user, onSuccess, language }: {
                 className="w-full px-3 py-2 bg-gray-50 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
               >
                 <option value="TEAM_MANAGER">{language === 'fr' ? 'Gestionnaire d\'équipe' : 'Team Manager'}</option>
+                <option value="COORDINATEUR">{language === 'fr' ? 'Coordinateur' : 'Coordinator'}</option>
                 <option value="AGENT_SUIVI">{language === 'fr' ? 'Agent de suivi' : 'Follow-up Agent'}</option>
                 <option value="AGENT_CALL_CENTER">{language === 'fr' ? 'Agent centre d\'appels' : 'Call Center Agent'}</option>
               </select>

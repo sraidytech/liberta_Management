@@ -104,10 +104,14 @@ export const requireAdmin = requireRole([UserRole.ADMIN]);
 // Manager or Admin middleware
 export const requireManager = requireRole([UserRole.ADMIN, UserRole.TEAM_MANAGER]);
 
+// Coordinateur middleware
+export const requireCoordinateur = requireRole([UserRole.ADMIN, UserRole.TEAM_MANAGER, UserRole.COORDINATEUR]);
+
 // Agent middleware (any agent role)
 export const requireAgent = requireRole([
   UserRole.ADMIN,
   UserRole.TEAM_MANAGER,
+  UserRole.COORDINATEUR,
   UserRole.AGENT_SUIVI,
   UserRole.AGENT_CALL_CENTER,
 ]);

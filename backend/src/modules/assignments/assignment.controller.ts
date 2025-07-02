@@ -16,8 +16,8 @@ export class AssignmentController {
       const userId = (req as any).user?.id;
       const userRole = (req as any).user?.role;
 
-      // Only allow ADMIN and TEAM_MANAGER to trigger assignments
-      if (!['ADMIN', 'TEAM_MANAGER'].includes(userRole)) {
+      // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to trigger assignments
+      if (!['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
         return res.status(403).json({
           success: false,
           error: {
@@ -104,8 +104,8 @@ export class AssignmentController {
         });
       }
 
-      // Only allow ADMIN and TEAM_MANAGER to reassign orders
-      if (!['ADMIN', 'TEAM_MANAGER'].includes(userRole)) {
+      // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to reassign orders
+      if (!['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
         return res.status(403).json({
           success: false,
           error: {
@@ -157,8 +157,8 @@ export class AssignmentController {
         targetAgents // array of { agentId, percentage }
       } = req.body;
 
-      // Only allow ADMIN and TEAM_MANAGER to bulk reassign orders
-      if (!['ADMIN', 'TEAM_MANAGER'].includes(userRole)) {
+      // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to bulk reassign orders
+      if (!['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
         return res.status(403).json({
           success: false,
           error: {
@@ -364,8 +364,8 @@ export class AssignmentController {
         });
       }
 
-      // Only allow ADMIN and TEAM_MANAGER to manually assign orders
-      if (!['ADMIN', 'TEAM_MANAGER'].includes(userRole)) {
+      // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to manually assign orders
+      if (!['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
         return res.status(403).json({
           success: false,
           error: {
@@ -410,8 +410,8 @@ export class AssignmentController {
     try {
       const userRole = (req as any).user?.role;
 
-      // Only allow ADMIN and TEAM_MANAGER to view agents
-      if (!['ADMIN', 'TEAM_MANAGER'].includes(userRole)) {
+      // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to view agents
+      if (!['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
         return res.status(403).json({
           success: false,
           error: {
@@ -500,7 +500,11 @@ export class AssignmentController {
         if (availability === 'ONLINE') {
           await assignmentService.updateAgentActivity(agentId);
         } else if (availability === 'OFFLINE') {
-          await assignmentService.setAgentOffline(agentId);
+          // 🚨 FIXED: Only mark as offline without automatic redistribution
+          // Remove socket connection and activity tracking
+          await redis.del(`socket:agent:${agentId}`);
+          await redis.del(`activity:agent:${agentId}`);
+          console.log(`✅ Agent ${agentId} marked as offline via availability update`);
         }
 
         // Emit socket event if available

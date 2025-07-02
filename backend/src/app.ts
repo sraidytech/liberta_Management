@@ -28,6 +28,7 @@ import commissionRoutes from '@/modules/commissions/commission.routes';
 import defaultCommissionSettingsRoutes from '@/modules/commissions/default-commission-settings.routes';
 import activityLogsRoutes from '@/modules/activity-logs/activity-logs.routes';
 import schedulerRoutes from '@/modules/scheduler/scheduler.routes';
+import productAssignmentRoutes from '@/modules/product-assignments/product-assignments.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -123,6 +124,7 @@ class App {
     this.app.use('/api/v1/commissions/default-settings', defaultCommissionSettingsRoutes); // Default commission settings routes
     this.app.use('/api/v1/activity-logs', activityLogsRoutes); // Activity logs routes have their own auth middleware
     this.app.use('/api/v1/scheduler', schedulerRoutes); // Scheduler routes for background job management
+    this.app.use('/api/v1/product-assignments', productAssignmentRoutes); // Product assignment routes have their own auth middleware
 
     // Root route
     this.app.get('/', (req, res) => {

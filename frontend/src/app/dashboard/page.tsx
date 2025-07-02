@@ -31,6 +31,9 @@ export default function DashboardPage() {
       if (user.role === 'ADMIN' || user.role === 'TEAM_MANAGER') {
         console.log('👑 Redirecting admin to admin panel');
         router.push('/admin');
+      } else if (user.role === 'COORDINATEUR') {
+        console.log('🎯 Redirecting coordinateur to coordinateur panel');
+        router.push('/coordinateur');
       } else if (user.role === 'AGENT_SUIVI' || user.role === 'AGENT_CALL_CENTER') {
         console.log('👤 Redirecting agent to agent portal');
         router.push('/agent');

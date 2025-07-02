@@ -85,7 +85,7 @@ export function Pagination({
       </div>
 
       {/* Pagination controls */}
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-3">
         {/* Previous button */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
@@ -99,7 +99,7 @@ export function Pagination({
         </button>
 
         {/* Page numbers */}
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-1 mr-2">
           {visiblePages.map((page, index) => (
             <div key={index}>
               {page === '...' ? (

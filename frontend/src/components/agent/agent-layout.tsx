@@ -3,13 +3,15 @@
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
 import { LanguageSwitcher } from '@/components/language-switcher';
+import { NotificationProvider } from '@/contexts/NotificationContext';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { 
-  Package, 
-  BarChart3, 
-  Settings, 
+import {
+  Package,
+  BarChart3,
+  Settings,
   Bell,
   Search,
   Menu,
@@ -47,6 +49,12 @@ export default function AgentLayout({ children }: AgentLayoutProps) {
       active: pathname === '/agent/orders'
     },
     {
+      name: language === 'fr' ? 'Notifications' : 'Notifications',
+      icon: Bell,
+      href: '/agent/notifications',
+      active: pathname === '/agent/notifications'
+    },
+    {
       name: language === 'fr' ? 'Appels' : 'Calls',
       icon: Phone,
       href: '/agent/calls',
@@ -67,7 +75,8 @@ export default function AgentLayout({ children }: AgentLayoutProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <NotificationProvider userId={user?.id} userRole={user?.role}>
+      <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
@@ -206,12 +215,7 @@ export default function AgentLayout({ children }: AgentLayoutProps) {
           {/* Right section */}
           <div className="flex items-center space-x-4">
             {/* Notifications */}
-            <button className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <Bell className="h-5 w-5 text-gray-600" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full flex items-center justify-center">
-                <span className="text-xs text-white font-medium">3</span>
-              </span>
-            </button>
+            <NotificationBell language={language} />
 
             {/* Language switcher */}
             <LanguageSwitcher />
@@ -223,6 +227,7 @@ export default function AgentLayout({ children }: AgentLayoutProps) {
           {children}
         </main>
       </div>
-    </div>
+      </div>
+    </NotificationProvider>
   );
 }

@@ -34,6 +34,7 @@ model User {
   commissionRates  AgentCommissionRate[] @relation("AgentCommissionRates")
   productConfirmationRates AgentProductConfirmationRate[] @relation("AgentProductConfirmationRates")
   activityLogs     ActivityLog[] @relation("UserActivityLogs")
+  productAssignments UserProductAssignment[] @relation("UserProductAssignments")
 
   // NextAuth.js fields
   emailVerified DateTime?
@@ -238,6 +239,7 @@ model WebhookEvent {
 enum UserRole {
   ADMIN
   TEAM_MANAGER
+  COORDINATEUR
   AGENT_SUIVI
   AGENT_CALL_CENTER
 }
@@ -414,4 +416,21 @@ enum LogLevel {
   INFO
   WARNING
   ERROR
+}
+
+model UserProductAssignment {
+  id          String   @id @default(cuid())
+  userId      String
+  productName String   // Product name from OrderItem.title
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  user User @relation("UserProductAssignments", fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, productName])
+  @@index([userId])
+  @@index([productName])
+  @@map("user_product_assignments")
 }

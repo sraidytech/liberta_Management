@@ -247,6 +247,82 @@ export interface Translations {
   failedToUpdateCommissionSettings: string;
   errorFetchingCommissionSettings: string;
   settingsResetToLastSavedValues: string;
+  
+  // Notifications
+  notifications: string;
+  notification: string;
+  unread: string;
+  markAsRead: string;
+  markAllAsRead: string;
+  markAllRead: string;
+  noNotifications: string;
+  noNotificationsYet: string;
+  viewAllNotifications: string;
+  newOrderAssigned: string;
+  orderStatusUpdated: string;
+  shippingUpdate: string;
+  systemAlert: string;
+  orderAssignment: string;
+  orderUpdate: string;
+  disconnectedFromServer: string;
+  connectedToServer: string;
+  notificationSettings: string;
+  enableNotifications: string;
+  disableNotifications: string;
+  testNotification: string;
+  sendTestNotification: string;
+  notificationSent: string;
+  failedToSendNotification: string;
+  loadingNotifications: string;
+  refreshNotifications: string;
+  notificationHistory: string;
+  clearNotifications: string;
+  notificationPreferences: string;
+  emailNotifications: string;
+  pushNotifications: string;
+  inAppNotifications: string;
+  notificationTypes: string;
+  orderNotifications: string;
+  systemNotifications: string;
+  deliveryNotifications: string;
+  agentNotifications: string;
+  andMoreNotifications: string;
+  minutesAgo: string;
+  hoursAgo: string;
+  daysAgo: string;
+  justNow: string;
+  yesterday: string;
+  today: string;
+  thisWeek: string;
+  lastWeek: string;
+  thisMonth: string;
+  lastMonth: string;
+  
+  // Coordinateur Interface
+  myProducts: string;
+  manageAndMonitorProducts: string;
+  assignedProducts: string;
+  assignedAgents: string;
+  fromAssignedProducts: string;
+  acrossAllProducts: string;
+  searchProducts: string;
+  failedToLoadAssignedProducts: string;
+  noProductsAssigned: string;
+  contactAdministratorForAssignments: string;
+  noProductsFound: string;
+  noProductsMatchSearch: string;
+  category: string;
+  price: string;
+  revenue: string;
+  active: string;
+  inactive: string;
+  myOrders: string;
+  manageOrdersForAssignedProducts: string;
+  agentAssignment: string;
+  manageAgentsForProducts: string;
+  orderDetailsModal: string;
+  viewOrderDetails: string;
+  retry: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -497,6 +573,82 @@ export const translations: Record<Language, Translations> = {
     failedToUpdateCommissionSettings: 'Failed to update commission settings',
     errorFetchingCommissionSettings: 'Error fetching commission settings',
     settingsResetToLastSavedValues: 'Settings reset to last saved values',
+    
+    // Notifications
+    notifications: 'Notifications',
+    notification: 'Notification',
+    unread: 'unread',
+    markAsRead: 'Mark as read',
+    markAllAsRead: 'Mark all as read',
+    markAllRead: 'Mark all read',
+    noNotifications: 'No notifications',
+    noNotificationsYet: 'No notifications yet',
+    viewAllNotifications: 'View all notifications',
+    newOrderAssigned: 'New Order Assigned',
+    orderStatusUpdated: 'Order Status Updated',
+    shippingUpdate: 'Shipping Update',
+    systemAlert: 'System Alert',
+    orderAssignment: 'Order Assignment',
+    orderUpdate: 'Order Update',
+    disconnectedFromServer: 'Disconnected from notification server',
+    connectedToServer: 'Connected to notification server',
+    notificationSettings: 'Notification Settings',
+    enableNotifications: 'Enable Notifications',
+    disableNotifications: 'Disable Notifications',
+    testNotification: 'Test Notification',
+    sendTestNotification: 'Send Test Notification',
+    notificationSent: 'Notification sent successfully',
+    failedToSendNotification: 'Failed to send notification',
+    loadingNotifications: 'Loading notifications...',
+    refreshNotifications: 'Refresh Notifications',
+    notificationHistory: 'Notification History',
+    clearNotifications: 'Clear Notifications',
+    notificationPreferences: 'Notification Preferences',
+    emailNotifications: 'Email Notifications',
+    pushNotifications: 'Push Notifications',
+    inAppNotifications: 'In-App Notifications',
+    notificationTypes: 'Notification Types',
+    orderNotifications: 'Order Notifications',
+    systemNotifications: 'System Notifications',
+    deliveryNotifications: 'Delivery Notifications',
+    agentNotifications: 'Agent Notifications',
+    andMoreNotifications: 'and {count} more notifications...',
+    minutesAgo: 'minutes ago',
+    hoursAgo: 'hours ago',
+    daysAgo: 'days ago',
+    justNow: 'just now',
+    yesterday: 'yesterday',
+    today: 'today',
+    thisWeek: 'this week',
+    lastWeek: 'last week',
+    thisMonth: 'this month',
+    lastMonth: 'last month',
+    
+    // Coordinateur Interface
+    myProducts: 'My Products',
+    manageAndMonitorProducts: 'Manage and monitor your assigned products',
+    assignedProducts: 'Assigned Products',
+    assignedAgents: 'Assigned Agents',
+    fromAssignedProducts: 'From assigned products',
+    acrossAllProducts: 'Across all products',
+    searchProducts: 'Search products...',
+    failedToLoadAssignedProducts: 'Failed to load your assigned products',
+    noProductsAssigned: 'No Products Assigned',
+    contactAdministratorForAssignments: 'You have not been assigned to any products yet. Contact your administrator to get product assignments.',
+    noProductsFound: 'No Products Found',
+    noProductsMatchSearch: 'No products match your search criteria. Try adjusting your search terms.',
+    category: 'Category',
+    price: 'Price',
+    revenue: 'Revenue',
+    active: 'Active',
+    inactive: 'Inactive',
+    myOrders: 'My Orders',
+    manageOrdersForAssignedProducts: 'Manage orders for your assigned products',
+    agentAssignment: 'Agent Assignment',
+    manageAgentsForProducts: 'Manage agents for your assigned products',
+    orderDetailsModal: 'Order Details',
+    viewOrderDetails: 'View Order Details',
+    retry: 'Retry',
   },
   fr: {
     // Common
@@ -745,6 +897,82 @@ export const translations: Record<Language, Translations> = {
     failedToUpdateCommissionSettings: 'Échec de la mise à jour des paramètres de commission',
     errorFetchingCommissionSettings: 'Erreur lors de la récupération des paramètres de commission',
     settingsResetToLastSavedValues: 'Paramètres réinitialisés aux dernières valeurs sauvegardées',
+    
+    // Notifications
+    notifications: 'Notifications',
+    notification: 'Notification',
+    unread: 'non lues',
+    markAsRead: 'Marquer comme lu',
+    markAllAsRead: 'Marquer tout comme lu',
+    markAllRead: 'Tout marquer comme lu',
+    noNotifications: 'Aucune notification',
+    noNotificationsYet: 'Aucune notification pour le moment',
+    viewAllNotifications: 'Voir toutes les notifications',
+    newOrderAssigned: 'Nouvelle Commande Assignée',
+    orderStatusUpdated: 'Statut de Commande Mis à Jour',
+    shippingUpdate: 'Mise à Jour de Livraison',
+    systemAlert: 'Alerte Système',
+    orderAssignment: 'Assignation de Commande',
+    orderUpdate: 'Mise à Jour de Commande',
+    disconnectedFromServer: 'Déconnecté du serveur de notifications',
+    connectedToServer: 'Connecté au serveur de notifications',
+    notificationSettings: 'Paramètres de Notification',
+    enableNotifications: 'Activer les Notifications',
+    disableNotifications: 'Désactiver les Notifications',
+    testNotification: 'Notification de Test',
+    sendTestNotification: 'Envoyer une Notification de Test',
+    notificationSent: 'Notification envoyée avec succès',
+    failedToSendNotification: 'Échec de l\'envoi de la notification',
+    loadingNotifications: 'Chargement des notifications...',
+    refreshNotifications: 'Actualiser les Notifications',
+    notificationHistory: 'Historique des Notifications',
+    clearNotifications: 'Effacer les Notifications',
+    notificationPreferences: 'Préférences de Notification',
+    emailNotifications: 'Notifications Email',
+    pushNotifications: 'Notifications Push',
+    inAppNotifications: 'Notifications In-App',
+    notificationTypes: 'Types de Notification',
+    orderNotifications: 'Notifications de Commande',
+    systemNotifications: 'Notifications Système',
+    deliveryNotifications: 'Notifications de Livraison',
+    agentNotifications: 'Notifications Agent',
+    andMoreNotifications: 'et {count} notifications de plus...',
+    minutesAgo: 'il y a quelques minutes',
+    hoursAgo: 'il y a quelques heures',
+    daysAgo: 'il y a quelques jours',
+    justNow: 'à l\'instant',
+    yesterday: 'hier',
+    today: 'aujourd\'hui',
+    thisWeek: 'cette semaine',
+    lastWeek: 'la semaine dernière',
+    thisMonth: 'ce mois-ci',
+    lastMonth: 'le mois dernier',
+    
+    // Coordinateur Interface
+    myProducts: 'Mes Produits',
+    manageAndMonitorProducts: 'Gérer et surveiller vos produits assignés',
+    assignedProducts: 'Produits Assignés',
+    assignedAgents: 'Agents Assignés',
+    fromAssignedProducts: 'Des produits assignés',
+    acrossAllProducts: 'À travers tous les produits',
+    searchProducts: 'Rechercher produits...',
+    failedToLoadAssignedProducts: 'Échec du chargement de vos produits assignés',
+    noProductsAssigned: 'Aucun Produit Assigné',
+    contactAdministratorForAssignments: 'Vous n\'avez été assigné à aucun produit pour le moment. Contactez votre administrateur pour obtenir des assignations de produits.',
+    noProductsFound: 'Aucun Produit Trouvé',
+    noProductsMatchSearch: 'Aucun produit ne correspond à vos critères de recherche. Essayez d\'ajuster vos termes de recherche.',
+    category: 'Catégorie',
+    price: 'Prix',
+    revenue: 'Chiffre d\'Affaires',
+    active: 'Actif',
+    inactive: 'Inactif',
+    myOrders: 'Mes Commandes',
+    manageOrdersForAssignedProducts: 'Gérer les commandes de vos produits assignés',
+    agentAssignment: 'Attribution des Agents',
+    manageAgentsForProducts: 'Gérer les agents pour vos produits assignés',
+    orderDetailsModal: 'Détails de la Commande',
+    viewOrderDetails: 'Voir les Détails de la Commande',
+    retry: 'Réessayer',
   },
 };
 

@@ -46,7 +46,7 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
     setLoadingAgents(true);
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
       const response = await fetch(`${apiUrl}/api/v1/assignments/agents`, {
         headers: {
@@ -154,7 +154,7 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
       const response = await fetch(`${apiUrl}/api/v1/assignments/bulk-reassign`, {
         method: 'POST',

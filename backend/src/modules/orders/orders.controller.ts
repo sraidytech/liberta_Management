@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { EcoManagerService } from '@/services/ecomanager.service';
 import { getMaystroService } from '@/services/maystro.service';
+import { productAssignmentService } from '@/services/product-assignment.service';
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -43,6 +44,26 @@ export class OrdersController {
 
       if (assignedAgentId) {
         where.assignedAgentId = assignedAgentId;
+      }
+
+      // Apply product-based filtering for non-admin users
+      const user = req.user;
+      if (user && user.role !== 'ADMIN') {
+        const userAssignedProducts = await productAssignmentService.getUserAssignedProducts(user.id);
+        
+        if (userAssignedProducts.length > 0) {
+          // Filter orders that contain at least one product assigned to the user
+          where.items = {
+            some: {
+              title: {
+                in: userAssignedProducts
+              }
+            }
+          };
+        } else {
+          // If user has no product assignments, show no orders (except for admins)
+          where.id = 'non-existent-id'; // This will return no results
+        }
       }
 
       if (search) {
@@ -447,16 +468,8 @@ export class OrdersController {
         });
       }
 
-      // Create notification for assigned agent
-      await prisma.notification.create({
-        data: {
-          userId: agentId,
-          orderId: id,
-          type: 'ORDER_ASSIGNMENT',
-          title: 'New Order Assigned',
-          message: `Order ${existingOrder.reference} has been assigned to you`
-        }
-      });
+      // ORDER_ASSIGNMENT notifications disabled per user request
+      console.log(`📋 Admin order assignment notification disabled for order ${existingOrder.reference} assigned to agent ${agentId}`);
 
       res.json({
         success: true,

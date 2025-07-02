@@ -3,15 +3,6 @@ import { logUserAction, logSystemEvent, logError } from '../../services/activity
 import { ActionType, LogLevel, UserRole } from '@prisma/client';
 import { ACTIVITY_ACTIONS } from '../../types';
 
-interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    name?: string;
-    role: UserRole;
-  };
-}
-
 // Helper function to determine action type from endpoint
 const getActionTypeFromEndpoint = (method: string, path: string): ActionType => {
   // Authentication endpoints
@@ -174,7 +165,7 @@ const generateDetailedDescription = (method: string, path: string, user?: any, r
 };
 
 // Middleware to log activities
-export const activityLogger = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const activityLogger = (req: Request, res: Response, next: NextFunction) => {
   // Skip logging for certain endpoints
   const skipPaths = [
     '/health',
@@ -323,7 +314,7 @@ export const activityLogger = (req: AuthRequest, res: Response, next: NextFuncti
 };
 
 // Middleware to log errors
-export const errorLogger = (error: Error, req: AuthRequest, res: Response, next: NextFunction) => {
+export const errorLogger = (error: Error, req: Request, res: Response, next: NextFunction) => {
   // Log the error
   logError(error, {
     userId: req.user?.id,
@@ -348,7 +339,7 @@ export const errorLogger = (error: Error, req: AuthRequest, res: Response, next:
 
 // Helper function to manually log specific activities
 export const logActivity = async (
-  req: AuthRequest,
+  req: Request,
   action: string,
   actionType: ActionType,
   description: string,

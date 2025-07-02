@@ -121,7 +121,7 @@ export default function AgentOrdersPage() {
       console.log('👤 User details:', { id: user.id, name: user.name, role: user.role, agentCode: (user as any).agentCode });
       
       // Use the correct API URL from environment variable
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const url = `${apiBaseUrl}/api/v1/orders?assignedAgentId=${user.id}`;
       console.log('📡 Full API URL:', url);
       console.log('🌐 API Base URL:', apiBaseUrl);
@@ -158,7 +158,7 @@ export default function AgentOrdersPage() {
   const updateOrderStatus = async (orderId: string, newStatus: string, notes?: string, noteType?: string, customNote?: string) => {
     try {
       const token = localStorage.getItem('token');
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
       console.log('🔄 Updating order status:', { orderId, newStatus, notes, noteType, customNote });
       

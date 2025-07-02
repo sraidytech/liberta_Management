@@ -45,7 +45,7 @@ export default function AssignmentDashboard() {
         return;
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiUrl}/api/v1/assignments/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -73,7 +73,7 @@ export default function AssignmentDashboard() {
   const triggerAssignment = async () => {
     setAssigning(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiUrl}/api/v1/assignments/trigger`, {
         method: 'POST',
         headers: {
@@ -103,7 +103,7 @@ export default function AssignmentDashboard() {
     
     try {
       const token = localStorage.getItem('token');
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiBaseUrl}/api/v1/assignments/test`, {
         method: 'POST',
         headers: {

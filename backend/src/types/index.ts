@@ -1,4 +1,23 @@
-import { User, Order, Customer, OrderItem, AgentActivity, Notification, ApiConfiguration, WebhookEvent, ActivityLog, ActionType, LogLevel } from '@prisma/client';
+import { User, Order, Customer, OrderItem, AgentActivity, Notification, ApiConfiguration, WebhookEvent, ActivityLog, ActionType, LogLevel, UserRole } from '@prisma/client';
+import { Request } from 'express';
+
+// Define a flexible user type for requests
+export interface RequestUser {
+  id: string;
+  email: string;
+  name?: string | null;
+  role: UserRole;
+  agentCode?: string | null;
+}
+
+// Extend Express Request interface to include user
+declare global {
+  namespace Express {
+    interface Request {
+      user?: RequestUser;
+    }
+  }
+}
 
 // Extended types with relations
 export interface UserWithRelations extends User {
@@ -6,6 +25,17 @@ export interface UserWithRelations extends User {
   agentActivities?: AgentActivity[];
   notifications?: Notification[];
   createdApiConfigs?: ApiConfiguration[];
+  productAssignments?: UserProductAssignment[];
+}
+
+export interface UserProductAssignment {
+  id: string;
+  userId: string;
+  productName: string;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: User;
 }
 
 export interface OrderWithRelations extends Order {
@@ -123,7 +153,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   name: string;
-  role?: 'ADMIN' | 'TEAM_MANAGER' | 'AGENT_SUIVI' | 'AGENT_CALL_CENTER';
+  role?: 'ADMIN' | 'TEAM_MANAGER' | 'COORDINATEUR' | 'AGENT_SUIVI' | 'AGENT_CALL_CENTER';
 }
 
 export interface AuthResponse {
@@ -140,6 +170,23 @@ export interface ChangeUserPasswordRequest {
 export interface ChangeOwnPasswordRequest {
   currentPassword: string;
   newPassword: string;
+}
+
+// Product Assignment types
+export interface CreateProductAssignmentRequest {
+  userId: string;
+  productNames: string[];
+}
+
+export interface UpdateProductAssignmentRequest {
+  userId: string;
+  productNames: string[];
+}
+
+export interface ProductAssignmentFilters {
+  userId?: string;
+  productName?: string;
+  isActive?: boolean;
 }
 
 // Analytics types
