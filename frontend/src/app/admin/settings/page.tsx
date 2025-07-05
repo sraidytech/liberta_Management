@@ -7,8 +7,9 @@ import AdminLayout from '@/components/admin/admin-layout';
 import { SchedulerSettings } from '@/components/admin/settings/scheduler-settings';
 import { MaystroApiSettings } from '@/components/admin/settings/maystro-api-settings';
 import { SystemSettings } from '@/components/admin/settings/system-settings';
+import { NoteTypesSettings } from '@/components/admin/settings/note-types-settings';
 
-type SettingsTab = 'scheduler' | 'maystro' | 'system';
+type SettingsTab = 'scheduler' | 'maystro' | 'system' | 'note-types';
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('scheduler');
@@ -17,6 +18,7 @@ export default function AdminSettingsPage() {
     { id: 'scheduler' as SettingsTab, label: 'Background Jobs & Scheduler', icon: '📅' },
     { id: 'maystro' as SettingsTab, label: 'Maystro API Keys', icon: '🚚' },
     { id: 'system' as SettingsTab, label: 'System Settings', icon: '⚙️' },
+    { id: 'note-types' as SettingsTab, label: 'Note Types', icon: '📝' },
   ];
 
   return (
@@ -55,6 +57,7 @@ export default function AdminSettingsPage() {
           {activeTab === 'scheduler' && <SchedulerSettings />}
           {activeTab === 'maystro' && <MaystroApiSettings />}
           {activeTab === 'system' && <SystemSettings />}
+          {activeTab === 'note-types' && <NoteTypesSettings />}
         </div>
       </div>
     </AdminLayout>

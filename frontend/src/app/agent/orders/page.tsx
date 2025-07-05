@@ -152,24 +152,54 @@ export default function AgentOrdersPage() {
   const [newTicketMessage, setNewTicketMessage] = useState('');
   const [sendingTicketMessage, setSendingTicketMessage] = useState(false);
 
-  // Predefined note options
-  const noteOptions = [
-    { value: 'CLIENT_NO_RESPONSE_1', label: 'Client (PAS DE REPONSE 1)' },
-    { value: 'CLIENT_NO_RESPONSE_2', label: 'Client (PAS DE REPONSE 2)' },
-    { value: 'CLIENT_NO_RESPONSE_3', label: 'Client (PAS DE REPONSE 3)' },
-    { value: 'CLIENT_NO_RESPONSE_4_SMS', label: 'Client (PAS DE REPONSE 4+SMS)' },
-    { value: 'CLIENT_POSTPONED', label: 'CLIENT (REPORTER)', hasRemark: true },
-    { value: 'CLIENT_CANCELLED', label: 'CLIENT (ANNULE)', hasRemark: true },
-    { value: 'RELAUNCHED', label: 'Relancé' },
-    { value: 'REFUND', label: 'Remboursement' },
-    { value: 'EXCHANGE', label: 'Echange' },
-    { value: 'POSTPONED_TO_DATE', label: 'Reporté à une date' },
-    { value: 'APPROVED_TO_DATE', label: 'Approuvé à une date' },
-    { value: 'PROBLEM_CLIENT_DELIVERY', label: 'Problem (client / livreur)', hasRemark: true },
-    { value: 'PROBLEM_ORDER', label: 'Problem (commande)', hasRemark: true },
-    { value: 'DELIVERED_PENDING', label: 'Livrée (en attente de finalisation)' },
-    { value: 'CUSTOM', label: 'Autre (personnalisé)', hasRemark: true }
-  ];
+  // Dynamic note options loaded from API
+  const [noteOptions, setNoteOptions] = useState<Array<{ value: string; label: string; hasRemark?: boolean }>>([]);
+  const [loadingNoteTypes, setLoadingNoteTypes] = useState(false);
+
+  // Fetch note types from API
+  const fetchNoteTypes = async () => {
+    try {
+      setLoadingNoteTypes(true);
+      const token = localStorage.getItem('token');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiBaseUrl}/api/v1/note-types`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const noteTypes = data.data?.noteTypes || [];
+        
+        // Transform API response to match the expected format
+        const transformedNoteTypes = noteTypes.map((noteType: any) => ({
+          value: noteType.name,
+          label: noteType.name,
+          // For backward compatibility, we'll keep the hasRemark logic for specific note types
+          hasRemark: noteType.name.includes('REPORTER') ||
+                    noteType.name.includes('ANNULE') ||
+                    noteType.name.includes('Problem') ||
+                    noteType.name.includes('personnalisé')
+        }));
+        
+        setNoteOptions(transformedNoteTypes);
+        console.log('✅ Note types loaded:', transformedNoteTypes);
+      } else {
+        console.error('❌ Failed to fetch note types:', response.status);
+        // Fallback to empty array if API fails
+        setNoteOptions([]);
+      }
+    } catch (error) {
+      console.error('💥 Error fetching note types:', error);
+      // Fallback to empty array if API fails
+      setNoteOptions([]);
+    } finally {
+      setLoadingNoteTypes(false);
+    }
+  };
 
   // Status options for multi-select
   const statusOptions = [
@@ -613,6 +643,11 @@ export default function AgentOrdersPage() {
     }
   }, []);
 
+  // Fetch note types on component mount
+  useEffect(() => {
+    fetchNoteTypes();
+  }, []);
+
   // Save pagination settings to localStorage
   useEffect(() => {
     const pagination = {
@@ -849,241 +884,229 @@ export default function AgentOrdersPage() {
 
   return (
     <AgentLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold">{t('myAssignedOrders')}</h1>
-            <p className="text-gray-600">{t('manageAssignedOrders')}</p>
-          </div>
-          <div className="text-sm text-gray-500">
-            {totalCount > 0 ? (
-              <>
-                Showing {((currentPage - 1) * limit) + 1} to {Math.min(currentPage * limit, totalCount)} of {totalCount} {t('orders')}
-                <div className="text-xs text-blue-600 mt-1">
-                  Page {currentPage} of {totalPages}
-                </div>
-              </>
-            ) : (
-              <>
-                {filteredOrders.length} / {totalAssignedOrders > 0 ? totalAssignedOrders : orders.length} {t('orders')}
-                {totalAssignedOrders > orders.length && (
-                  <div className="text-xs text-blue-600 mt-1">
-                    Showing {orders.length} orders (filtered by product assignments)
+      <div className="bg-gray-50 min-h-screen">
+        <div className="p-6 space-y-6">
+          {/* Clean Header */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{t('myAssignedOrders')}</h1>
+                <p className="text-gray-600 mt-1">{t('manageAssignedOrders')}</p>
+              </div>
+              <div className="text-sm text-gray-500 bg-gray-100 rounded-lg px-4 py-2">
+                {totalCount > 0 ? (
+                  <div>
+                    <div className="font-medium">
+                      Showing {((currentPage - 1) * limit) + 1} to {Math.min(currentPage * limit, totalCount)} of {totalCount} {t('orders')}
+                    </div>
+                    <div className="text-xs text-blue-600 mt-1">
+                      Page {currentPage} of {totalPages}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="font-medium">
+                      {filteredOrders.length} / {totalAssignedOrders > 0 ? totalAssignedOrders : orders.length} {t('orders')}
+                    </div>
+                    {totalAssignedOrders > orders.length && (
+                      <div className="text-xs text-blue-600 mt-1">
+                        Showing {orders.length} orders (filtered by product assignments)
+                      </div>
+                    )}
                   </div>
                 )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Filters */}
-        <Card className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by reference, customer name, or phone..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
               </div>
             </div>
-            
-            {/* Status Filter */}
-            <div className="relative status-dropdown">
-              <button
-                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                className="flex items-center gap-2 px-4 py-4 bg-gray-50/50 border border-gray-200/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-700 font-medium hover:bg-gray-100"
-              >
-                <Filter className="w-4 h-4" />
-                <span className="text-sm">
-                  {t('selectStatuses')} {statusFilter.length > 0 && !statusFilter.includes('ALL') && `(${statusFilter.length})`}
-                </span>
-                {showStatusDropdown ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
+          </div>
 
-              {/* Status Dropdown */}
-              {showStatusDropdown && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-700">{t('selectStatuses')}</span>
-                      <button
-                        onClick={() => setStatusFilter(['ALL'])}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        {t('clearSelection')}
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {statusOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                        >
-                          <div className="relative">
-                            <input
-                              type="checkbox"
-                              checked={statusFilter.includes(option.value)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setStatusFilter([...statusFilter.filter(s => s !== 'ALL'), option.value]);
-                                } else {
-                                  const newFilter = statusFilter.filter(s => s !== option.value);
-                                  setStatusFilter(newFilter.length === 0 ? ['ALL'] : newFilter);
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                              statusFilter.includes(option.value)
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'border-gray-300 hover:border-blue-400'
-                            }`}>
-                              {statusFilter.includes(option.value) && (
-                                <Check className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-sm text-gray-700 flex-1">{option.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
+          {/* Clean Filter Section */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            {/* Primary Filter Row */}
+            <div className="flex flex-col lg:flex-row gap-4 mb-4">
+              {/* Search */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by reference, customer name, or phone..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
                 </div>
-              )}
-            </div>
-
-            {/* Shipping Status Filter */}
-            <div className="relative shipping-status-dropdown">
-              <button
-                onClick={() => setShowShippingStatusDropdown(!showShippingStatusDropdown)}
-                className="flex items-center gap-2 px-4 py-4 bg-gray-50/50 border border-gray-200/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-700 font-medium hover:bg-gray-100"
-              >
-                <Truck className="w-4 h-4" />
-                <span className="text-sm">
-                  {t('selectShippingStatus')} {selectedShippingStatuses.length > 0 && `(${selectedShippingStatuses.length})`}
-                </span>
-                {showShippingStatusDropdown ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
-              </button>
-
-              {/* Shipping Status Dropdown */}
-              {showShippingStatusDropdown && (
-                <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-700">{t('selectShippingStatus')}</span>
-                      <button
-                        onClick={() => setSelectedShippingStatuses([])}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        {t('clearSelection')}
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {loadingShippingStatuses ? (
-                        <div className="flex items-center justify-center py-4">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
-                          <span className="ml-2 text-sm text-gray-500">Loading shipping statuses...</span>
-                        </div>
-                      ) : shippingStatusOptions.length === 0 ? (
-                        <div className="text-center py-4 text-sm text-gray-500">
-                          No shipping statuses found
-                        </div>
-                      ) : (
-                        shippingStatusOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
-                        >
-                          <div className="relative">
-                            <input
-                              type="checkbox"
-                              checked={selectedShippingStatuses.includes(option.value)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setSelectedShippingStatuses([...selectedShippingStatuses, option.value]);
-                                } else {
-                                  setSelectedShippingStatuses(selectedShippingStatuses.filter(s => s !== option.value));
-                                }
-                              }}
-                              className="sr-only"
-                            />
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                              selectedShippingStatuses.includes(option.value)
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'border-gray-300 hover:border-blue-400'
-                            }`}>
-                              {selectedShippingStatuses.includes(option.value) && (
-                                <Check className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-sm text-gray-700 flex-1">{option.label}</span>
-                        </label>
-                        ))
+              </div>
+              
+              {/* Filters */}
+              <div className="flex flex-wrap gap-3">
+                {/* Status Filter */}
+                <div className="relative status-dropdown">
+                  <button
+                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                    className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <Filter className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Status {statusFilter.length > 0 && !statusFilter.includes('ALL') && (
+                        <span className="ml-1 px-2 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+                          {statusFilter.length}
+                        </span>
                       )}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showStatusDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Status Dropdown */}
+                  {showStatusDropdown && (
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-semibold text-gray-800">{t('selectStatuses')}</span>
+                          <button
+                            onClick={() => setStatusFilter(['ALL'])}
+                            className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {statusOptions.map((option) => (
+                            <label
+                              key={option.value}
+                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={statusFilter.includes(option.value)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setStatusFilter([...statusFilter.filter(s => s !== 'ALL'), option.value]);
+                                  } else {
+                                    const newFilter = statusFilter.filter(s => s !== option.value);
+                                    setStatusFilter(newFilter.length === 0 ? ['ALL'] : newFilter);
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-sm text-gray-700">{option.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              )}
+
+                {/* Shipping Status Filter */}
+                <div className="relative shipping-status-dropdown">
+                  <button
+                    onClick={() => setShowShippingStatusDropdown(!showShippingStatusDropdown)}
+                    className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <Truck className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">
+                      Shipping {selectedShippingStatuses.length > 0 && (
+                        <span className="ml-1 px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
+                          {selectedShippingStatuses.length}
+                        </span>
+                      )}
+                    </span>
+                    <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showShippingStatusDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Shipping Status Dropdown */}
+                  {showShippingStatusDropdown && (
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm font-semibold text-gray-800">{t('selectShippingStatus')}</span>
+                          <button
+                            onClick={() => setSelectedShippingStatuses([])}
+                            className="text-xs text-green-600 hover:text-green-800 font-medium"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+                        <div className="space-y-2 max-h-60 overflow-y-auto">
+                          {loadingShippingStatuses ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+                              <span className="ml-2 text-sm text-gray-500">Loading...</span>
+                            </div>
+                          ) : shippingStatusOptions.length === 0 ? (
+                            <div className="text-center py-4 text-sm text-gray-500">
+                              No shipping statuses found
+                            </div>
+                          ) : (
+                            shippingStatusOptions.map((option) => (
+                            <label
+                              key={option.value}
+                              className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedShippingStatuses.includes(option.value)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedShippingStatuses([...selectedShippingStatuses, option.value]);
+                                  } else {
+                                    setSelectedShippingStatuses(selectedShippingStatuses.filter(s => s !== option.value));
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+                              />
+                              <span className="text-sm text-gray-700">{option.label}</span>
+                            </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Items Per Page */}
-            <div className="relative">
+            {/* Secondary Controls Row */}
+            <div className="flex flex-wrap gap-3">
+              {/* Items Per Page */}
               <select
                 value={limit}
                 onChange={(e) => setLimit(parseInt(e.target.value))}
-                className="appearance-none bg-gray-50/50 border border-gray-200/50 rounded-2xl px-4 py-4 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-700 font-medium"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm"
               >
                 <option value={10}>10 items</option>
                 <option value={25}>25 items</option>
                 <option value={50}>50 items</option>
                 <option value={100}>100 items</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-            </div>
 
-            {/* Page Jump */}
-            <div className="relative flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-600">Page:</span>
-              <input
-                type="number"
-                min="1"
-                max={totalPages}
-                value={currentPage}
-                onChange={(e) => {
-                  const page = parseInt(e.target.value);
-                  if (page >= 1 && page <= totalPages) {
-                    setCurrentPage(page);
-                  }
-                }}
-                className="w-20 px-3 py-4 bg-gray-50/50 border border-gray-200/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-center font-medium"
-              />
-              <span className="text-sm text-gray-500">of {totalPages}</span>
-            </div>
+              {/* Page Jump */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">Page:</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={totalPages}
+                  value={currentPage}
+                  onChange={(e) => {
+                    const page = parseInt(e.target.value);
+                    if (page >= 1 && page <= totalPages) {
+                      setCurrentPage(page);
+                    }
+                  }}
+                  className="w-16 px-2 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-sm"
+                />
+                <span className="text-sm text-gray-600">of {totalPages}</span>
+              </div>
 
-            {/* Hide Delivered Orders Toggle */}
-            <div className="flex items-center gap-3">
+              {/* Toggle Buttons */}
               <button
                 onClick={() => setHideDeliveredOrders(!hideDeliveredOrders)}
-                className={`flex items-center gap-2 px-4 py-4 rounded-2xl transition-all duration-200 ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   hideDeliveredOrders
-                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25'
-                    : 'bg-gray-50/50 text-gray-600 border border-gray-200/50 hover:bg-gray-100'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {hideDeliveredOrders ? (
@@ -1091,18 +1114,15 @@ export default function AgentOrdersPage() {
                 ) : (
                   <ToggleLeft className="w-4 h-4" />
                 )}
-                <span className="text-sm font-medium">{t('hideDeliveredOrders')}</span>
+                Hide Delivered
               </button>
-            </div>
 
-            {/* Show Only Orders With Notes Toggle */}
-            <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowOnlyOrdersWithNotes(!showOnlyOrdersWithNotes)}
-                className={`flex items-center gap-2 px-4 py-4 rounded-2xl transition-all duration-200 ${
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   showOnlyOrdersWithNotes
-                    ? 'bg-green-500 text-white shadow-lg shadow-green-500/25'
-                    : 'bg-gray-50/50 text-gray-600 border border-gray-200/50 hover:bg-gray-100'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 {showOnlyOrdersWithNotes ? (
@@ -1111,47 +1131,45 @@ export default function AgentOrdersPage() {
                   <ToggleLeft className="w-4 h-4" />
                 )}
                 <StickyNote className="w-4 h-4" />
-                <span className="text-sm font-medium">{t('withNotesOnly')}</span>
-              </button>
-            </div>
-
-            {/* Note Types Filter */}
-            <div className="relative note-type-dropdown">
-              <button
-                onClick={() => setShowNoteTypeDropdown(!showNoteTypeDropdown)}
-                className="flex items-center gap-2 px-4 py-4 bg-gray-50/50 border border-gray-200/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-700 font-medium hover:bg-gray-100"
-              >
-                <StickyNote className="w-4 h-4" />
-                <span className="text-sm">
-                  {t('noteTypes')} {selectedNoteTypes.length > 0 && `(${selectedNoteTypes.length})`}
-                </span>
-                {showNoteTypeDropdown ? (
-                  <ChevronUp className="w-4 h-4" />
-                ) : (
-                  <ChevronDown className="w-4 h-4" />
-                )}
+                With Notes
               </button>
 
-              {/* Note Types Dropdown */}
-              {showNoteTypeDropdown && (
-                <div className="absolute top-full right-0 mt-2 w-96 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 max-h-80 overflow-y-auto">
-                  <div className="p-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-sm font-semibold text-gray-700">{t('selectNoteTypes')}</span>
-                      <button
-                        onClick={() => setSelectedNoteTypes([])}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        {t('clearSelection')}
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {noteOptions.map((option) => (
-                        <label
-                          key={option.value}
-                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+              {/* Note Types Filter */}
+              <div className="relative note-type-dropdown">
+                <button
+                  onClick={() => setShowNoteTypeDropdown(!showNoteTypeDropdown)}
+                  className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                >
+                  <StickyNote className="w-4 h-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Note Types {selectedNoteTypes.length > 0 && (
+                      <span className="ml-1 px-2 py-0.5 bg-orange-500 text-white text-xs rounded-full">
+                        {selectedNoteTypes.length}
+                      </span>
+                    )}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showNoteTypeDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Note Types Dropdown */}
+                {showNoteTypeDropdown && (
+                  <div className="absolute top-full right-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-80 overflow-hidden">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-semibold text-gray-800">{t('selectNoteTypes')}</span>
+                        <button
+                          onClick={() => setSelectedNoteTypes([])}
+                          className="text-xs text-orange-600 hover:text-orange-800 font-medium"
                         >
-                          <div className="relative">
+                          Clear All
+                        </button>
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {noteOptions.map((option) => (
+                          <label
+                            key={option.value}
+                            className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
+                          >
                             <input
                               type="checkbox"
                               checked={selectedNoteTypes.includes(option.value)}
@@ -1162,225 +1180,210 @@ export default function AgentOrdersPage() {
                                   setSelectedNoteTypes(selectedNoteTypes.filter(type => type !== option.value));
                                 }
                               }}
-                              className="sr-only"
+                              className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
                             />
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
-                              selectedNoteTypes.includes(option.value)
-                                ? 'bg-blue-500 border-blue-500'
-                                : 'border-gray-300'
-                            }`}>
-                              {selectedNoteTypes.includes(option.value) && (
-                                <Check className="w-3 h-3 text-white" />
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-sm text-gray-700 flex-1">{option.label}</span>
-                        </label>
-                      ))}
+                            <span className="text-sm text-gray-700">{option.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
-        </Card>
 
-        {/* Orders List */}
-        <div className="space-y-4">
-          {filteredOrders.length === 0 ? (
-            <Card className="p-8 text-center">
-              <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-500">No orders found</p>
-              <p className="text-sm text-gray-400">
-                {searchTerm || (statusFilter.length > 0 && !statusFilter.includes('ALL'))
-                  ? 'Try adjusting your search or filters' 
-                  : 'Orders will appear here when assigned to you'
-                }
-              </p>
-            </Card>
-          ) : (
-            filteredOrders.map((order) => (
-              <Card
-                key={order.id}
-                className="p-6 hover:shadow-md transition-shadow"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <h3 className="font-semibold text-xl">{order.reference}</h3>
-                      <Badge className={`${getStatusColor(order.status)} flex items-center space-x-1`}>
-                        {getStatusIcon(order.status)}
-                        <span>{order.status}</span>
-                      </Badge>
-                      {order.shippingStatus && (
-                        <Badge className={`${getShippingStatusColor(order.shippingStatus)} flex items-center space-x-1`}>
-                          <Truck className="h-3 w-3" />
-                          <span className="text-xs">{order.shippingStatus}</span>
-                        </Badge>
-                      )}
+          {/* Clean Card-Based Orders List */}
+          <div className="space-y-3">
+            {filteredOrders.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
+                <Package className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">No orders found</h3>
+                <p className="text-gray-600">
+                  {searchTerm || (statusFilter.length > 0 && !statusFilter.includes('ALL'))
+                    ? 'Try adjusting your search or filters to find more orders'
+                    : 'Orders will appear here when assigned to you'
+                  }
+                </p>
+              </div>
+            ) : (
+              filteredOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow"
+                >
+                  {/* Header Row */}
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-lg font-bold text-gray-900">{order.reference}</h3>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                        {order.shippingStatus && (
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getShippingStatusColor(order.shippingStatus)}`}>
+                            {order.shippingStatus}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm mb-4">
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <User className="h-4 w-4" />
-                        <span>{order.customer.fullName}</span>
+                    <div className="text-right">
+                      <div className="text-xl font-bold text-green-600">
+                        {formatCurrency(order.total)}
                       </div>
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <Phone className="h-4 w-4" />
-                        <span>{order.customer.telephone}</span>
+                      <div className="text-sm text-gray-500">
+                        {order._count?.items || order.items?.length || 0} items
                       </div>
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <MapPin className="h-4 w-4" />
-                        <span>{order.customer.wilaya}, {order.customer.commune}</span>
+                    </div>
+                  </div>
+
+                  {/* Customer Info Row - Single Row with Icons */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-600" />
+                      <div>
+                        <div className="text-xs text-gray-500">Customer</div>
+                        <div className="font-medium text-gray-900">{order.customer.fullName}</div>
+                        <div className="text-sm text-gray-600">{order.customer.telephone}</div>
                       </div>
-                      <div className="flex items-center space-x-2 text-gray-600">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatDate(order.assignedAt)}</span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-green-600" />
+                      <div>
+                        <div className="text-xs text-gray-500">Location</div>
+                        <div className="font-medium text-gray-900">{order.customer.wilaya}</div>
+                        <div className="text-sm text-gray-600">{order.customer.commune}</div>
                       </div>
-                      {order.trackingNumber && (
-                        <div className="flex items-center space-x-2 text-gray-600">
-                          <Truck className="h-4 w-4" />
-                          <span>{order.trackingNumber}</span>
-                        </div>
-                      )}
-                      {order.ecoManagerId && (
-                        <div className="flex items-center space-x-2 text-gray-600">
-                          <Package className="h-4 w-4" />
-                          <span>ECO: {order.ecoManagerId}</span>
-                        </div>
-                      )}
                     </div>
 
-                    {/* Alert indicators */}
-                    {(order.alertReason || order.abortReason) && (
-                      <div className="flex items-center space-x-2 mb-3">
-                        {order.alertReason && (
-                          <Badge className="bg-yellow-100 text-yellow-800 flex items-center space-x-1">
-                            <AlertCircle className="h-3 w-3" />
-                            <span className="text-xs">{order.alertReason}</span>
-                          </Badge>
-                        )}
-                        {order.abortReason && (
-                          <Badge className="bg-red-100 text-red-800 flex items-center space-x-1">
-                            <XCircle className="h-3 w-3" />
-                            <span className="text-xs">{order.abortReason}</span>
-                          </Badge>
-                        )}
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-purple-600" />
+                      <div>
+                        <div className="text-xs text-gray-500">Assigned</div>
+                        <div className="text-sm text-gray-900">{formatDate(order.assignedAt)}</div>
                       </div>
-                    )}
+                    </div>
 
-                    {/* Last Note Display */}
-                    {(() => {
-                      const lastNote = getLastNote(order);
-                      return lastNote ? (
-                        <div className="mt-3 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 mb-1">
-                                <StickyNote className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                                <span className="text-xs font-semibold text-blue-800 bg-blue-100 px-2 py-1 rounded-full">
-                                  {formatNoteType(lastNote.type)}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {formatTimestamp(lastNote.timestamp)}
-                                </span>
-                              </div>
-                              <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">
-                                {lastNote.text || 'No details provided'}
-                              </p>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-gray-600" />
+                      <div>
+                        <div className="text-xs text-gray-500">Order Date</div>
+                        <div className="text-sm text-gray-900">{formatDate(order.orderDate || order.createdAt)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Alerts & Notes */}
+                  {((order.alertReason || order.abortReason) || getLastNote(order)) && (
+                    <div className="mb-3">
+                      {/* Alerts */}
+                      {(order.alertReason || order.abortReason) && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {order.alertReason && (
+                            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">
+                              ⚠️ {order.alertReason}
+                            </span>
+                          )}
+                          {order.abortReason && (
+                            <span className="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-medium">
+                              ❌ {order.abortReason}
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Last Note */}
+                      {(() => {
+                        const lastNote = getLastNote(order);
+                        return lastNote ? (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-semibold text-blue-800 bg-blue-100 px-2 py-1 rounded-full">
+                                {formatNoteType(lastNote.type)}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {formatTimestamp(lastNote.timestamp)}
+                              </span>
                               {lastNote.addedBy && (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <User className="w-3 h-3 text-gray-400" />
-                                  <span className="text-xs text-gray-500">{lastNote.addedBy}</span>
-                                </div>
+                                <span className="text-xs text-gray-500">by {lastNote.addedBy}</span>
                               )}
                             </div>
+                            <p className="text-sm text-gray-700">
+                              {lastNote.text || 'No details provided'}
+                            </p>
                           </div>
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                  
-                  <div className="text-right ml-4">
-                    <div className="font-bold text-xl">{formatCurrency(order.total)}</div>
-                    <div className="text-sm text-gray-500">
-                      {order._count?.items || order.items?.length || 0} {t('items')}
+                        ) : null;
+                      })()}
                     </div>
-                  </div>
-                </div>
+                  )}
 
-                {/* Action buttons */}
-                <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                  <div className="flex space-x-2">
-                    <Button
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-200">
+                    <button
                       onClick={() => {
                         setSelectedOrder(order);
                         setShowOrderModal(true);
                       }}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center space-x-1"
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
                     >
                       <Eye className="h-4 w-4" />
-                      <span>{t('viewDetails')}</span>
-                    </Button>
-                    <Button
+                      View Details
+                    </button>
+                    
+                    <button
                       onClick={() => {
                         setEditingStatus(order.id);
                         setNewStatus(order.status);
                         setStatusNotes('');
                       }}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center space-x-1"
+                      className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
                     >
                       <Edit className="h-4 w-4" />
-                      <span>{t('editStatus')}</span>
-                    </Button>
-                    <Button
+                      Edit Status
+                    </button>
+                    
+                    <button
                       onClick={() => {
                         setTicketOrder(order);
                         setTicketTitle(`Problem with order ${order.reference}`);
                         setShowTicketModal(true);
                       }}
-                      variant="outline"
-                      size="sm"
-                      className="flex items-center space-x-1 text-orange-600 border-orange-200 hover:bg-orange-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
                     >
                       <MessageSquare className="h-4 w-4" />
-                      <span>{t('reportAProblem')}</span>
-                    </Button>
+                      Report Issue
+                    </button>
+                    
                     {orderTicketCounts[order.id] > 0 && (
-                      <Button
+                      <button
                         onClick={() => viewOrderTickets(order)}
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center space-x-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
                       >
                         <Eye className="h-4 w-4" />
-                        <span>{t('viewTickets')} ({orderTicketCounts[order.id]})</span>
-                      </Button>
+                        View Tickets ({orderTicketCounts[order.id]})
+                      </button>
                     )}
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {t('orderDate')}: {formatDate(order.orderDate || order.createdAt)}
-                  </div>
                 </div>
-              </Card>
-            ))
+              ))
+            )}
+          </div>
+
+          {/* Space-Optimized Pagination */}
+          {totalPages > 1 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-3 mt-2">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={totalCount}
+                itemsPerPage={limit}
+              />
+            </div>
           )}
         </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <Pagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            totalItems={totalCount}
-            itemsPerPage={limit}
-          />
-        )}
 
         {/* Enhanced Status Edit Modal with Structured Notes */}
         {editingStatus && (

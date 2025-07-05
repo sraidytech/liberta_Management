@@ -516,3 +516,14 @@ enum TicketStatus {
   RESOLVED
   CLOSED
 }
+
+// Note Types Management Model
+model NoteType {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("note_types")
+}

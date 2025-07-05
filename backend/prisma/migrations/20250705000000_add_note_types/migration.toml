@@ -1,0 +1,3 @@
+[migration]
+name = "add_note_types"
+description = "Add NoteType model for admin-managed note types"
