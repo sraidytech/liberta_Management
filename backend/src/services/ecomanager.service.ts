@@ -581,9 +581,13 @@ export class EcoManagerService {
       status: this.mapOrderStatus(ecoOrder.order_state_name),
       total: parseFloat(ecoOrder.total.toString()),
       shippingCost: 0, // Default, can be updated later
-      notes: ecoOrder.confirmation_history && ecoOrder.confirmation_history.length > 0
-        ? `Last confirmation: ${ecoOrder.confirmation_history[ecoOrder.confirmation_history.length - 1].state_name}`
-        : null,
+      notes: null, // Keep notes field clean for agent notes only
+      additionalMetaData: {
+        ecoManagerConfirmationHistory: ecoOrder.confirmation_history || [],
+        lastConfirmation: ecoOrder.confirmation_history && ecoOrder.confirmation_history.length > 0
+          ? ecoOrder.confirmation_history[ecoOrder.confirmation_history.length - 1].state_name
+          : null
+      },
       ecoManagerStatus: ecoOrder.order_state_name,
       storeIdentifier: this.config.storeIdentifier,
       orderDate: new Date(ecoOrder.created_at),

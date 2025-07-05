@@ -27,6 +27,15 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
+ * @route GET /api/v1/assignments/agent/:agentId/stats
+ * @desc Get assignment statistics for a specific agent (considering product assignments)
+ * @access ADMIN, TEAM_MANAGER, Own Agent
+ */
+router.get('/agent/:agentId/stats', async (req, res) => {
+  await assignmentController.getAgentStats(req, res);
+});
+
+/**
  * @route POST /api/v1/assignments/reassign/:orderId
  * @desc Manually reassign an order to a specific agent
  * @access ADMIN, TEAM_MANAGER

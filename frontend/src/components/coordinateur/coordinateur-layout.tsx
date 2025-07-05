@@ -21,7 +21,8 @@ import {
   ChevronRight,
   UserCheck,
   Package,
-  Key
+  Key,
+  MessageSquare
 } from 'lucide-react';
 
 interface CoordinateurLayoutProps {
@@ -75,6 +76,12 @@ export default function CoordinateurLayout({ children }: CoordinateurLayoutProps
       icon: Bell,
       href: '/coordinateur/notifications',
       active: pathname === '/coordinateur/notifications'
+    },
+    {
+      name: language === 'fr' ? 'Tickets' : 'Tickets',
+      icon: MessageSquare,
+      href: '/coordinateur/tickets',
+      active: pathname === '/coordinateur/tickets'
     }
   ];
 

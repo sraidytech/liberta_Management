@@ -323,6 +323,99 @@ export interface Translations {
   orderDetailsModal: string;
   viewOrderDetails: string;
   retry: string;
+  
+  // Ticket System
+  tickets: string;
+  ticket: string;
+  reportProblem: string;
+  reportAProblem: string;
+  createTicket: string;
+  ticketTitle: string;
+  ticketCategory: string;
+  ticketPriority: string;
+  ticketDescription: string;
+  ticketStatus: string;
+  ticketMessages: string;
+  addMessage: string;
+  sendMessage: string;
+  assignTicket: string;
+  assignTo: string;
+  autoAssign: string;
+  coordinator: string;
+  teamLeader: string;
+  ticketAssignedTo: string;
+  ticketReportedBy: string;
+  ticketCreatedAt: string;
+  ticketUpdatedAt: string;
+  ticketResolvedAt: string;
+  ticketClosedAt: string;
+  
+  // Ticket Categories
+  customerIssue: string;
+  productIssue: string;
+  deliveryIssue: string;
+  systemIssue: string;
+  paymentIssue: string;
+  otherIssue: string;
+  
+  // Ticket Priorities
+  lowPriority: string;
+  mediumPriority: string;
+  highPriority: string;
+  urgentPriority: string;
+  
+  // Ticket Statuses
+  openTicket: string;
+  inProgressTicket: string;
+  waitingResponse: string;
+  resolvedTicket: string;
+  closedTicket: string;
+  
+  // Ticket Actions
+  viewTicket: string;
+  viewTickets: string;
+  updateTicketStatus: string;
+  closeTicket: string;
+  reopenTicket: string;
+  resolveTicket: string;
+  markInProgress: string;
+  waitingForResponse: string;
+  
+  // Ticket Messages
+  noTicketsFound: string;
+  noMessagesYet: string;
+  typeYourMessage: string;
+  ticketCreatedSuccessfully: string;
+  ticketUpdatedSuccessfully: string;
+  messageAddedSuccessfully: string;
+  failedToCreateTicket: string;
+  failedToUpdateTicket: string;
+  failedToAddMessage: string;
+  
+  // Ticket Dashboard
+  myTickets: string;
+  assignedTickets: string;
+  openTickets: string;
+  resolvedTickets: string;
+  ticketStats: string;
+  activeTickets: string;
+  
+  // Agent Orders Filters
+  hideDeliveredOrders: string;
+  noteTypes: string;
+  withNotesOnly: string;
+  lastNote: string;
+  selectNoteTypes: string;
+  allNoteTypes: string;
+  clearSelection: string;
+  selectShippingStatus: string;
+  allShippingStatuses: string;
+  selectStatuses: string;
+  
+  // Additional shipping status values
+  inTransit: string;
+  outForDelivery: string;
+  failedDelivery: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -649,6 +742,99 @@ export const translations: Record<Language, Translations> = {
     orderDetailsModal: 'Order Details',
     viewOrderDetails: 'View Order Details',
     retry: 'Retry',
+    
+    // Ticket System
+    tickets: 'Tickets',
+    ticket: 'Ticket',
+    reportProblem: 'Report Problem',
+    reportAProblem: 'Report a Problem',
+    createTicket: 'Create Ticket',
+    ticketTitle: 'Ticket Title',
+    ticketCategory: 'Category',
+    ticketPriority: 'Priority',
+    ticketDescription: 'Description',
+    ticketStatus: 'Status',
+    ticketMessages: 'Messages',
+    addMessage: 'Add Message',
+    sendMessage: 'Send Message',
+    assignTicket: 'Assign Ticket',
+    assignTo: 'Assign To',
+    autoAssign: 'Auto-assign',
+    coordinator: 'Coordinator',
+    teamLeader: 'Team Leader',
+    ticketAssignedTo: 'Assigned To',
+    ticketReportedBy: 'Reported By',
+    ticketCreatedAt: 'Created At',
+    ticketUpdatedAt: 'Updated At',
+    ticketResolvedAt: 'Resolved At',
+    ticketClosedAt: 'Closed At',
+    
+    // Ticket Categories
+    customerIssue: 'Customer Issue',
+    productIssue: 'Product Issue',
+    deliveryIssue: 'Delivery Issue',
+    systemIssue: 'System Issue',
+    paymentIssue: 'Payment Issue',
+    otherIssue: 'Other',
+    
+    // Ticket Priorities
+    lowPriority: 'Low',
+    mediumPriority: 'Medium',
+    highPriority: 'High',
+    urgentPriority: 'Urgent',
+    
+    // Ticket Statuses
+    openTicket: 'Open',
+    inProgressTicket: 'In Progress',
+    waitingResponse: 'Waiting Response',
+    resolvedTicket: 'Resolved',
+    closedTicket: 'Closed',
+    
+    // Ticket Actions
+    viewTicket: 'View Ticket',
+    viewTickets: 'View Tickets',
+    updateTicketStatus: 'Update Status',
+    closeTicket: 'Close Ticket',
+    reopenTicket: 'Reopen Ticket',
+    resolveTicket: 'Resolve Ticket',
+    markInProgress: 'Mark In Progress',
+    waitingForResponse: 'Waiting for Response',
+    
+    // Ticket Messages
+    noTicketsFound: 'No tickets found',
+    noMessagesYet: 'No messages yet',
+    typeYourMessage: 'Type your message...',
+    ticketCreatedSuccessfully: 'Ticket created successfully',
+    ticketUpdatedSuccessfully: 'Ticket updated successfully',
+    messageAddedSuccessfully: 'Message added successfully',
+    failedToCreateTicket: 'Failed to create ticket',
+    failedToUpdateTicket: 'Failed to update ticket',
+    failedToAddMessage: 'Failed to add message',
+    
+    // Ticket Dashboard
+    myTickets: 'My Tickets',
+    assignedTickets: 'Assigned Tickets',
+    openTickets: 'Open Tickets',
+    resolvedTickets: 'Resolved Tickets',
+    ticketStats: 'Ticket Statistics',
+    activeTickets: 'Active Tickets',
+    
+    // Agent Orders Filters
+    hideDeliveredOrders: 'Hide Delivered Orders',
+    noteTypes: 'Note Types',
+    withNotesOnly: 'With Notes Only',
+    lastNote: 'Last Note',
+    selectNoteTypes: 'Select Note Types',
+    allNoteTypes: 'All Note Types',
+    clearSelection: 'Clear Selection',
+    selectShippingStatus: 'Select Shipping Status',
+    allShippingStatuses: 'All Shipping Statuses',
+    selectStatuses: 'Select Statuses',
+    
+    // Additional shipping status values
+    inTransit: 'In Transit',
+    outForDelivery: 'Out for Delivery',
+    failedDelivery: 'Failed Delivery',
   },
   fr: {
     // Common
@@ -973,6 +1159,99 @@ export const translations: Record<Language, Translations> = {
     orderDetailsModal: 'Détails de la Commande',
     viewOrderDetails: 'Voir les Détails de la Commande',
     retry: 'Réessayer',
+    
+    // Ticket System
+    tickets: 'Tickets',
+    ticket: 'Ticket',
+    reportProblem: 'Signaler un Problème',
+    reportAProblem: 'Signaler un Problème',
+    createTicket: 'Créer un Ticket',
+    ticketTitle: 'Titre du Ticket',
+    ticketCategory: 'Catégorie',
+    ticketPriority: 'Priorité',
+    ticketDescription: 'Description',
+    ticketStatus: 'Statut',
+    ticketMessages: 'Messages',
+    addMessage: 'Ajouter un Message',
+    sendMessage: 'Envoyer le Message',
+    assignTicket: 'Assigner le Ticket',
+    assignTo: 'Assigner à',
+    autoAssign: 'Attribution automatique',
+    coordinator: 'Coordinateur',
+    teamLeader: 'Chef d\'équipe',
+    ticketAssignedTo: 'Assigné à',
+    ticketReportedBy: 'Signalé par',
+    ticketCreatedAt: 'Créé le',
+    ticketUpdatedAt: 'Mis à jour le',
+    ticketResolvedAt: 'Résolu le',
+    ticketClosedAt: 'Fermé le',
+    
+    // Ticket Categories
+    customerIssue: 'Problème Client',
+    productIssue: 'Problème Produit',
+    deliveryIssue: 'Problème de Livraison',
+    systemIssue: 'Problème Système',
+    paymentIssue: 'Problème de Paiement',
+    otherIssue: 'Autre',
+    
+    // Ticket Priorities
+    lowPriority: 'Faible',
+    mediumPriority: 'Moyenne',
+    highPriority: 'Élevée',
+    urgentPriority: 'Urgente',
+    
+    // Ticket Statuses
+    openTicket: 'Ouvert',
+    inProgressTicket: 'En Cours',
+    waitingResponse: 'En Attente de Réponse',
+    resolvedTicket: 'Résolu',
+    closedTicket: 'Fermé',
+    
+    // Ticket Actions
+    viewTicket: 'Voir le Ticket',
+    viewTickets: 'Voir les Tickets',
+    updateTicketStatus: 'Mettre à Jour le Statut',
+    closeTicket: 'Fermer le Ticket',
+    reopenTicket: 'Rouvrir le Ticket',
+    resolveTicket: 'Résoudre le Ticket',
+    markInProgress: 'Marquer En Cours',
+    waitingForResponse: 'En Attente de Réponse',
+    
+    // Ticket Messages
+    noTicketsFound: 'Aucun ticket trouvé',
+    noMessagesYet: 'Aucun message pour le moment',
+    typeYourMessage: 'Tapez votre message...',
+    ticketCreatedSuccessfully: 'Ticket créé avec succès',
+    ticketUpdatedSuccessfully: 'Ticket mis à jour avec succès',
+    messageAddedSuccessfully: 'Message ajouté avec succès',
+    failedToCreateTicket: 'Échec de la création du ticket',
+    failedToUpdateTicket: 'Échec de la mise à jour du ticket',
+    failedToAddMessage: 'Échec de l\'ajout du message',
+    
+    // Ticket Dashboard
+    myTickets: 'Mes Tickets',
+    assignedTickets: 'Tickets Assignés',
+    openTickets: 'Tickets Ouverts',
+    resolvedTickets: 'Tickets Résolus',
+    ticketStats: 'Statistiques des Tickets',
+    activeTickets: 'Tickets Actifs',
+    
+    // Agent Orders Filters
+    hideDeliveredOrders: 'Masquer les Commandes Livrées',
+    noteTypes: 'Types de Notes',
+    withNotesOnly: 'Avec Notes Seulement',
+    lastNote: 'Dernière Note',
+    selectNoteTypes: 'Sélectionner les Types de Notes',
+    allNoteTypes: 'Tous les Types de Notes',
+    clearSelection: 'Effacer la Sélection',
+    selectShippingStatus: 'Sélectionner le Statut de Livraison',
+    allShippingStatuses: 'Tous les Statuts de Livraison',
+    selectStatuses: 'Sélectionner les Statuts',
+    
+    // Additional shipping status values
+    inTransit: 'En Transit',
+    outForDelivery: 'En Cours de Livraison',
+    failedDelivery: 'Échec de Livraison',
   },
 };
 

@@ -86,6 +86,54 @@ export class AssignmentController {
   }
 
   /**
+   * Get assignment statistics for a specific agent (considering product assignments)
+   */
+  async getAgentStats(req: Request, res: Response) {
+    try {
+      const { agentId } = req.params;
+      const userId = (req as any).user?.id;
+      const userRole = (req as any).user?.role;
+
+      if (!agentId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Agent ID is required'
+          }
+        });
+      }
+
+      // Allow agents to view their own stats, or managers to view any agent stats
+      if (userId !== agentId && !['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            message: 'Insufficient permissions to view agent statistics'
+          }
+        });
+      }
+
+      console.log('📊 Getting agent-specific stats for:', agentId);
+      const stats = await assignmentService.getAgentSpecificStats(agentId);
+      console.log('📊 Agent-specific stats retrieved:', stats);
+
+      res.json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      console.error('❌ Get agent stats error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch agent statistics',
+          details: error instanceof Error ? error.message : 'Unknown error'
+        }
+      });
+    }
+  }
+
+  /**
    * Manually reassign an order to a specific agent
    */
   async reassignOrder(req: Request, res: Response) {

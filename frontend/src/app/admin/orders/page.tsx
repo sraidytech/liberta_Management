@@ -39,7 +39,8 @@ import {
   Loader2,
   Trash2,
   Save,
-  ArrowUpDown
+  ArrowUpDown,
+  MessageSquare
 } from 'lucide-react';
 
 interface Order {
@@ -135,6 +136,7 @@ export default function OrdersPage() {
   const { showToast } = useToast();
   
   const [orders, setOrders] = useState<Order[]>([]);
+  const [orderTicketCounts, setOrderTicketCounts] = useState<Record<string, number>>({});
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -193,6 +195,51 @@ export default function OrdersPage() {
     }
   };
 
+  // 🚀 PROFESSIONAL SOLUTION: Extract ticket counts from orders response
+  // No more separate API calls - ticket counts are included in the main orders query
+  const extractTicketCountsFromOrders = (orders: Order[]) => {
+    const counts: Record<string, number> = {};
+    orders.forEach(order => {
+      // Extract ticket count from the _count field that's now included in the orders response
+      counts[order.id] = (order as any)._count?.tickets || 0;
+    });
+    setOrderTicketCounts(counts);
+    console.log('✅ Admin: Ticket counts extracted from orders response:', counts);
+  };
+
+  // Get last agent note status - exclude EcoManager confirmation notes
+  const getLastNoteStatus = (order: Order): string => {
+    if (!order.notes) return '-';
+    
+    try {
+      const notes = JSON.parse(order.notes);
+      if (Array.isArray(notes) && notes.length > 0) {
+        // Filter out EcoManager confirmation notes
+        const agentNotes = notes.filter(note => {
+          const noteText = note.type || note.note || '';
+          return !noteText.toLowerCase().includes('last confirmation') &&
+                 !noteText.toLowerCase().includes('confirmation échouée');
+        });
+        
+        if (agentNotes.length > 0) {
+          const lastNote = agentNotes[agentNotes.length - 1];
+          const noteText = lastNote.type || lastNote.note || '-';
+          return noteText.length > 15 ? noteText.substring(0, 15) + '...' : noteText;
+        }
+      }
+    } catch (error) {
+      // If notes is not JSON, check if it's a confirmation note
+      const noteText = order.notes;
+      if (noteText.toLowerCase().includes('last confirmation') ||
+          noteText.toLowerCase().includes('confirmation échouée')) {
+        return '-';
+      }
+      return noteText.length > 15 ? noteText.substring(0, 15) + '...' : noteText;
+    }
+    
+    return '-';
+  };
+
   // Fetch orders
   const fetchOrders = async () => {
     try {
@@ -218,9 +265,17 @@ export default function OrdersPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setOrders(data.data.orders);
+        const orders = data.data.orders;
+        setOrders(orders);
         setTotalPages(data.data.pagination.totalPages);
         setTotalCount(data.data.pagination.totalCount);
+        
+        // Fetch ticket counts for all orders
+        // 🚀 PROFESSIONAL SOLUTION: Extract ticket counts from orders response
+        // No more separate API calls needed!
+        if (orders.length > 0) {
+          extractTicketCountsFromOrders(orders);
+        }
       } else {
         showToast({
           type: 'error',
@@ -1205,101 +1260,110 @@ export default function OrdersPage() {
 
         {/* Clean Modern Orders Table */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+            <table className="w-full table-auto">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {/* Bulk Select */}
-                  <th className="px-6 py-4 text-left w-12">
+                  <th className="px-3 py-3 text-left w-10">
                     <button
                       onClick={toggleSelectAll}
                       className="p-1 hover:bg-gray-200 rounded transition-colors"
                     >
                       {selectedOrders.size === orders.length && orders.length > 0 ? (
-                        <CheckSquare className="w-5 h-5 text-blue-600" />
+                        <CheckSquare className="w-4 h-4 text-blue-600" />
                       ) : (
-                        <Square className="w-5 h-5 text-gray-400" />
+                        <Square className="w-4 h-4 text-gray-400" />
                       )}
                     </button>
                   </th>
                   
                   {/* Sortable Headers */}
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-3 py-3 text-left">
                     <button
                       onClick={() => handleSort('reference')}
-                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                     >
                       {t('order')}
                       {sortConfig.key === 'reference' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
                   </th>
                   
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-3 py-3 text-left">
                     <button
                       onClick={() => handleSort('customer.fullName')}
-                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                     >
                       {t('customer')}
                       {sortConfig.key === 'customer.fullName' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
                   </th>
                   
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-3 py-3 text-left">
                     <button
                       onClick={() => handleSort('status')}
-                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                     >
                       {t('status')}
                       {sortConfig.key === 'status' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
                   </th>
                   
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-3 py-3 text-left">
                     <span className="text-sm font-semibold text-gray-700">{t('shippingStatus')}</span>
                   </th>
-                  
-                  <th className="px-6 py-4 text-left">
+
+                  <th className="px-3 py-3 text-left">
+                    <span className="text-sm font-semibold text-gray-700">Agent Note</span>
+                  </th>
+
+                  <th className="px-3 py-3 text-center">
+                    <span className="text-sm font-semibold text-gray-700">{t('tickets')}</span>
+                  </th>
+
+                  <th className="px-3 py-3 text-left">
                     <button
                       onClick={() => handleSort('assignedAgent.name')}
-                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                     >
                       {t('agent')}
                       {sortConfig.key === 'assignedAgent.name' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
                   </th>
                   
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-3 py-3 text-left">
                     <button
                       onClick={() => handleSort('total')}
-                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                     >
                       {t('total')}
                       {sortConfig.key === 'total' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
                   </th>
                   
-                  <th className="px-6 py-4 text-left">
+                  <th className="px-3 py-3 text-left">
                     <button
                       onClick={() => handleSort('orderDate')}
-                      className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      className="flex items-center gap-1 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
                     >
                       {t('date')}
                       {sortConfig.key === 'orderDate' && (
-                        sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />
+                        sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                       )}
                     </button>
                   </th>
                   
-                  <th className="px-6 py-4 text-center">
+                  <th className="px-3 py-3 text-center">
                     <span className="text-sm font-semibold text-gray-700">{t('actions')}</span>
                   </th>
                 </tr>
@@ -1307,7 +1371,7 @@ export default function OrdersPage() {
               <tbody className="bg-white divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <div className="flex items-center justify-center gap-3 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin" />
                         <span className="text-lg font-medium">{t('loading')}</span>
@@ -1316,7 +1380,7 @@ export default function OrdersPage() {
                   </tr>
                 ) : orders.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center gap-3 text-slate-500">
                         <Package className="w-12 h-12" />
                         <span className="text-lg font-medium">{t('noOrdersFound')}</span>
@@ -1330,21 +1394,21 @@ export default function OrdersPage() {
                       className={`hover:bg-slate-50 transition-colors ${selectedOrders.has(order.id) ? 'bg-blue-50 border-l-4 border-blue-400' : ''}`}
                     >
                       {/* Bulk Select Checkbox */}
-                      <td className="px-6 py-4">
+                      <td className="px-3 py-3">
                         <button
                           onClick={() => toggleSelectOrder(order.id)}
                           className="p-1 hover:bg-slate-100 rounded transition-colors"
                         >
                           {selectedOrders.has(order.id) ? (
-                            <CheckSquare className="w-5 h-5 text-blue-600" />
+                            <CheckSquare className="w-4 h-4 text-blue-600" />
                           ) : (
-                            <Square className="w-5 h-5 text-slate-400" />
+                            <Square className="w-4 h-4 text-slate-400" />
                           )}
                         </button>
                       </td>
 
                       {/* Order Info */}
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <div>
                           <div className="flex items-center space-x-2">
                             <div className="text-sm font-bold text-slate-900">
@@ -1380,25 +1444,25 @@ export default function OrdersPage() {
                       </td>
 
                       {/* Customer Info */}
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                            <User className="w-4 h-4 text-slate-400" />
-                            {order.customer.fullName}
+                          <div className="text-sm font-medium text-slate-900 flex items-center gap-1">
+                            <User className="w-3 h-3 text-slate-400" />
+                            <span className="truncate">{order.customer.fullName}</span>
                           </div>
-                          <div className="text-sm text-slate-500 flex items-center gap-2">
+                          <div className="text-xs text-slate-500 flex items-center gap-1">
                             <Phone className="w-3 h-3" />
-                            {order.customer.telephone}
+                            <span className="truncate">{order.customer.telephone}</span>
                           </div>
-                          <div className="text-xs text-slate-400 flex items-center gap-2">
+                          <div className="text-xs text-slate-400 flex items-center gap-1">
                             <MapPin className="w-3 h-3" />
-                            {order.customer.wilaya}, {order.customer.commune}
+                            <span className="truncate">{order.customer.wilaya}, {order.customer.commune}</span>
                           </div>
                         </div>
                       </td>
 
                       {/* Status */}
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full shadow-sm ${statusColors[order.status as keyof typeof statusColors]}`}>
                           {order.status === 'PENDING' ? t('pending') :
                            order.status === 'ASSIGNED' ? t('assigned') :
@@ -1413,16 +1477,16 @@ export default function OrdersPage() {
                       </td>
 
                       {/* Shipping Status */}
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {order.shippingStatus ? (
                           <div>
-                            <span className={`inline-flex px-3 py-1 text-xs font-bold rounded-full shadow-sm ${shippingStatusColors[order.shippingStatus as keyof typeof shippingStatusColors] || 'bg-gray-100 text-gray-800'}`}>
-                              <Truck className="w-3 h-3 mr-1" />
-                              {order.shippingStatus}
+                            <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${shippingStatusColors[order.shippingStatus as keyof typeof shippingStatusColors] || 'bg-gray-100 text-gray-800'}`}>
+                              <Truck className="w-3 h-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">{order.shippingStatus}</span>
                             </span>
                             {order.trackingNumber && (
-                              <div className="text-xs text-slate-500 mt-1">
-                                {t('trackingNumber')}: {order.trackingNumber}
+                              <div className="text-xs text-slate-500 mt-1 truncate">
+                                {order.trackingNumber}
                               </div>
                             )}
                           </div>
@@ -1431,67 +1495,86 @@ export default function OrdersPage() {
                         )}
                       </td>
 
+                      {/* Agent Note */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="text-sm text-slate-600 block truncate" title={getLastNoteStatus(order)}>
+                          {getLastNoteStatus(order)}
+                        </span>
+                      </td>
+
+                      {/* View Tickets */}
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        {orderTicketCounts[order.id] > 0 ? (
+                          <Button
+                            onClick={() => {
+                              // Open tickets modal for this order
+                              window.open(`/admin/tickets?orderId=${order.id}`, '_blank');
+                            }}
+                            variant="outline"
+                            size="sm"
+                            className="flex items-center space-x-1 text-blue-600 border-blue-200 hover:bg-blue-50 px-2 py-1"
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            <span className="text-xs">{orderTicketCounts[order.id]}</span>
+                          </Button>
+                        ) : (
+                          <span className="text-sm text-slate-400">-</span>
+                        )}
+                      </td>
+
                       {/* Agent */}
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {order.assignedAgent ? (
-                          <div>
-                            <div className="text-sm font-medium text-slate-900 flex items-center gap-2">
-                              <User className="w-4 h-4 text-green-500" />
-                              {order.assignedAgent.name}
+                          <div className="max-w-[100px]">
+                            <div className="text-sm font-medium text-slate-900 flex items-center gap-1 truncate">
+                              <User className="w-3 h-3 text-green-500 flex-shrink-0" />
+                              <span className="truncate">{order.assignedAgent.name}</span>
                             </div>
-                            <div className="text-sm text-slate-500">
+                            <div className="text-xs text-slate-500 truncate">
                               {order.assignedAgent.agentCode}
                             </div>
                           </div>
                         ) : (
-                          <span className="text-sm text-slate-400 flex items-center gap-2">
-                            <AlertCircle className="w-4 h-4" />
-                            {t('unassigned')}
+                          <span className="text-sm text-slate-400 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3 flex-shrink-0" />
+                            <span className="truncate">{t('unassigned')}</span>
                           </span>
                         )}
                       </td>
 
                       {/* Total */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-slate-900">
+                      <td className="px-3 py-3 whitespace-nowrap text-sm font-bold text-slate-900">
                         {formatCurrency(order.total)}
                       </td>
 
                       {/* Date */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {formatDate(order.orderDate)}
+                      <td className="px-3 py-3 whitespace-nowrap text-sm text-slate-500">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{formatDate(order.orderDate)}</span>
+                        </div>
                       </td>
 
                       {/* Ultra Modern Actions */}
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="px-3 py-3 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-1">
                           {/* View Details */}
-                          <div className="group relative">
-                            <button
-                              onClick={() => setSelectedOrder(order)}
-                              className="p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
-                              title={t('viewDetails')}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                              {t('viewDetails')}
-                            </div>
-                          </div>
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-md shadow-sm hover:shadow-md transition-all duration-200"
+                            title={t('viewDetails')}
+                          >
+                            <Eye className="w-3 h-3" />
+                          </button>
 
                           {/* Assign/Reassign */}
-                          <div className="group relative">
-                            <button
-                              onClick={() => openAssignModal(order.id)}
-                              className={`p-2 ${!order.assignedAgent ? 'bg-green-500 hover:bg-green-600' : 'bg-amber-500 hover:bg-amber-600'} text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105`}
-                              title={!order.assignedAgent ? t('assign') : 'Reassign'}
-                            >
-                              <UserPlus className="w-4 h-4" />
-                            </button>
-                            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                              {!order.assignedAgent ? t('assign') : 'Reassign'}
-                            </div>
-                          </div>
+                          <button
+                            onClick={() => openAssignModal(order.id)}
+                            className={`p-1.5 ${!order.assignedAgent ? 'bg-green-500 hover:bg-green-600' : 'bg-amber-500 hover:bg-amber-600'} text-white rounded-md shadow-sm hover:shadow-md transition-all duration-200`}
+                            title={!order.assignedAgent ? t('assign') : 'Reassign'}
+                          >
+                            <UserPlus className="w-3 h-3" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1499,6 +1582,7 @@ export default function OrdersPage() {
                 )}
               </tbody>
             </table>
+          </div>
         </div>
 
         {/* Pagination */}

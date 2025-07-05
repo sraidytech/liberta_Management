@@ -10,6 +10,47 @@ const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export class OrdersController {
   /**
+   * Get unique shipping statuses from database
+   */
+  async getShippingStatuses(req: Request, res: Response) {
+    try {
+      const shippingStatuses = await prisma.order.findMany({
+        select: {
+          shippingStatus: true
+        },
+        where: {
+          AND: [
+            { shippingStatus: { not: null } },
+            { shippingStatus: { not: '' } }
+          ]
+        },
+        distinct: ['shippingStatus'],
+        orderBy: {
+          shippingStatus: 'asc'
+        }
+      });
+
+      const uniqueStatuses = shippingStatuses
+        .map(order => order.shippingStatus)
+        .filter(status => status && status.trim().length > 0)
+        .sort();
+
+      res.json({
+        success: true,
+        data: {
+          shippingStatuses: uniqueStatuses
+        }
+      });
+    } catch (error) {
+      console.error('❌ Error fetching shipping statuses:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch shipping statuses'
+      });
+    }
+  }
+
+  /**
    * Get all orders with pagination and filtering
    */
   async getOrders(req: Request, res: Response) {
@@ -18,13 +59,17 @@ export class OrdersController {
         page = 1,
         limit = 25,
         status,
+        shippingStatus,
         storeIdentifier,
         assignedAgentId,
         search,
         startDate,
         endDate,
         sortBy = 'createdAt',
-        sortOrder = 'desc'
+        sortOrder = 'desc',
+        excludeStatus,
+        noteTypes,
+        hasAgentNotes
       } = req.query;
 
       const pageNum = parseInt(page as string);
@@ -34,8 +79,32 @@ export class OrdersController {
       // Build where clause
       const where: any = {};
 
+      // Handle multi-select status filter
       if (status) {
-        where.status = status;
+        if (typeof status === 'string' && status.includes(',')) {
+          // Multi-select: status is comma-separated
+          const statusArray = status.split(',').filter(s => s.trim());
+          where.status = {
+            in: statusArray
+          };
+        } else {
+          // Single status
+          where.status = status;
+        }
+      }
+
+      // Handle multi-select shipping status filter
+      if (shippingStatus) {
+        if (typeof shippingStatus === 'string' && shippingStatus.includes(',')) {
+          // Multi-select: shippingStatus is comma-separated
+          const shippingStatusArray = shippingStatus.split(',').filter(s => s.trim());
+          where.shippingStatus = {
+            in: shippingStatusArray
+          };
+        } else {
+          // Single shipping status
+          where.shippingStatus = shippingStatus;
+        }
       }
 
       if (storeIdentifier) {
@@ -46,24 +115,83 @@ export class OrdersController {
         where.assignedAgentId = assignedAgentId;
       }
 
+      // Handle excludeStatus filter (for hiding delivered orders)
+      if (excludeStatus) {
+        where.status = {
+          not: excludeStatus
+        };
+      }
+
+      // Handle note types filter (improved multi-select)
+      if (noteTypes) {
+        const noteTypeArray = (noteTypes as string).split(',').filter(nt => nt.trim());
+        if (noteTypeArray.length > 0) {
+          where.AND = [
+            ...(where.AND || []),
+            {
+              OR: noteTypeArray.map(noteType => ({
+                OR: [
+                  { notes: { contains: noteType.trim() } },
+                  { internalNotes: { contains: noteType.trim() } }
+                ]
+              }))
+            }
+          ];
+        }
+      }
+
+      // Handle hasAgentNotes filter (show only orders with agent-entered notes)
+      if (hasAgentNotes === 'true') {
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              {
+                AND: [
+                  { notes: { not: null } },
+                  { notes: { not: '' } },
+                  { notes: { not: { contains: 'Last confirmation: Confirmation échouée 1' } } }
+                ]
+              },
+              {
+                AND: [
+                  { internalNotes: { not: null } },
+                  { internalNotes: { not: '' } }
+                ]
+              }
+            ]
+          }
+        ];
+      }
+
       // Apply product-based filtering for non-admin users
       const user = req.user;
       if (user && user.role !== 'ADMIN') {
-        const userAssignedProducts = await productAssignmentService.getUserAssignedProducts(user.id);
+        // 🚨 CRITICAL FIX: Product assignments should ONLY be used for NEW order assignments
+        // When viewing existing assigned orders (assignedAgentId is specified),
+        // agents should see ALL their assigned orders regardless of product assignments
         
-        if (userAssignedProducts.length > 0) {
-          // Filter orders that contain at least one product assigned to the user
-          where.items = {
-            some: {
-              title: {
-                in: userAssignedProducts
+        if (!assignedAgentId) {
+          // Only apply product filtering when browsing unassigned orders (no assignedAgentId filter)
+          const userAssignedProducts = await productAssignmentService.getUserAssignedProducts(user.id);
+          
+          if (userAssignedProducts.length > 0) {
+            // Filter orders that contain at least one product assigned to the user
+            where.items = {
+              some: {
+                title: {
+                  in: userAssignedProducts
+                }
               }
-            }
-          };
-        } else {
-          // If user has no product assignments, show no orders (except for admins)
-          where.id = 'non-existent-id'; // This will return no results
+            };
+          } else {
+            // If user has no product assignments, show no orders when browsing
+            where.id = 'non-existent-id'; // This will return no results
+          }
         }
+        // 🔥 WHEN assignedAgentId IS SPECIFIED: NO PRODUCT FILTERING
+        // The agent must see ALL orders assigned to them, period!
+        console.log(`🔍 Orders API - User: ${user.id}, Role: ${user.role}, AssignedAgentId: ${assignedAgentId}, ProductFilteringApplied: ${!assignedAgentId}`);
       }
 
       if (search) {
@@ -105,7 +233,8 @@ export class OrdersController {
         }
       }
 
-      // Get orders with relations
+      // 🚀 PROFESSIONAL SOLUTION: Include ticket counts directly in the query
+      // This eliminates the need for separate API calls and prevents 429 errors
       const [orders, totalCount] = await Promise.all([
         prisma.order.findMany({
           where,
@@ -129,7 +258,8 @@ export class OrdersController {
             items: true,
             _count: {
               select: {
-                items: true
+                items: true,
+                tickets: true  // 🎯 CRITICAL: Include ticket count in the main query
               }
             }
           },

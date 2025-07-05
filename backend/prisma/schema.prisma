@@ -35,6 +35,11 @@ model User {
   productConfirmationRates AgentProductConfirmationRate[] @relation("AgentProductConfirmationRates")
   activityLogs     ActivityLog[] @relation("UserActivityLogs")
   productAssignments UserProductAssignment[] @relation("UserProductAssignments")
+  
+  // Ticket system relations
+  reportedTickets  Ticket[] @relation("ReportedTickets")
+  assignedTickets  Ticket[] @relation("AssignedTickets")
+  sentTicketMessages TicketMessage[] @relation("SentTicketMessages")
 
   // NextAuth.js fields
   emailVerified DateTime?
@@ -147,6 +152,7 @@ model Order {
   activities    AgentActivity[]
   notifications Notification[]
   webhookEvents WebhookEvent[]
+  tickets       Ticket[]
 
   @@map("orders")
 }
@@ -433,4 +439,80 @@ model UserProductAssignment {
   @@index([userId])
   @@index([productName])
   @@map("user_product_assignments")
+}
+
+// Ticket System Models
+model Ticket {
+  id          String        @id @default(cuid())
+  orderId     String
+  reporterId  String        // Agent who reported the problem
+  assigneeId  String?       // Team Manager or Coordinateur assigned to handle
+  
+  // Ticket details
+  title       String
+  category    TicketCategory
+  priority    TicketPriority @default(MEDIUM)
+  status      TicketStatus   @default(OPEN)
+  description String
+  
+  // Metadata
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  
+  // Relations
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reporter    User          @relation("ReportedTickets", fields: [reporterId], references: [id])
+  assignee    User?         @relation("AssignedTickets", fields: [assigneeId], references: [id])
+  messages    TicketMessage[]
+  
+  @@index([orderId])
+  @@index([reporterId])
+  @@index([assigneeId])
+  @@index([status])
+  @@index([priority])
+  @@map("tickets")
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  senderId  String
+  message   String   @db.Text
+  isInternal Boolean @default(false) // For internal notes between team members
+  createdAt DateTime @default(now())
+  
+  // Relations
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender    User     @relation("SentTicketMessages", fields: [senderId], references: [id])
+  
+  @@index([ticketId])
+  @@index([senderId])
+  @@map("ticket_messages")
+}
+
+// Ticket Enums
+enum TicketCategory {
+  CUSTOMER_ISSUE      // Customer unreachable, refused delivery, etc.
+  PRODUCT_ISSUE       // Wrong item, damaged product, etc.
+  DELIVERY_ISSUE      // Shipping problems, address issues, etc.
+  SYSTEM_ISSUE        // Technical problems, app issues, etc.
+  PAYMENT_ISSUE       // Payment problems, refunds, etc.
+  OTHER               // Other issues
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_RESPONSE
+  RESOLVED
+  CLOSED
 }

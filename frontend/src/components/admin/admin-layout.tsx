@@ -28,7 +28,8 @@ import {
   FileText,
   Key,
   Activity,
-  Package
+  Package,
+  MessageSquare
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -106,6 +107,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Bell,
       href: '/admin/notifications',
       active: pathname === '/admin/notifications'
+    },
+    {
+      name: language === 'fr' ? 'Tickets' : 'Tickets',
+      icon: MessageSquare,
+      href: '/admin/tickets',
+      active: pathname === '/admin/tickets'
     },
     {
       name: language === 'fr' ? 'Journaux d\'Activité' : 'Activity Logs',

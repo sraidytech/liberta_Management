@@ -133,8 +133,9 @@ export default function AssignmentDashboard() {
   useEffect(() => {
     fetchStats();
     
-    // Refresh stats every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
+    // 🔧 FIX: Reduce polling frequency to prevent 429 errors
+    // Refresh stats every 60 seconds instead of 30 seconds
+    const interval = setInterval(fetchStats, 60000);
     return () => clearInterval(interval);
   }, []);
 

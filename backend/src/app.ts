@@ -29,12 +29,14 @@ import defaultCommissionSettingsRoutes from '@/modules/commissions/default-commi
 import activityLogsRoutes from '@/modules/activity-logs/activity-logs.routes';
 import schedulerRoutes from '@/modules/scheduler/scheduler.routes';
 import productAssignmentRoutes from '@/modules/product-assignments/product-assignments.routes';
+import ticketRoutes from '@/modules/tickets/tickets.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
 import { notFound } from '@/common/middleware/notFound';
 import { authMiddleware } from '@/common/middleware/auth';
 import { activityLogger, errorLogger } from '@/common/middleware/activity-logger';
+import { generalRateLimit, authRateLimit, userRateLimit } from '@/middleware/rate-limiter';
 
 class App {
   public app: express.Application;
@@ -74,15 +76,13 @@ class App {
       credentials: true,
     }));
 
-    // Rate limiting
-    const limiter = rateLimit({
-      windowMs: config.rateLimitWindowMs,
-      max: config.rateLimitMaxRequests,
-      message: 'Too many requests from this IP, please try again later.',
-      standardHeaders: true,
-      legacyHeaders: false,
-    });
-    this.app.use('/api/', limiter);
+    // 🚀 ENTERPRISE-GRADE RATE LIMITING
+    // Apply general rate limiting to all API routes
+    this.app.use('/api/', generalRateLimit);
+    
+    // Apply strict rate limiting to auth routes
+    this.app.use('/api/v1/auth/login', authRateLimit);
+    this.app.use('/api/v1/auth/register', authRateLimit);
 
     // Body parsing
     this.app.use(express.json({ limit: '10mb' }));
@@ -112,19 +112,21 @@ class App {
     // API routes
     this.app.use('/api/v1/auth', authRoutes);
     this.app.use('/api/v1/users', usersRoutes); // Users routes have their own auth middleware
-    this.app.use('/api/v1/orders', authMiddleware, orderRoutes);
-    this.app.use('/api/v1/agents', authMiddleware, agentRoutes);
-    this.app.use('/api/v1/customers', authMiddleware, customerRoutes);
+    // 🚀 CRITICAL ROUTES WITH USER-BASED RATE LIMITING
+    this.app.use('/api/v1/orders', authMiddleware, userRateLimit, orderRoutes);
+    this.app.use('/api/v1/agents', authMiddleware, userRateLimit, agentRoutes);
+    this.app.use('/api/v1/customers', authMiddleware, userRateLimit, customerRoutes);
     this.app.use('/api/v1/webhooks', webhookRoutes); // No auth for webhooks
-    this.app.use('/api/v1/notifications', authMiddleware, notificationRoutes);
-    this.app.use('/api/v1/analytics', authMiddleware, analyticsRoutes);
-    this.app.use('/api/v1/stores', authMiddleware, storesRoutes);
-    this.app.use('/api/v1/assignments', authMiddleware, assignmentRoutes);
+    this.app.use('/api/v1/notifications', authMiddleware, userRateLimit, notificationRoutes);
+    this.app.use('/api/v1/analytics', authMiddleware, userRateLimit, analyticsRoutes);
+    this.app.use('/api/v1/stores', authMiddleware, userRateLimit, storesRoutes);
+    this.app.use('/api/v1/assignments', authMiddleware, userRateLimit, assignmentRoutes);
     this.app.use('/api/v1/commissions', commissionRoutes); // Commission routes have their own auth middleware
     this.app.use('/api/v1/commissions/default-settings', defaultCommissionSettingsRoutes); // Default commission settings routes
     this.app.use('/api/v1/activity-logs', activityLogsRoutes); // Activity logs routes have their own auth middleware
     this.app.use('/api/v1/scheduler', schedulerRoutes); // Scheduler routes for background job management
     this.app.use('/api/v1/product-assignments', productAssignmentRoutes); // Product assignment routes have their own auth middleware
+    this.app.use('/api/v1/tickets', authMiddleware, userRateLimit, ticketRoutes); // Ticket system routes with rate limiting
 
     // Root route
     this.app.get('/', (req, res) => {

@@ -941,6 +941,130 @@ export class AgentAssignmentService {
   }
 
   /**
+   * Get assignment statistics for a specific agent (considering product assignments)
+   */
+  async getAgentSpecificStats(agentId: string): Promise<{
+    assignedOrders: number;
+    pendingOrders: number;
+    completedToday: number;
+    maxOrders: number;
+    utilizationRate: number;
+  }> {
+    // Get agent info
+    const agent = await prisma.user.findUnique({
+      where: { id: agentId },
+      select: { maxOrders: true }
+    });
+
+    if (!agent) {
+      throw new Error('Agent not found');
+    }
+
+    // Get agent's assigned products
+    const assignedProducts = await prisma.userProductAssignment.findMany({
+      where: { userId: agentId },
+      select: { productName: true }
+    });
+
+    const productNames = assignedProducts.map((p: { productName: string }) => p.productName);
+    
+    console.log(`🔍 Agent ${agentId} product assignments:`, productNames.length, productNames);
+
+    // Build where clause for orders assigned to this agent
+    const baseWhere: any = {
+      assignedAgentId: agentId
+    };
+
+    // 🔧 FIX: Only apply product filtering if agent has specific product assignments
+    // If no product assignments, show ALL assigned orders (like admin view)
+    if (productNames.length > 0) {
+      baseWhere.items = {
+        some: {
+          title: {
+            in: productNames
+          }
+        }
+      };
+      console.log(`📦 Applying product filter for agent ${agentId}:`, productNames);
+    } else {
+      console.log(`📦 No product assignments for agent ${agentId}, showing ALL assigned orders`);
+    }
+    // If agent has no product assignments, don't add product filtering
+    // This ensures they see all their assigned orders
+
+    // Count orders by status
+    console.log(`🔍 Base where clause for agent ${agentId}:`, JSON.stringify(baseWhere, null, 2));
+    
+    const [assignedCount, inProgressCount, completedTodayCount] = await Promise.all([
+      // Count ASSIGNED orders
+      prisma.order.count({
+        where: {
+          assignedAgentId: agentId,
+          status: 'ASSIGNED',
+          ...(productNames.length > 0 ? {
+            items: {
+              some: {
+                title: {
+                  in: productNames
+                }
+              }
+            }
+          } : {})
+        }
+      }),
+      // Count IN_PROGRESS orders
+      prisma.order.count({
+        where: {
+          assignedAgentId: agentId,
+          status: 'IN_PROGRESS',
+          ...(productNames.length > 0 ? {
+            items: {
+              some: {
+                title: {
+                  in: productNames
+                }
+              }
+            }
+          } : {})
+        }
+      }),
+      // Count completed today
+      prisma.order.count({
+        where: {
+          assignedAgentId: agentId,
+          status: { in: ['CONFIRMED', 'SHIPPED', 'DELIVERED'] },
+          assignedAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+            lt: new Date(new Date().setHours(23, 59, 59, 999))
+          },
+          ...(productNames.length > 0 ? {
+            items: {
+              some: {
+                title: {
+                  in: productNames
+                }
+              }
+            }
+          } : {})
+        }
+      })
+    ]);
+
+    console.log(`📊 Agent ${agentId} counts - Assigned: ${assignedCount}, InProgress: ${inProgressCount}, CompletedToday: ${completedTodayCount}`);
+
+    const pendingCount = assignedCount + inProgressCount;
+    const utilizationRate = agent.maxOrders > 0 ? (assignedCount / agent.maxOrders) * 100 : 0;
+
+    return {
+      assignedOrders: assignedCount,
+      pendingOrders: pendingCount,
+      completedToday: completedTodayCount,
+      maxOrders: agent.maxOrders,
+      utilizationRate: Math.round(utilizationRate * 100) / 100
+    };
+  }
+
+  /**
    * Manual reassignment by team managers
    */
   async reassignOrder(orderId: string, newAgentId: string, managerId: string): Promise<AssignmentResult> {

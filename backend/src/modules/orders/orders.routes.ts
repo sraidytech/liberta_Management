@@ -12,6 +12,11 @@ router.get('/', async (req, res) => {
   await ordersController.getOrders(req, res);
 });
 
+// Get unique shipping statuses
+router.get('/shipping-statuses', async (req, res) => {
+  await ordersController.getShippingStatuses(req, res);
+});
+
 // Get dashboard statistics
 router.get('/stats', async (req, res) => {
   await ordersController.getDashboardStats(req, res);

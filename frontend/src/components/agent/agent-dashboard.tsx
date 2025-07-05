@@ -88,50 +88,54 @@ export default function AgentDashboard() {
         }
       }
       
-      // Fetch assigned orders for this agent
-      const ordersResponse = await fetch(`${apiBaseUrl}/api/v1/orders?assignedAgentId=${user.id}`, {
+      // Fetch agent-specific stats that consider product assignments
+      const statsResponse = await fetch(`${apiBaseUrl}/api/v1/assignments/agent/${user.id}/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
       
-      console.log('📊 Orders API Response Status:', ordersResponse.status);
+      console.log('📊 Agent Stats API Response Status:', statsResponse.status);
+      
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        console.log('📊 Agent Stats Data:', statsData);
+        
+        if (statsData.success && statsData.data) {
+          setStats(statsData.data);
+          console.log('✅ Agent stats loaded successfully:', statsData.data);
+        }
+      } else {
+        console.error('❌ Failed to fetch agent stats:', statsResponse.status);
+      }
+
+      // Fetch assigned orders for display (first 5 only)
+      const ordersResponse = await fetch(`${apiBaseUrl}/api/v1/orders?assignedAgentId=${user.id}&limit=5`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('📦 Orders API Response Status:', ordersResponse.status);
       
       if (ordersResponse.ok) {
         const ordersData = await ordersResponse.json();
         console.log('📦 Orders Data:', ordersData);
         
-        const assignedOrders = ordersData.data?.orders || [];
-        console.log('📋 Assigned Orders Count:', assignedOrders.length);
+        const displayOrders = ordersData.data?.orders || [];
+        setOrders(displayOrders);
         
-        setOrders(assignedOrders.slice(0, 5)); // Show only first 5 for dashboard
-        
-        // Calculate stats from actual data
-        const assignedCount = assignedOrders.filter((o: Order) => o.status === 'ASSIGNED').length;
-        const inProgressCount = assignedOrders.filter((o: Order) => o.status === 'IN_PROGRESS').length;
-        const completedToday = assignedOrders.filter((o: Order) =>
-          ['CONFIRMED', 'SHIPPED', 'DELIVERED'].includes(o.status) &&
-          new Date(o.assignedAt).toDateString() === new Date().toDateString()
-        ).length;
-        
-        const maxOrders = (user as any).maxOrders || 50;
-        const pendingCount = assignedCount + inProgressCount;
-        
-        setStats({
-          assignedOrders: assignedOrders.length,
-          maxOrders,
-          completedToday,
-          pendingOrders: pendingCount,
-          utilizationRate: Math.round((pendingCount / maxOrders) * 100)
-        });
-        
-        console.log('✅ Agent dashboard data loaded successfully');
+        console.log('✅ Agent dashboard orders loaded successfully');
+        console.log('📊 Orders for display:', displayOrders.length);
       } else {
         const errorText = await ordersResponse.text();
         console.error('❌ Failed to fetch orders:', ordersResponse.status, errorText);
-        
-        // Set default stats if API fails
+      }
+
+      // Set default stats if no stats were loaded
+      if (!stats) {
         setStats({
           assignedOrders: 0,
           maxOrders: (user as any).maxOrders || 50,
@@ -213,8 +217,9 @@ export default function AgentDashboard() {
   useEffect(() => {
     fetchAgentData();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchAgentData, 30000);
+    // 🔧 FIX: Reduce polling frequency to prevent 429 errors
+    // Refresh every 60 seconds instead of 30 seconds
+    const interval = setInterval(fetchAgentData, 60000);
     return () => clearInterval(interval);
   }, []);
 
