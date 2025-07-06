@@ -416,6 +416,296 @@ export interface Translations {
   inTransit: string;
   outForDelivery: string;
   failedDelivery: string;
+  
+  // Agent Notes Analytics
+  notesActivityAnalysis: string;
+  agentNotesPerformance: string;
+  notesFrequencyPatterns: string;
+  peakActivityHours: string;
+  noteQualityIndicators: string;
+  timeBetweenNotes: string;
+  timeToFirstNote: string;
+  responseTimeAnalysis: string;
+  activityConsistency: string;
+  productivityRanking: string;
+  totalNotes: string;
+  notesPerDay: string;
+  notesPerOrder: string;
+  averageNoteLength: string;
+  averageTimeBetweenNotes: string;
+  averageTimeToFirstNote: string;
+  peakActivityHour: string;
+  noteQualityScore: string;
+  activeDaysWithNotes: string;
+  hourlyDistribution: string;
+  dailyTrend: string;
+  responseTimeMetrics: string;
+  fastestResponse: string;
+  slowestResponse: string;
+  averageResponse: string;
+  globalPeakHour: string;
+  activeAgentsWithNotes: string;
+  averageNotesPerAgent: string;
+  averageQualityScore: string;
+  topNotesPerformers: string;
+  notesActivitySummary: string;
+  hoursLabel: string;
+  minutesLabel: string;
+  charactersLabel: string;
+  consistencyScore: string;
+  qualityScore: string;
+  productivityRank: string;
+  noNotesActivity: string;
+  noNotesFound: string;
+  agentHasNoNotes: string;
+  periodDays: string;
+  
+  // Missing translations for placeholders and common UI elements
+  enterEcoManagerToken: string;
+  briefDescription: string;
+  nameOrPhone: string;
+  agentNamePlaceholder: string;
+  searchByReference: string;
+  yourEmail: string;
+  networkError: string;
+  connectionTestFailed: string;
+  pickupRequested: string;
+  pickedUp: string;
+  allShippingStatus: string;
+  allAgents: string;
+  allRoles: string;
+  administrators: string;
+  managers: string;
+  coordinators: string;
+  followUpAgents: string;
+  followUpAgent: string;
+  allStores: string;
+  allResources: string;
+  orderResource: string;
+  userResource: string;
+  storeResource: string;
+  assignmentResource: string;
+  commissionResource: string;
+  enterResourceId: string;
+  enterUserId: string;
+  searchAgents: string;
+  searchByNameOrCode: string;
+  loadingSystemInfo: string;
+  loadingSchedulerStatus: string;
+  loadingApiConfig: string;
+  loadingNoteTypes: string;
+  loadingWilayaSettings: string;
+  loadingStores: string;
+  savingChanges: string;
+  testingConnection: string;
+  startingScheduler: string;
+  stoppingScheduler: string;
+  syncingEcoManager: string;
+  syncingShippingStatus: string;
+  creatingStore: string;
+  updatingStore: string;
+  failedToFetchAgents: string;
+  failedToFetchUsers: string;
+  failedToFetchStores: string;
+  failedToSaveStore: string;
+  failedToDeleteStore: string;
+  failedToToggleStoreStatus: string;
+  failedToTestConnection: string;
+  noAuthToken: string;
+  invalidEmailOrPassword: string;
+  currentPasswordRequired: string;
+  newPasswordRequired: string;
+  passwordTooShort: string;
+  passwordsDoNotMatch: string;
+  passwordChangeError: string;
+  networkErrorTryAgain: string;
+  passwordChanged: string;
+  changeMyPassword: string;
+  changePassword: string;
+  forUser: string;
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+  egNatuStore: string;
+  egNatu: string;
+  ecoManagerApiUrl: string;
+  enterApiToken: string;
+  testConnection: string;
+  testing: string;
+  createStore: string;
+  editStore: string;
+  addNewStore: string;
+  updateStore: string;
+  never: string;
+  lastSync: string;
+  toggle: string;
+  deleteStore: string;
+  confirmDelete: string;
+  areYouSure: string;
+  thisActionCannotBeUndone: string;
+  yes: string;
+  no: string;
+  agentPortal: string;
+  manageYourOrders: string;
+  allPriorities: string;
+  allCategories: string;
+  searchByTitle: string;
+  sendingMessage: string;
+  addingMessage: string;
+  updatingTicketStatus: string;
+  creatingTicket: string;
+  loadingTickets: string;
+  ticketCreatedFor: string;
+  min: string;
+  max: string;
+  agentCodeOrName: string;
+  customDateRange: string;
+  startDate: string;
+  endDate: string;
+  advancedFilters: string;
+  clearFilters: string;
+  dateRange: string;
+  store: string;
+  revenueRange: string;
+  loadingReports: string;
+  loadingError: string;
+  retryLoading: string;
+  salesReports: string;
+  agentPerformance: string;
+  geographicAnalytics: string;
+  customerAnalytics: string;
+  totalSales: string;
+  averageOrderValue: string;
+  activeWilayas: string;
+  deliveredOrdersOnly: string;
+  perOrder: string;
+  regionsCovered: string;
+  orderAnalysisByWilaya: string;
+  yearPerformance: string;
+  revenueByStore: string;
+  salesDistribution: string;
+  revenueByStatus: string;
+  performanceByStatus: string;
+  topProducts: string;
+  bestSellers: string;
+  monthlyComparison: string;
+  activeCustomers: string;
+  newCustomers: string;
+  returningCustomers: string;
+  retentionRate: string;
+  inPeriod: string;
+  customerRetentionMetrics: string;
+  noDataAvailable: string;
+  selectedPeriod: string;
+  dailyEvolution: string;
+  stores: string;
+  successRate: string;
+  successful: string;
+  errors: string;
+  connectionIssue: string;
+  lastError: string;
+  failed: string;
+  requestCount: string;
+  successCount: string;
+  errorCount: string;
+  lastTestResults: string;
+  isRunning: string;
+  lastRun: string;
+  nextRun: string;
+  startScheduler: string;
+  stopScheduler: string;
+  syncEcoManagerNow: string;
+  syncShippingStatusNow: string;
+  schedulerStatus: string;
+  backgroundJobs: string;
+  ecoManagerSync: string;
+  shippingStatusSync: string;
+  manualSync: string;
+  lastSyncResults: string;
+  syncedOrders: string;
+  updatedOrders: string;
+  syncErrors: string;
+  nextSyncTimes: string;
+  systemInformation: string;
+  nodeEnvironment: string;
+  production: string;
+  development: string;
+  uptime: string;
+  memoryUsage: string;
+  cpuUsage: string;
+  databaseStatus: string;
+  redisStatus: string;
+  connected: string;
+  disconnected: string;
+  apiVersion: string;
+  buildVersion: string;
+  lastDeployment: string;
+  serverHealth: string;
+  healthy: string;
+  unhealthy: string;
+  noteTypeName: string;
+  enterNoteTypeName: string;
+  noteTypeCreated: string;
+  noteTypeUpdated: string;
+  noteTypeDeleted: string;
+  failedToCreateNoteType: string;
+  failedToUpdateNoteType: string;
+  failedToDeleteNoteType: string;
+  failedToToggleNoteType: string;
+  noteTypeRequired: string;
+  wilayaSettings: string;
+  initializeSettings: string;
+  saveAllSettings: string;
+  wilayaSettingsInitialized: string;
+  failedToInitializeSettings: string;
+  failedToSaveSettings: string;
+  settingsSaved: string;
+  wilayaAlreadyExists: string;
+  addWilaya: string;
+  deliveryTime: string;
+  days: string;
+  isActive: string;
+  removeWilaya: string;
+  onlineUsers: string;
+  usersOnline: string;
+  role: string;
+  lastSeen: string;
+  admin: string;
+  agentSuivi: string;
+  callCenterAgent: string;
+  loadingUsers: string;
+  failedToLoadUsers: string;
+  searchByTitleOrderRef: string;
+  describeTheProblem: string;
+  assigneeSelection: string;
+  autoAssignTicket: string;
+  manualAssignTicket: string;
+  selectAssignee: string;
+  ticketStatusUpdated: string;
+  failedToUpdateTicketStatus: string;
+  messageAdded: string;
+  loadingProducts: string;
+  failedToLoadProducts: string;
+  contactAdminForAssignments: string;
+  adjustSearchTerms: string;
+  busyAgents: string;
+  availableAgents: string;
+  available: string;
+  utilizationRate: string;
+  assignmentSummary: string;
+  coordinatorDashboard: string;
+  overviewOfAssignedProducts: string;
+  myAgents: string;
+  quickActions: string;
+  viewMyOrders: string;
+  viewAssignedProducts: string;
+  manageAgents: string;
+  performanceOverview: string;
+  completionRate: string;
+  myNotifications: string;
+  manageYourNotifications: string;
+  noAuthTokenFound: string;
+  failedToFetchDashboardStats: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -835,6 +1125,296 @@ export const translations: Record<Language, Translations> = {
     inTransit: 'In Transit',
     outForDelivery: 'Out for Delivery',
     failedDelivery: 'Failed Delivery',
+    
+    // Agent Notes Analytics
+    notesActivityAnalysis: 'Notes Activity Analysis',
+    agentNotesPerformance: 'Agent Notes Performance',
+    notesFrequencyPatterns: 'Notes Frequency Patterns',
+    peakActivityHours: 'Peak Activity Hours',
+    noteQualityIndicators: 'Note Quality Indicators',
+    timeBetweenNotes: 'Time Between Notes',
+    timeToFirstNote: 'Time to First Note',
+    responseTimeAnalysis: 'Response Time Analysis',
+    activityConsistency: 'Activity Consistency',
+    productivityRanking: 'Productivity Ranking',
+    totalNotes: 'Total Notes',
+    notesPerDay: 'Notes per Day',
+    notesPerOrder: 'Notes per Order',
+    averageNoteLength: 'Average Note Length',
+    averageTimeBetweenNotes: 'Average Time Between Notes',
+    averageTimeToFirstNote: 'Average Time to First Note',
+    peakActivityHour: 'Peak Activity Hour',
+    noteQualityScore: 'Note Quality Score',
+    activeDaysWithNotes: 'Active Days with Notes',
+    hourlyDistribution: 'Hourly Distribution',
+    dailyTrend: 'Daily Trend',
+    responseTimeMetrics: 'Response Time Metrics',
+    fastestResponse: 'Fastest Response',
+    slowestResponse: 'Slowest Response',
+    averageResponse: 'Average Response',
+    globalPeakHour: 'Global Peak Hour',
+    activeAgentsWithNotes: 'Active Agents with Notes',
+    averageNotesPerAgent: 'Average Notes per Agent',
+    averageQualityScore: 'Average Quality Score',
+    topNotesPerformers: 'Top Notes Performers',
+    notesActivitySummary: 'Notes Activity Summary',
+    hoursLabel: 'hours',
+    minutesLabel: 'minutes',
+    charactersLabel: 'characters',
+    consistencyScore: 'Consistency Score',
+    qualityScore: 'Quality Score',
+    productivityRank: 'Productivity Rank',
+    noNotesActivity: 'No Notes Activity',
+    noNotesFound: 'No notes found',
+    agentHasNoNotes: 'Agent has no notes',
+    periodDays: 'Period Days',
+    
+    // Missing translations for placeholders and common UI elements
+    enterEcoManagerToken: 'Enter your EcoManager API token',
+    briefDescription: 'Brief description of the problem',
+    nameOrPhone: 'Name or phone',
+    agentNamePlaceholder: 'Agent name',
+    searchByReference: 'Search by reference, customer name, or phone...',
+    yourEmail: 'votre@email.com',
+    networkError: 'Network error',
+    connectionTestFailed: 'Connection test failed',
+    pickupRequested: 'Pickup Requested',
+    pickedUp: 'Picked Up',
+    allShippingStatus: 'All Shipping Status',
+    allAgents: 'All Agents',
+    allRoles: 'All roles',
+    administrators: 'Administrators',
+    managers: 'Managers',
+    coordinators: 'Coordinators',
+    followUpAgents: 'Follow-up Agents',
+    followUpAgent: 'Follow-up Agent',
+    allStores: 'All stores',
+    allResources: 'All Resources',
+    orderResource: 'Order',
+    userResource: 'User',
+    storeResource: 'Store',
+    assignmentResource: 'Assignment',
+    commissionResource: 'Commission',
+    enterResourceId: 'Enter resource ID',
+    enterUserId: 'Enter user ID',
+    searchAgents: 'Search agents...',
+    searchByNameOrCode: 'Search by name or code...',
+    loadingSystemInfo: 'Loading system information...',
+    loadingSchedulerStatus: 'Loading scheduler status...',
+    loadingApiConfig: 'Loading API configuration...',
+    loadingNoteTypes: 'Loading note types...',
+    loadingWilayaSettings: 'Loading wilaya settings...',
+    loadingStores: 'Loading stores...',
+    savingChanges: 'Saving...',
+    testingConnection: 'Testing...',
+    startingScheduler: 'Starting...',
+    stoppingScheduler: 'Stopping...',
+    syncingEcoManager: 'Syncing...',
+    syncingShippingStatus: 'Syncing...',
+    creatingStore: 'Saving...',
+    updatingStore: 'Saving...',
+    failedToFetchAgents: 'Failed to fetch agents',
+    failedToFetchUsers: 'Failed to fetch users',
+    failedToFetchStores: 'Failed to fetch stores',
+    failedToSaveStore: 'Failed to save store',
+    failedToDeleteStore: 'Failed to delete store',
+    failedToToggleStoreStatus: 'Failed to toggle store status',
+    failedToTestConnection: 'Failed to test connection',
+    noAuthToken: 'No authentication token found',
+    invalidEmailOrPassword: 'Invalid email or password',
+    currentPasswordRequired: 'Current password is required',
+    newPasswordRequired: 'New password is required',
+    passwordTooShort: 'Password must be at least 6 characters long',
+    passwordsDoNotMatch: 'Passwords do not match',
+    passwordChangeError: 'Error changing password',
+    networkErrorTryAgain: 'Network error. Please try again.',
+    passwordChanged: 'Password changed successfully',
+    changeMyPassword: 'Change My Password',
+    changePassword: 'Change Password',
+    forUser: 'For',
+    currentPassword: 'Current Password',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm Password',
+    egNatuStore: 'e.g., NATU Store',
+    egNatu: 'e.g., NATU',
+    ecoManagerApiUrl: 'https://natureldz.ecomanager.dz/api/shop/v2',
+    enterApiToken: 'Enter your EcoManager API token',
+    testConnection: 'Test Connection',
+    testing: 'Testing...',
+    createStore: 'Create Store',
+    editStore: 'Edit Store',
+    addNewStore: 'Add New Store',
+    updateStore: 'Update Store',
+    never: 'Never',
+    lastSync: 'Last Sync',
+    toggle: 'Toggle',
+    deleteStore: 'Delete',
+    confirmDelete: 'Confirm Delete',
+    areYouSure: 'Are you sure?',
+    thisActionCannotBeUndone: 'This action cannot be undone',
+    yes: 'Yes',
+    no: 'No',
+    agentPortal: 'Agent Portal',
+    manageYourOrders: 'Manage your orders',
+    allPriorities: 'All Priorities',
+    allCategories: 'All Categories',
+    searchByTitle: 'Search by title, order reference, or customer...',
+    sendingMessage: 'Sending...',
+    addingMessage: 'Adding...',
+    updatingTicketStatus: 'Updating...',
+    creatingTicket: 'Creating...',
+    loadingTickets: 'Loading...',
+    ticketCreatedFor: 'Ticket created for order',
+    min: 'Min',
+    max: 'Max',
+    agentCodeOrName: 'Agent code or name',
+    customDateRange: 'Custom',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    advancedFilters: 'Advanced filters',
+    clearFilters: 'Clear',
+    dateRange: 'Date Range',
+    store: 'Store',
+    revenueRange: 'Revenue Range',
+    loadingReports: 'Loading Reports',
+    loadingError: 'Loading Error',
+    retryLoading: 'Retry',
+    salesReports: 'Sales Reports',
+    agentPerformance: 'Agent Performance',
+    geographicAnalytics: 'Geographic Analytics',
+    customerAnalytics: 'Customer Analytics',
+    totalSales: 'Total Sales',
+    averageOrderValue: 'Average Order Value',
+    activeWilayas: 'Active Wilayas',
+    deliveredOrdersOnly: 'Delivered orders only',
+    perOrder: 'Per order',
+    regionsCovered: 'Regions covered',
+    orderAnalysisByWilaya: 'Order analysis by wilaya and commune',
+    yearPerformance: 'Year performance',
+    revenueByStore: 'Revenue by Store',
+    salesDistribution: 'Sales distribution',
+    revenueByStatus: 'Revenue by Status',
+    performanceByStatus: 'Performance by status',
+    topProducts: 'Top Products',
+    bestSellers: 'Best sellers',
+    monthlyComparison: 'Monthly Comparison',
+    activeCustomers: 'Active Customers',
+    newCustomers: 'New Customers',
+    returningCustomers: 'Returning Customers',
+    retentionRate: 'Retention Rate',
+    inPeriod: 'In period',
+    customerRetentionMetrics: 'Customer retention and behavior metrics',
+    noDataAvailable: 'No data available',
+    selectedPeriod: 'Selected period',
+    dailyEvolution: 'Daily evolution',
+    stores: 'Stores',
+    successRate: 'Success Rate',
+    successful: 'Successful',
+    errors: 'Errors',
+    connectionIssue: 'Connection Issue',
+    lastError: 'Last Error',
+    failed: 'Failed',
+    requestCount: 'Request Count',
+    successCount: 'Success Count',
+    errorCount: 'Error Count',
+    lastTestResults: 'Last Test Results',
+    isRunning: 'Running',
+    lastRun: 'Last Run',
+    nextRun: 'Next Run',
+    startScheduler: 'Start Scheduler',
+    stopScheduler: 'Stop Scheduler',
+    syncEcoManagerNow: 'Sync EcoManager Now',
+    syncShippingStatusNow: 'Sync Shipping Status Now',
+    schedulerStatus: 'Scheduler Status',
+    backgroundJobs: 'Background Jobs & Scheduler',
+    ecoManagerSync: 'EcoManager Sync',
+    shippingStatusSync: 'Shipping Status Sync',
+    manualSync: 'Manual Sync',
+    lastSyncResults: 'Last Sync Results',
+    syncedOrders: 'Synced Orders',
+    updatedOrders: 'Updated Orders',
+    syncErrors: 'Sync Errors',
+    nextSyncTimes: 'Next Sync Times',
+    systemInformation: 'System Information',
+    nodeEnvironment: 'Node Environment',
+    production: 'PROD',
+    development: 'DEV',
+    uptime: 'Uptime',
+    memoryUsage: 'Memory Usage',
+    cpuUsage: 'CPU Usage',
+    databaseStatus: 'Database Status',
+    redisStatus: 'Redis Status',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+    apiVersion: 'API Version',
+    buildVersion: 'Build Version',
+    lastDeployment: 'Last Deployment',
+    serverHealth: 'Server Health',
+    healthy: 'Healthy',
+    unhealthy: 'Unhealthy',
+    noteTypeName: 'Note Type Name',
+    enterNoteTypeName: 'Enter note type name...',
+    noteTypeCreated: 'Note type created successfully',
+    noteTypeUpdated: 'Note type updated successfully',
+    noteTypeDeleted: 'Note type deleted successfully',
+    failedToCreateNoteType: 'Failed to create note type',
+    failedToUpdateNoteType: 'Failed to update note type',
+    failedToDeleteNoteType: 'Failed to delete note type',
+    failedToToggleNoteType: 'Failed to toggle note type status',
+    noteTypeRequired: 'Note type name is required',
+    wilayaSettings: 'Wilaya Delivery Times',
+    initializeSettings: 'Initialize Settings',
+    saveAllSettings: 'Save All Settings',
+    wilayaSettingsInitialized: 'Wilaya settings initialized successfully',
+    failedToInitializeSettings: 'Failed to initialize wilaya settings',
+    failedToSaveSettings: 'Failed to save settings',
+    settingsSaved: 'Settings saved successfully',
+    wilayaAlreadyExists: 'This wilaya already exists in settings',
+    addWilaya: 'Add Wilaya',
+    deliveryTime: 'Delivery Time',
+    days: 'days',
+    isActive: 'Active',
+    removeWilaya: 'Remove',
+    onlineUsers: 'Online Users',
+    usersOnline: 'users online',
+    role: 'Role',
+    lastSeen: 'Last seen',
+    admin: 'Admin',
+    agentSuivi: 'Agent Suivi',
+    callCenterAgent: 'Call Center Agent',
+    loadingUsers: 'Loading...',
+    failedToLoadUsers: 'Failed to load online users',
+    searchByTitleOrderRef: 'Search by title, order reference, or customer...',
+    describeTheProblem: 'Describe the problem in detail...',
+    assigneeSelection: 'Assignee Selection',
+    autoAssignTicket: 'Auto-assign',
+    manualAssignTicket: 'Manual assignment',
+    selectAssignee: 'Select assignee',
+    ticketStatusUpdated: 'Ticket updated successfully',
+    failedToUpdateTicketStatus: 'Failed to update ticket',
+    messageAdded: 'Message added successfully',
+    loadingProducts: 'Loading...',
+    failedToLoadProducts: 'Failed to load your assigned products',
+    contactAdminForAssignments: 'You have not been assigned to any products yet. Contact your administrator to get product assignments.',
+    adjustSearchTerms: 'Try adjusting your search terms.',
+    busyAgents: 'Busy',
+    availableAgents: 'Available',
+    available: 'Available',
+    utilizationRate: 'Utilization rate',
+    assignmentSummary: 'Assignment Summary',
+    coordinatorDashboard: 'Coordinator Dashboard',
+    overviewOfAssignedProducts: 'Overview of your assigned products and orders',
+    myAgents: 'My Agents',
+    quickActions: 'Quick Actions',
+    viewMyOrders: 'View My Orders',
+    viewAssignedProducts: 'View assigned products',
+    manageAgents: 'Manage agents',
+    performanceOverview: 'Performance Overview',
+    completionRate: 'Completion Rate',
+    myNotifications: 'My Notifications',
+    manageYourNotifications: 'Manage your notifications',
+    noAuthTokenFound: 'No authentication token found',
+    failedToFetchDashboardStats: 'Failed to fetch dashboard stats',
   },
   fr: {
     // Common
@@ -1252,6 +1832,296 @@ export const translations: Record<Language, Translations> = {
     inTransit: 'En Transit',
     outForDelivery: 'En Cours de Livraison',
     failedDelivery: 'Échec de Livraison',
+    
+    // Agent Notes Analytics
+    notesActivityAnalysis: 'Analyse d\'Activité des Notes',
+    agentNotesPerformance: 'Performance des Notes d\'Agent',
+    notesFrequencyPatterns: 'Modèles de Fréquence des Notes',
+    peakActivityHours: 'Heures de Pointe d\'Activité',
+    noteQualityIndicators: 'Indicateurs de Qualité des Notes',
+    timeBetweenNotes: 'Temps Entre les Notes',
+    timeToFirstNote: 'Temps Jusqu\'à la Première Note',
+    responseTimeAnalysis: 'Analyse du Temps de Réponse',
+    activityConsistency: 'Cohérence d\'Activité',
+    productivityRanking: 'Classement de Productivité',
+    totalNotes: 'Total des Notes',
+    notesPerDay: 'Notes par Jour',
+    notesPerOrder: 'Notes par Commande',
+    averageNoteLength: 'Longueur Moyenne des Notes',
+    averageTimeBetweenNotes: 'Temps Moyen Entre les Notes',
+    averageTimeToFirstNote: 'Temps Moyen Jusqu\'à la Première Note',
+    peakActivityHour: 'Heure de Pointe d\'Activité',
+    noteQualityScore: 'Score de Qualité des Notes',
+    activeDaysWithNotes: 'Jours Actifs avec Notes',
+    hourlyDistribution: 'Distribution Horaire',
+    dailyTrend: 'Tendance Quotidienne',
+    responseTimeMetrics: 'Métriques de Temps de Réponse',
+    fastestResponse: 'Réponse la Plus Rapide',
+    slowestResponse: 'Réponse la Plus Lente',
+    averageResponse: 'Réponse Moyenne',
+    globalPeakHour: 'Heure de Pointe Globale',
+    activeAgentsWithNotes: 'Agents Actifs avec Notes',
+    averageNotesPerAgent: 'Moyenne de Notes par Agent',
+    averageQualityScore: 'Score de Qualité Moyen',
+    topNotesPerformers: 'Meilleurs Performeurs de Notes',
+    notesActivitySummary: 'Résumé d\'Activité des Notes',
+    hoursLabel: 'heures',
+    minutesLabel: 'minutes',
+    charactersLabel: 'caractères',
+    consistencyScore: 'Score de Cohérence',
+    qualityScore: 'Score de Qualité',
+    productivityRank: 'Rang de Productivité',
+    noNotesActivity: 'Aucune Activité de Notes',
+    noNotesFound: 'Aucune note trouvée',
+    agentHasNoNotes: 'L\'agent n\'a aucune note',
+    periodDays: 'Jours de Période',
+    
+    // Missing translations for placeholders and common UI elements
+    enterEcoManagerToken: 'Entrez votre token API EcoManager',
+    briefDescription: 'Brève description du problème',
+    nameOrPhone: 'Nom ou téléphone',
+    agentNamePlaceholder: 'Nom de l\'agent',
+    searchByReference: 'Rechercher par référence, nom du client ou téléphone...',
+    yourEmail: 'votre@email.com',
+    networkError: 'Erreur réseau',
+    connectionTestFailed: 'Test de connexion échoué',
+    pickupRequested: 'Ramassage Demandé',
+    pickedUp: 'Ramassé',
+    allShippingStatus: 'Tous les Statuts de Livraison',
+    allAgents: 'Tous les Agents',
+    allRoles: 'Tous les rôles',
+    administrators: 'Administrateurs',
+    managers: 'Gestionnaires',
+    coordinators: 'Coordinateurs',
+    followUpAgents: 'Agents de suivi',
+    followUpAgent: 'Agent de suivi',
+    allStores: 'Tous les magasins',
+    allResources: 'Toutes les Ressources',
+    orderResource: 'Commande',
+    userResource: 'Utilisateur',
+    storeResource: 'Magasin',
+    assignmentResource: 'Attribution',
+    commissionResource: 'Commission',
+    enterResourceId: 'Entrez l\'ID de ressource',
+    enterUserId: 'Entrez l\'ID utilisateur',
+    searchAgents: 'Rechercher agents...',
+    searchByNameOrCode: 'Rechercher par nom ou code...',
+    loadingSystemInfo: 'Chargement des informations système...',
+    loadingSchedulerStatus: 'Chargement du statut du planificateur...',
+    loadingApiConfig: 'Chargement de la configuration API...',
+    loadingNoteTypes: 'Chargement des types de notes...',
+    loadingWilayaSettings: 'Chargement des paramètres de wilaya...',
+    loadingStores: 'Chargement des magasins...',
+    savingChanges: 'Sauvegarde...',
+    testingConnection: 'Test en cours...',
+    startingScheduler: 'Démarrage...',
+    stoppingScheduler: 'Arrêt...',
+    syncingEcoManager: 'Synchronisation...',
+    syncingShippingStatus: 'Synchronisation...',
+    creatingStore: 'Sauvegarde...',
+    updatingStore: 'Sauvegarde...',
+    failedToFetchAgents: 'Échec de récupération des agents',
+    failedToFetchUsers: 'Échec de récupération des utilisateurs',
+    failedToFetchStores: 'Échec de récupération des magasins',
+    failedToSaveStore: 'Échec de sauvegarde du magasin',
+    failedToDeleteStore: 'Échec de suppression du magasin',
+    failedToToggleStoreStatus: 'Échec de basculement du statut du magasin',
+    failedToTestConnection: 'Échec du test de connexion',
+    noAuthToken: 'Aucun token d\'authentification trouvé',
+    invalidEmailOrPassword: 'Email ou mot de passe invalide',
+    currentPasswordRequired: 'Le mot de passe actuel est requis',
+    newPasswordRequired: 'Le nouveau mot de passe est requis',
+    passwordTooShort: 'Le mot de passe doit contenir au moins 6 caractères',
+    passwordsDoNotMatch: 'Les mots de passe ne correspondent pas',
+    passwordChangeError: 'Erreur lors du changement de mot de passe',
+    networkErrorTryAgain: 'Erreur réseau. Veuillez réessayer.',
+    passwordChanged: 'Mot de passe changé avec succès',
+    changeMyPassword: 'Changer Mon Mot de Passe',
+    changePassword: 'Changer le Mot de Passe',
+    forUser: 'Pour',
+    currentPassword: 'Mot de Passe Actuel',
+    newPassword: 'Nouveau Mot de Passe',
+    confirmPassword: 'Confirmer le Mot de Passe',
+    egNatuStore: 'ex: Magasin NATU',
+    egNatu: 'ex: NATU',
+    ecoManagerApiUrl: 'https://natureldz.ecomanager.dz/api/shop/v2',
+    enterApiToken: 'Entrez votre token API EcoManager',
+    testConnection: 'Tester la Connexion',
+    testing: 'Test en cours...',
+    createStore: 'Créer le Magasin',
+    editStore: 'Modifier le Magasin',
+    addNewStore: 'Ajouter un Nouveau Magasin',
+    updateStore: 'Mettre à Jour le Magasin',
+    never: 'Jamais',
+    lastSync: 'Dernière Sync',
+    toggle: 'Basculer',
+    deleteStore: 'Supprimer',
+    confirmDelete: 'Confirmer la Suppression',
+    areYouSure: 'Êtes-vous sûr ?',
+    thisActionCannotBeUndone: 'Cette action ne peut pas être annulée',
+    yes: 'Oui',
+    no: 'Non',
+    agentPortal: 'Portail Agent',
+    manageYourOrders: 'Gérez vos commandes',
+    allPriorities: 'Toutes les Priorités',
+    allCategories: 'Toutes les Catégories',
+    searchByTitle: 'Rechercher par titre, référence de commande ou client...',
+    sendingMessage: 'Envoi...',
+    addingMessage: 'Ajout...',
+    updatingTicketStatus: 'Mise à jour...',
+    creatingTicket: 'Création...',
+    loadingTickets: 'Chargement...',
+    ticketCreatedFor: 'Ticket créé pour la commande',
+    min: 'Min',
+    max: 'Max',
+    agentCodeOrName: 'Code agent ou nom',
+    customDateRange: 'Personnalisé',
+    startDate: 'Date de Début',
+    endDate: 'Date de Fin',
+    advancedFilters: 'Filtres avancés',
+    clearFilters: 'Effacer',
+    dateRange: 'Plage de Dates',
+    store: 'Magasin',
+    revenueRange: 'Plage de Revenus',
+    loadingReports: 'Chargement des Rapports',
+    loadingError: 'Erreur de Chargement',
+    retryLoading: 'Réessayer',
+    salesReports: 'Rapports de Ventes',
+    agentPerformance: 'Performance des Agents',
+    geographicAnalytics: 'Analyses Géographiques',
+    customerAnalytics: 'Analyses Clients',
+    totalSales: 'Ventes Totales',
+    averageOrderValue: 'Valeur Moyenne de Commande',
+    activeWilayas: 'Wilayas Actives',
+    deliveredOrdersOnly: 'Commandes livrées uniquement',
+    perOrder: 'Par commande',
+    regionsCovered: 'Régions couvertes',
+    orderAnalysisByWilaya: 'Analyse des commandes par wilaya et commune',
+    yearPerformance: 'Performance annuelle',
+    revenueByStore: 'Revenus par Magasin',
+    salesDistribution: 'Distribution des ventes',
+    revenueByStatus: 'Revenus par Statut',
+    performanceByStatus: 'Performance par statut',
+    topProducts: 'Meilleurs Produits',
+    bestSellers: 'Meilleures ventes',
+    monthlyComparison: 'Comparaison Mensuelle',
+    activeCustomers: 'Clients Actifs',
+    newCustomers: 'Nouveaux Clients',
+    returningCustomers: 'Clients Récurrents',
+    retentionRate: 'Taux de Rétention',
+    inPeriod: 'Dans la période',
+    customerRetentionMetrics: 'Métriques de rétention et comportement client',
+    noDataAvailable: 'Aucune donnée disponible',
+    selectedPeriod: 'Période sélectionnée',
+    dailyEvolution: 'Évolution quotidienne',
+    stores: 'Magasins',
+    successRate: 'Taux de Succès',
+    successful: 'Réussi',
+    errors: 'Erreurs',
+    connectionIssue: 'Problème de Connexion',
+    lastError: 'Dernière Erreur',
+    failed: 'Échoué',
+    requestCount: 'Nombre de Requêtes',
+    successCount: 'Nombre de Succès',
+    errorCount: 'Nombre d\'Erreurs',
+    lastTestResults: 'Derniers Résultats de Test',
+    isRunning: 'En cours',
+    lastRun: 'Dernière Exécution',
+    nextRun: 'Prochaine Exécution',
+    startScheduler: 'Démarrer le Planificateur',
+    stopScheduler: 'Arrêter le Planificateur',
+    syncEcoManagerNow: 'Synchroniser EcoManager Maintenant',
+    syncShippingStatusNow: 'Synchroniser le Statut de Livraison Maintenant',
+    schedulerStatus: 'Statut du Planificateur',
+    backgroundJobs: 'Tâches en Arrière-plan et Planificateur',
+    ecoManagerSync: 'Synchronisation EcoManager',
+    shippingStatusSync: 'Synchronisation Statut de Livraison',
+    manualSync: 'Synchronisation Manuelle',
+    lastSyncResults: 'Derniers Résultats de Sync',
+    syncedOrders: 'Commandes Synchronisées',
+    updatedOrders: 'Commandes Mises à Jour',
+    syncErrors: 'Erreurs de Sync',
+    nextSyncTimes: 'Prochaines Heures de Sync',
+    systemInformation: 'Informations Système',
+    nodeEnvironment: 'Environnement Node',
+    production: 'PROD',
+    development: 'DEV',
+    uptime: 'Temps de Fonctionnement',
+    memoryUsage: 'Utilisation Mémoire',
+    cpuUsage: 'Utilisation CPU',
+    databaseStatus: 'Statut Base de Données',
+    redisStatus: 'Statut Redis',
+    connected: 'Connecté',
+    disconnected: 'Déconnecté',
+    apiVersion: 'Version API',
+    buildVersion: 'Version Build',
+    lastDeployment: 'Dernier Déploiement',
+    serverHealth: 'Santé du Serveur',
+    healthy: 'Sain',
+    unhealthy: 'Malsain',
+    noteTypeName: 'Nom du Type de Note',
+    enterNoteTypeName: 'Entrez le nom du type de note...',
+    noteTypeCreated: 'Type de note créé avec succès',
+    noteTypeUpdated: 'Type de note mis à jour avec succès',
+    noteTypeDeleted: 'Type de note supprimé avec succès',
+    failedToCreateNoteType: 'Échec de création du type de note',
+    failedToUpdateNoteType: 'Échec de mise à jour du type de note',
+    failedToDeleteNoteType: 'Échec de suppression du type de note',
+    failedToToggleNoteType: 'Échec de basculement du statut du type de note',
+    noteTypeRequired: 'Le nom du type de note est requis',
+    wilayaSettings: 'Temps de Livraison par Wilaya',
+    initializeSettings: 'Initialiser les Paramètres',
+    saveAllSettings: 'Sauvegarder Tous les Paramètres',
+    wilayaSettingsInitialized: 'Paramètres de wilaya initialisés avec succès',
+    failedToInitializeSettings: 'Échec d\'initialisation des paramètres de wilaya',
+    failedToSaveSettings: 'Échec de sauvegarde des paramètres',
+    settingsSaved: 'Paramètres sauvegardés avec succès',
+    wilayaAlreadyExists: 'Cette wilaya existe déjà dans les paramètres',
+    addWilaya: 'Ajouter Wilaya',
+    deliveryTime: 'Temps de Livraison',
+    days: 'jours',
+    isActive: 'Actif',
+    removeWilaya: 'Supprimer',
+    onlineUsers: 'Utilisateurs En Ligne',
+    usersOnline: 'utilisateurs en ligne',
+    role: 'Rôle',
+    lastSeen: 'Vu pour la dernière fois',
+    admin: 'Admin',
+    agentSuivi: 'Agent Suivi',
+    callCenterAgent: 'Agent Call Center',
+    loadingUsers: 'Chargement...',
+    failedToLoadUsers: 'Échec de chargement des utilisateurs en ligne',
+    searchByTitleOrderRef: 'Rechercher par titre, référence de commande ou client...',
+    describeTheProblem: 'Décrivez le problème en détail...',
+    assigneeSelection: 'Sélection du Destinataire',
+    autoAssignTicket: 'Attribution automatique',
+    manualAssignTicket: 'Attribution manuelle',
+    selectAssignee: 'Sélectionner le destinataire',
+    ticketStatusUpdated: 'Ticket mis à jour avec succès',
+    failedToUpdateTicketStatus: 'Échec de mise à jour du ticket',
+    messageAdded: 'Message ajouté avec succès',
+    loadingProducts: 'Chargement...',
+    failedToLoadProducts: 'Échec de chargement de vos produits assignés',
+    contactAdminForAssignments: 'Vous n\'avez été assigné à aucun produit pour le moment. Contactez votre administrateur pour obtenir des assignations de produits.',
+    adjustSearchTerms: 'Essayez d\'ajuster vos termes de recherche.',
+    busyAgents: 'Occupés',
+    availableAgents: 'Disponibles',
+    available: 'Disponible',
+    utilizationRate: 'Taux d\'utilisation',
+    assignmentSummary: 'Résumé des Attributions',
+    coordinatorDashboard: 'Tableau de Bord Coordinateur',
+    overviewOfAssignedProducts: 'Vue d\'ensemble de vos produits et commandes assignés',
+    myAgents: 'Mes Agents',
+    quickActions: 'Actions Rapides',
+    viewMyOrders: 'Voir Mes Commandes',
+    viewAssignedProducts: 'Voir les produits assignés',
+    manageAgents: 'Gérer les agents',
+    performanceOverview: 'Aperçu des Performances',
+    completionRate: 'Taux de Completion',
+    myNotifications: 'Mes Notifications',
+    manageYourNotifications: 'Gérez vos notifications',
+    noAuthTokenFound: 'Aucun token d\'authentification trouvé',
+    failedToFetchDashboardStats: 'Échec de récupération des statistiques du tableau de bord',
   },
 };
 

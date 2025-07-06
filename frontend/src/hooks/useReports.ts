@@ -91,6 +91,55 @@ interface AgentData {
   }>;
 }
 
+interface AgentNotesData {
+  summary: {
+    totalAgents: number;
+    activeAgents: number;
+    totalNotes: number;
+    averageNotesPerAgent: number;
+    averageQualityScore: number;
+    globalPeakHour: number;
+    periodDays: number;
+  };
+  agentAnalytics: Array<{
+    id: string;
+    name: string;
+    agentCode: string;
+    availability: string;
+    totalNotes: number;
+    notesPerDay: number;
+    notesPerOrder: number;
+    averageNoteLength: number;
+    averageTimeBetweenNotes: number;
+    averageTimeToFirstNote: number;
+    peakActivityHour: number | null;
+    activityConsistency: number;
+    noteQualityScore: number;
+    productivityRank: number;
+    activeDaysWithNotes: number;
+    hourlyDistribution: number[];
+    dailyTrend: Array<{
+      date: string;
+      notes: number;
+    }>;
+    responseTimeMetrics: {
+      fastest: number;
+      slowest: number;
+      average: number;
+    };
+  }>;
+  globalHourlyDistribution: number[];
+  topPerformers: Array<{
+    id: string;
+    name: string;
+    agentCode: string;
+    availability: string;
+    totalNotes: number;
+    noteQualityScore: number;
+    productivityRank: number;
+  }>;
+}
+
 interface GeographicData {
   summary: {
     totalWilayas: number;
@@ -156,6 +205,7 @@ interface CustomerData {
 export const useReports = (filters: ReportFilters) => {
   const [salesData, setSalesData] = useState<SalesData | null>(null);
   const [agentData, setAgentData] = useState<AgentData | null>(null);
+  const [agentNotesData, setAgentNotesData] = useState<AgentNotesData | null>(null);
   const [geographicData, setGeographicData] = useState<GeographicData | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -294,6 +344,55 @@ export const useReports = (filters: ReportFilters) => {
     }
   }, [filters, getDateRange]);
 
+  const fetchAgentNotesData = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Convert date range to period parameter
+      let period = '30d';
+      switch (filters.dateRange) {
+        case 'last7days':
+          period = '7d';
+          break;
+        case 'last90days':
+          period = '90d';
+          break;
+        default:
+          period = '30d';
+      }
+
+      const params = new URLSearchParams({
+        period,
+        ...(filters.agentId && { agentId: filters.agentId })
+      });
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/analytics/agents/notes?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setAgentNotesData(result.data);
+      } else {
+        throw new Error(result.error?.message || 'Failed to fetch agent notes data');
+      }
+    } catch (err) {
+      console.error('Error fetching agent notes data:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    }
+  }, [filters.dateRange, filters.agentId]);
+
   const fetchGeographicData = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -378,6 +477,7 @@ export const useReports = (filters: ReportFilters) => {
       await Promise.all([
         fetchSalesData(),
         fetchAgentData(),
+        fetchAgentNotesData(),
         fetchGeographicData(),
         fetchCustomerData()
       ]);
@@ -386,7 +486,7 @@ export const useReports = (filters: ReportFilters) => {
     } finally {
       setLoading(false);
     }
-  }, [fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
+  }, [fetchSalesData, fetchAgentData, fetchAgentNotesData, fetchGeographicData, fetchCustomerData]);
 
   const exportData = useCallback(async (format: 'pdf' | 'excel' | 'csv', type: 'sales' | 'agents' | 'geographic' | 'customers') => {
     try {
@@ -447,6 +547,7 @@ export const useReports = (filters: ReportFilters) => {
   return {
     salesData,
     agentData,
+    agentNotesData,
     geographicData,
     customerData,
     loading,

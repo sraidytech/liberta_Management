@@ -60,13 +60,63 @@ interface AgentData {
   }>;
 }
 
+interface AgentNotesData {
+  summary: {
+    totalAgents: number;
+    activeAgents: number;
+    totalNotes: number;
+    averageNotesPerAgent: number;
+    averageQualityScore: number;
+    globalPeakHour: number;
+    periodDays: number;
+  };
+  agentAnalytics: Array<{
+    id: string;
+    name: string;
+    agentCode: string;
+    availability: string;
+    totalNotes: number;
+    notesPerDay: number;
+    notesPerOrder: number;
+    averageNoteLength: number;
+    averageTimeBetweenNotes: number;
+    averageTimeToFirstNote: number;
+    peakActivityHour: number | null;
+    activityConsistency: number;
+    noteQualityScore: number;
+    productivityRank: number;
+    activeDaysWithNotes: number;
+    hourlyDistribution: number[];
+    dailyTrend: Array<{
+      date: string;
+      notes: number;
+    }>;
+    responseTimeMetrics: {
+      fastest: number;
+      slowest: number;
+      average: number;
+    };
+  }>;
+  globalHourlyDistribution: number[];
+  topPerformers: Array<{
+    id: string;
+    name: string;
+    agentCode: string;
+    availability: string;
+    totalNotes: number;
+    noteQualityScore: number;
+    productivityRank: number;
+  }>;
+}
+
 interface AgentReportsProps {
   data: AgentData | null;
+  agentNotesData: AgentNotesData | null;
   loading: boolean;
   filters: any;
 }
 
-export default function AgentReports({ data, loading, filters }: AgentReportsProps) {
+export default function AgentReports({ data, agentNotesData, loading, filters }: AgentReportsProps) {
   const { language } = useLanguage();
 
   // Format currency
@@ -550,6 +600,349 @@ export default function AgentReports({ data, loading, filters }: AgentReportsPro
           ))}
         </div>
       </div>
+
+      {/* Notes Activity Analysis Section */}
+      {agentNotesData && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">
+                  {language === 'fr' ? 'Analyse d\'Activité des Notes' : 'Notes Activity Analysis'}
+                </h3>
+                <p className="text-gray-600">
+                  {language === 'fr' ? 'Performance détaillée basée sur l\'activité des notes' : 'Detailed performance based on notes activity'}
+                </p>
+              </div>
+              <Activity className="w-8 h-8 text-gray-400" />
+            </div>
+          </div>
+
+          {/* Notes Summary Cards */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {/* Total Notes */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-6 text-white shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <CheckCircle className="w-5 h-5 opacity-80" />
+                      <p className="text-indigo-100 font-medium">
+                        {language === 'fr' ? 'Total des Notes' : 'Total Notes'}
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold mb-2">
+                      {formatNumber(agentNotesData.summary.totalNotes)}
+                    </p>
+                    <p className="text-sm text-indigo-100">
+                      {agentNotesData.summary.periodDays} {language === 'fr' ? 'jours' : 'days'}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <CheckCircle className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+              </div>
+
+              {/* Active Agents with Notes */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Users className="w-5 h-5 opacity-80" />
+                      <p className="text-green-100 font-medium">
+                        {language === 'fr' ? 'Agents Actifs' : 'Active Agents'}
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold mb-2">
+                      {agentNotesData.summary.activeAgents}
+                    </p>
+                    <p className="text-sm text-green-100">
+                      {language === 'fr' ? 'avec notes' : 'with notes'}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <Users className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+              </div>
+
+              {/* Average Notes per Agent */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <BarChart3 className="w-5 h-5 opacity-80" />
+                      <p className="text-amber-100 font-medium">
+                        {language === 'fr' ? 'Moy. par Agent' : 'Avg per Agent'}
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold mb-2">
+                      {agentNotesData.summary.averageNotesPerAgent.toFixed(1)}
+                    </p>
+                    <p className="text-sm text-amber-100">
+                      {language === 'fr' ? 'notes/agent' : 'notes/agent'}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <BarChart3 className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+              </div>
+
+              {/* Average Quality Score */}
+              <div className="relative overflow-hidden bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Award className="w-5 h-5 opacity-80" />
+                      <p className="text-purple-100 font-medium">
+                        {language === 'fr' ? 'Score Qualité' : 'Quality Score'}
+                      </p>
+                    </div>
+                    <p className="text-3xl font-bold mb-2">
+                      {agentNotesData.summary.averageQualityScore.toFixed(1)}%
+                    </p>
+                    <p className="text-sm text-purple-100">
+                      {language === 'fr' ? 'moyenne' : 'average'}
+                    </p>
+                  </div>
+                  <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                    <Award className="w-8 h-8" />
+                  </div>
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+              </div>
+            </div>
+
+            {/* Top Notes Performers */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-900 mb-1">
+                      {language === 'fr' ? 'Meilleurs Performeurs de Notes' : 'Top Notes Performers'}
+                    </h4>
+                    <p className="text-gray-600">
+                      {language === 'fr' ? 'Classés par score de qualité' : 'Ranked by quality score'}
+                    </p>
+                  </div>
+                  <Zap className="w-8 h-8 text-gray-400" />
+                </div>
+
+                <div className="space-y-4">
+                  {agentNotesData.topPerformers.slice(0, 5).map((agent, index) => (
+                    <div key={agent.id} className="flex items-center space-x-4 p-4 bg-white rounded-xl hover:shadow-md transition-all">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                          {index + 1}
+                        </div>
+                        <div className="relative">
+                          <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+                            <span className="text-white font-bold">{agent.name?.[0] || 'A'}</span>
+                          </div>
+                          <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <p className="font-bold text-gray-900 truncate">{agent.name}</p>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-600">
+                            #{agent.productivityRank}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600">
+                          {agent.agentCode} • {agent.totalNotes} {language === 'fr' ? 'notes' : 'notes'}
+                        </p>
+                      </div>
+                      
+                      <div className="text-right">
+                        <p className="text-xl font-bold text-purple-600">{agent.noteQualityScore.toFixed(1)}%</p>
+                        <p className="text-xs text-gray-600">{language === 'fr' ? 'qualité' : 'quality'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Global Peak Hours */}
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h4 className="text-lg font-bold text-gray-900 mb-1">
+                      {language === 'fr' ? 'Heures de Pointe Globales' : 'Global Peak Hours'}
+                    </h4>
+                    <p className="text-gray-600">
+                      {language === 'fr' ? 'Distribution horaire des notes' : 'Hourly distribution of notes'}
+                    </p>
+                  </div>
+                  <Clock className="w-8 h-8 text-gray-400" />
+                </div>
+
+                <div className="space-y-3">
+                  {agentNotesData.globalHourlyDistribution.map((count, hour) => {
+                    const maxCount = Math.max(...agentNotesData.globalHourlyDistribution);
+                    const percentage = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                    const isPeak = hour === agentNotesData.summary.globalPeakHour;
+                    
+                    return (
+                      <div key={hour} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <span className={`font-medium ${isPeak ? 'text-orange-600' : 'text-gray-900'}`}>
+                              {hour.toString().padStart(2, '0')}:00
+                            </span>
+                            {isPeak && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-600">
+                                {language === 'fr' ? 'Pointe' : 'Peak'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <span className={`font-bold ${isPeak ? 'text-orange-600' : 'text-gray-900'}`}>
+                              {count}
+                            </span>
+                            <span className="text-sm text-gray-600 ml-1">
+                              {language === 'fr' ? 'notes' : 'notes'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-500 ${
+                              isPeak ? 'bg-orange-500' : 'bg-blue-500'
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Agent Notes Performance Table */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h4 className="text-lg font-bold text-gray-900 mb-1">
+                    {language === 'fr' ? 'Performance Détaillée des Notes' : 'Detailed Notes Performance'}
+                  </h4>
+                  <p className="text-gray-600">
+                    {language === 'fr' ? 'Métriques complètes par agent' : 'Complete metrics per agent'}
+                  </p>
+                </div>
+                <User className="w-8 h-8 text-gray-400" />
+              </div>
+
+              <div className="space-y-4">
+                {agentNotesData.agentAnalytics.slice(0, 10).map((agent) => (
+                  <div key={agent.id} className="p-4 bg-white rounded-xl hover:shadow-md transition-all">
+                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-center">
+                      {/* Agent Info */}
+                      <div className="lg:col-span-1">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                              <span className="text-white font-bold text-sm">{agent.name?.[0] || 'A'}</span>
+                            </div>
+                            <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{agent.name}</p>
+                            <p className="text-sm text-gray-600">{agent.agentCode}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Notes Stats */}
+                      <div className="lg:col-span-1">
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-gray-600 mb-1">
+                            {language === 'fr' ? 'Notes Totales' : 'Total Notes'}
+                          </p>
+                          <p className="text-lg font-bold text-gray-900">{agent.totalNotes}</p>
+                          <p className="text-xs text-gray-600">
+                            {agent.notesPerDay.toFixed(1)} {language === 'fr' ? '/jour' : '/day'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Quality Score */}
+                      <div className="lg:col-span-1">
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-gray-600 mb-1">
+                            {language === 'fr' ? 'Score Qualité' : 'Quality Score'}
+                          </p>
+                          <div className="text-lg font-bold text-purple-600 mb-2">
+                            {agent.noteQualityScore.toFixed(1)}%
+                          </div>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-600">
+                            #{agent.productivityRank}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Response Time */}
+                      <div className="lg:col-span-1">
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-gray-600 mb-1">
+                            {language === 'fr' ? 'Temps Réponse' : 'Response Time'}
+                          </p>
+                          <p className="font-bold text-gray-900 text-sm">
+                            {agent.averageTimeToFirstNote.toFixed(1)}h
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {language === 'fr' ? 'première note' : 'first note'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Note Length */}
+                      <div className="lg:col-span-1">
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-gray-600 mb-1">
+                            {language === 'fr' ? 'Long. Moyenne' : 'Avg Length'}
+                          </p>
+                          <p className="font-bold text-gray-900 text-sm">
+                            {agent.averageNoteLength.toFixed(0)}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {language === 'fr' ? 'caractères' : 'characters'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Activity Days */}
+                      <div className="lg:col-span-1">
+                        <div className="text-center">
+                          <p className="text-xs font-medium text-gray-600 mb-1">
+                            {language === 'fr' ? 'Jours Actifs' : 'Active Days'}
+                          </p>
+                          <div className="flex items-center justify-center space-x-1 mb-1">
+                            <Activity className="w-3 h-3 text-gray-400" />
+                            <span className="text-sm font-bold text-gray-900">
+                              {agent.activeDaysWithNotes}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600">
+                            {language === 'fr' ? 'avec notes' : 'with notes'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

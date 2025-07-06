@@ -1032,7 +1032,7 @@ export default function OrdersPage() {
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                 <input
                   type="text"
-                  placeholder="Search orders, customers, references..."
+                  placeholder={t('searchByReference')}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="w-full pl-12 pr-4 py-4 bg-gray-50/50 border border-gray-200/50 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-900 placeholder-gray-500"
@@ -1146,7 +1146,7 @@ export default function OrdersPage() {
                       type="text"
                       value={customerFilter}
                       onChange={(e) => setCustomerFilter(e.target.value)}
-                      placeholder="Name or phone"
+                      placeholder={t('nameOrPhone')}
                       className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 placeholder-gray-400"
                     />
                   </div>
@@ -1161,7 +1161,7 @@ export default function OrdersPage() {
                       type="text"
                       value={wilayaFilter}
                       onChange={(e) => setWilayaFilter(e.target.value)}
-                      placeholder="Wilaya name"
+                      placeholder={t('wilaya')}
                       className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 placeholder-gray-400"
                     />
                   </div>
@@ -1176,7 +1176,7 @@ export default function OrdersPage() {
                       type="text"
                       value={agentFilter}
                       onChange={(e) => setAgentFilter(e.target.value)}
-                      placeholder="Agent name"
+                      placeholder={t('agentNamePlaceholder')}
                       className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 placeholder-gray-400"
                     />
                   </div>

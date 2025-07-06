@@ -42,4 +42,9 @@ router.get('/customers', requireAdmin as any, async (req, res) => {
   await analyticsController.getCustomerReports(req, res);
 });
 
+// Agent notes activity analytics
+router.get('/agents/notes', requireAdmin as any, async (req, res) => {
+  await analyticsController.getAgentNotesAnalytics(req, res);
+});
+
 export default router;

@@ -224,7 +224,7 @@ export default function StoresPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-lg">Loading stores...</div>
+        <div className="text-lg">{t('loadingStores')}</div>
       </div>
     );
   }
@@ -294,7 +294,7 @@ export default function StoresPage() {
                   type="password"
                   value={formData.apiToken}
                   onChange={(e) => setFormData({ ...formData, apiToken: e.target.value })}
-                  placeholder="Enter your EcoManager API token"
+                  placeholder={t('enterEcoManagerToken')}
                   required
                 />
               </div>
@@ -308,10 +308,10 @@ export default function StoresPage() {
                   className="flex items-center gap-2"
                 >
                   <TestTube className="h-4 w-4" />
-                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                  {testingConnection ? t('testing') : t('testConnection')}
                 </Button>
                 <Button type="submit" disabled={formLoading}>
-                  {formLoading ? 'Saving...' : editingStore ? 'Update Store' : 'Create Store'}
+                  {formLoading ? t('savingChanges') : editingStore ? t('updateStore') : t('createStore')}
                 </Button>
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancel

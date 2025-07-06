@@ -39,6 +39,7 @@ export default function ReportsPage() {
   const {
     salesData,
     agentData,
+    agentNotesData,
     geographicData,
     customerData,
     loading,
@@ -207,8 +208,9 @@ export default function ReportsPage() {
               />
             )}
             {activeTab === 'agents' && (
-              <AgentReports 
+              <AgentReports
                 data={agentData}
+                agentNotesData={agentNotesData}
                 loading={loading}
                 filters={filters}
               />

@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
+import { useLanguage } from '@/lib/language-context';
 import {
   Plus,
   Edit,
@@ -27,6 +28,7 @@ interface NoteType {
 
 export function NoteTypesSettings() {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [noteTypes, setNoteTypes] = useState<NoteType[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -289,7 +291,7 @@ export function NoteTypesSettings() {
       <Card className="p-6">
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <span className="ml-2 text-gray-600">Loading note types...</span>
+          <span className="ml-2 text-gray-600">{t('loadingNoteTypes')}</span>
         </div>
       </Card>
     );
@@ -320,7 +322,7 @@ export function NoteTypesSettings() {
           <Card className="p-4 mb-6 bg-blue-50 border-blue-200">
             <div className="flex items-center gap-3">
               <Input
-                placeholder="Enter note type name..."
+                placeholder={t('enterNoteTypeName')}
                 value={newNoteName}
                 onChange={(e) => setNewNoteName(e.target.value)}
                 className="flex-1"
@@ -336,7 +338,7 @@ export function NoteTypesSettings() {
                 className="flex items-center gap-2"
               >
                 <Save className="h-4 w-4" />
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? t('savingChanges') : t('save')}
               </Button>
               <Button
                 variant="outline"
@@ -404,7 +406,7 @@ export function NoteTypesSettings() {
                           className="flex items-center gap-1"
                         >
                           <Save className="h-3 w-3" />
-                          {saving ? 'Saving...' : 'Save'}
+                          {saving ? t('savingChanges') : t('save')}
                         </Button>
                         <Button
                           size="sm"

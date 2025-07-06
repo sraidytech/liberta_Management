@@ -472,16 +472,31 @@ export class OrdersController {
         }
       });
 
-      // Create activity log
+      // Create activity logs
       if (userId) {
+        // Create status change activity
         await prisma.agentActivity.create({
           data: {
             agentId: userId,
             orderId: id,
             activityType: 'STATUS_CHANGED',
-            description: `Order status changed from ${existingOrder.status} to ${status}${notes ? `. Notes: ${notes}` : ''}`
+            description: `Order status changed from ${existingOrder.status} to ${status}`
           }
         });
+
+        // Create notes activity if notes were added
+        if (notes || noteType || customNote) {
+          const noteContent = notes || customNote || '';
+          await prisma.agentActivity.create({
+            data: {
+              agentId: userId,
+              orderId: id,
+              activityType: 'NOTES_ADDED',
+              description: noteContent,
+              duration: null // Can be calculated later if needed
+            }
+          });
+        }
       }
 
       // Create notification for assigned agent if different from current user

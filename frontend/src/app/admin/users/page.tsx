@@ -85,13 +85,13 @@ export default function UserManagement() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error?.message || 'Failed to fetch users');
+        throw new Error(data.error?.message || t('failedToFetchUsers'));
       }
 
       if (data.success) {
         setUsers(data.data);
       } else {
-        throw new Error(data.error?.message || 'Failed to fetch users');
+        throw new Error(data.error?.message || t('failedToFetchUsers'));
       }
     } catch (error: any) {
       console.error('Fetch users error:', error);
@@ -266,7 +266,7 @@ export default function UserManagement() {
           <div className="flex items-center space-x-3">
             <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
             <span className="text-gray-600">
-              {language === 'fr' ? 'Chargement des utilisateurs...' : 'Loading users...'}
+              {t('loadingUsers')}
             </span>
           </div>
         </div>

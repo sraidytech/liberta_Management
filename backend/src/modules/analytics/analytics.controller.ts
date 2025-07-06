@@ -1274,4 +1274,305 @@ export class AnalyticsController {
       });
     }
   }
+
+  /**
+   * Get comprehensive agent notes activity analysis
+   */
+  async getAgentNotesAnalytics(req: Request, res: Response) {
+    try {
+      const { period = '30d', agentId } = req.query;
+      
+      let days = 30;
+      if (period === '7d') days = 7;
+      if (period === '90d') days = 90;
+      
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      // Build where clause for agent filter
+      const agentWhereClause: any = {
+        role: { in: [UserRole.AGENT_SUIVI, UserRole.AGENT_CALL_CENTER] },
+        isActive: true
+      };
+      
+      if (agentId) {
+        agentWhereClause.id = agentId as string;
+      }
+
+      // Get all agents with their notes activities
+      const agentsWithNotesActivities = await prisma.user.findMany({
+        where: agentWhereClause,
+        select: {
+          id: true,
+          name: true,
+          agentCode: true,
+          availability: true,
+          currentOrders: true,
+          maxOrders: true,
+          agentActivities: {
+            where: {
+              activityType: 'NOTES_ADDED',
+              createdAt: { gte: startDate },
+              // Exclude EcoManager/system generated notes
+              NOT: {
+                OR: [
+                  { description: { contains: 'Last confirmation:' } },
+                  { description: { contains: 'Confirmation échouée' } },
+                  { description: { contains: 'EcoManager' } }
+                ]
+              }
+            },
+            select: {
+              id: true,
+              description: true,
+              duration: true,
+              createdAt: true,
+              orderId: true,
+              order: {
+                select: {
+                  id: true,
+                  reference: true,
+                  orderDate: true,
+                  assignedAt: true,
+                  total: true,
+                  status: true
+                }
+              }
+            },
+            orderBy: { createdAt: 'asc' }
+          },
+          assignedOrders: {
+            where: {
+              createdAt: { gte: startDate }
+            },
+            select: {
+              id: true,
+              orderDate: true,
+              assignedAt: true,
+              total: true,
+              status: true
+            }
+          }
+        }
+      });
+
+      // Calculate comprehensive metrics for each agent
+      const agentNotesAnalytics = agentsWithNotesActivities.map(agent => {
+        const notesActivities = agent.agentActivities;
+        const totalNotes = notesActivities.length;
+        
+        if (totalNotes === 0) {
+          return {
+            id: agent.id,
+            name: agent.name,
+            agentCode: agent.agentCode,
+            availability: agent.availability,
+            totalNotes: 0,
+            notesPerDay: 0,
+            notesPerOrder: 0,
+            averageNoteLength: 0,
+            averageTimeBetweenNotes: 0,
+            averageTimeToFirstNote: 0,
+            peakActivityHour: null,
+            activityConsistency: 0,
+            noteQualityScore: 0,
+            productivityRank: 0,
+            activeDaysWithNotes: 0,
+            hourlyDistribution: Array(24).fill(0),
+            dailyTrend: [],
+            responseTimeMetrics: {
+              fastest: 0,
+              slowest: 0,
+              average: 0
+            }
+          };
+        }
+
+        // Calculate basic metrics
+        const notesPerDay = totalNotes / days;
+        const notesPerOrder = agent.assignedOrders.length > 0 ? totalNotes / agent.assignedOrders.length : 0;
+        
+        // Calculate average note length
+        const totalNoteLength = notesActivities.reduce((sum, activity) =>
+          sum + (activity.description?.length || 0), 0);
+        const averageNoteLength = totalNoteLength / totalNotes;
+
+        // Calculate time between consecutive notes
+        const timeBetweenNotes: number[] = [];
+        for (let i = 1; i < notesActivities.length; i++) {
+          const timeDiff = notesActivities[i].createdAt.getTime() - notesActivities[i-1].createdAt.getTime();
+          timeBetweenNotes.push(timeDiff / (1000 * 60 * 60)); // Convert to hours
+        }
+        const averageTimeBetweenNotes = timeBetweenNotes.length > 0
+          ? timeBetweenNotes.reduce((sum, time) => sum + time, 0) / timeBetweenNotes.length
+          : 0;
+
+        // Calculate time from order assignment to first note
+        const timeToFirstNoteValues: number[] = [];
+        const orderFirstNoteMap = new Map();
+        
+        notesActivities.forEach(activity => {
+          if (activity.order && activity.order.assignedAt) {
+            const orderId = activity.order.id;
+            if (!orderFirstNoteMap.has(orderId)) {
+              const timeToFirstNote = activity.createdAt.getTime() - activity.order.assignedAt.getTime();
+              timeToFirstNoteValues.push(timeToFirstNote / (1000 * 60 * 60)); // Convert to hours
+              orderFirstNoteMap.set(orderId, activity.createdAt);
+            }
+          }
+        });
+        
+        const averageTimeToFirstNote = timeToFirstNoteValues.length > 0
+          ? timeToFirstNoteValues.reduce((sum, time) => sum + time, 0) / timeToFirstNoteValues.length
+          : 0;
+
+        // Calculate hourly distribution and peak activity hour
+        const hourlyDistribution = Array(24).fill(0);
+        notesActivities.forEach(activity => {
+          const hour = activity.createdAt.getHours();
+          hourlyDistribution[hour]++;
+        });
+        
+        const peakActivityHour = hourlyDistribution.indexOf(Math.max(...hourlyDistribution));
+
+        // Calculate active days with notes
+        const uniqueDays = new Set();
+        notesActivities.forEach(activity => {
+          const dayKey = activity.createdAt.toISOString().split('T')[0];
+          uniqueDays.add(dayKey);
+        });
+        const activeDaysWithNotes = uniqueDays.size;
+
+        // Calculate activity consistency (standard deviation of daily notes)
+        const dailyNoteCounts: number[] = [];
+        const dailyMap = new Map();
+        
+        notesActivities.forEach(activity => {
+          const dayKey = activity.createdAt.toISOString().split('T')[0];
+          dailyMap.set(dayKey, (dailyMap.get(dayKey) || 0) + 1);
+        });
+        
+        // Fill in days with 0 notes
+        for (let i = 0; i < days; i++) {
+          const date = new Date(startDate);
+          date.setDate(startDate.getDate() + i);
+          const dayKey = date.toISOString().split('T')[0];
+          dailyNoteCounts.push(dailyMap.get(dayKey) || 0);
+        }
+        
+        const meanDailyNotes = dailyNoteCounts.reduce((sum, count) => sum + count, 0) / dailyNoteCounts.length;
+        const variance = dailyNoteCounts.reduce((sum, count) => sum + Math.pow(count - meanDailyNotes, 2), 0) / dailyNoteCounts.length;
+        const activityConsistency = Math.sqrt(variance);
+
+        // Calculate note quality score (based on length and frequency)
+        const noteQualityScore = Math.min(100,
+          (averageNoteLength / 50) * 30 + // 30% for note length (normalized to 50 chars)
+          (notesPerDay / 5) * 40 + // 40% for frequency (normalized to 5 notes per day)
+          (activeDaysWithNotes / days) * 30 // 30% for consistency
+        );
+
+        // Prepare daily trend data
+        const dailyTrend = dailyNoteCounts.map((count, index) => {
+          const date = new Date(startDate);
+          date.setDate(startDate.getDate() + index);
+          return {
+            date: date.toISOString().split('T')[0],
+            notes: count
+          };
+        });
+
+        // Response time metrics
+        const responseTimeMetrics = {
+          fastest: timeToFirstNoteValues.length > 0 ? Math.min(...timeToFirstNoteValues) : 0,
+          slowest: timeToFirstNoteValues.length > 0 ? Math.max(...timeToFirstNoteValues) : 0,
+          average: averageTimeToFirstNote
+        };
+
+        return {
+          id: agent.id,
+          name: agent.name,
+          agentCode: agent.agentCode,
+          availability: agent.availability,
+          totalNotes,
+          notesPerDay: parseFloat(notesPerDay.toFixed(2)),
+          notesPerOrder: parseFloat(notesPerOrder.toFixed(2)),
+          averageNoteLength: parseFloat(averageNoteLength.toFixed(1)),
+          averageTimeBetweenNotes: parseFloat(averageTimeBetweenNotes.toFixed(2)),
+          averageTimeToFirstNote: parseFloat(averageTimeToFirstNote.toFixed(2)),
+          peakActivityHour,
+          activityConsistency: parseFloat(activityConsistency.toFixed(2)),
+          noteQualityScore: parseFloat(noteQualityScore.toFixed(1)),
+          productivityRank: 0, // Will be calculated after sorting
+          activeDaysWithNotes,
+          hourlyDistribution,
+          dailyTrend,
+          responseTimeMetrics: {
+            fastest: parseFloat(responseTimeMetrics.fastest.toFixed(2)),
+            slowest: parseFloat(responseTimeMetrics.slowest.toFixed(2)),
+            average: parseFloat(responseTimeMetrics.average.toFixed(2))
+          }
+        };
+      });
+
+      // Calculate productivity rankings
+      const sortedByProductivity = [...agentNotesAnalytics]
+        .sort((a, b) => b.noteQualityScore - a.noteQualityScore);
+      
+      sortedByProductivity.forEach((agent, index) => {
+        const originalAgent = agentNotesAnalytics.find(a => a.id === agent.id);
+        if (originalAgent) {
+          originalAgent.productivityRank = index + 1;
+        }
+      });
+
+      // Calculate summary statistics
+      const activeAgents = agentNotesAnalytics.filter(agent => agent.totalNotes > 0);
+      const totalNotesAllAgents = agentNotesAnalytics.reduce((sum, agent) => sum + agent.totalNotes, 0);
+      const averageNotesPerAgent = activeAgents.length > 0 ? totalNotesAllAgents / activeAgents.length : 0;
+      const averageQualityScore = activeAgents.length > 0
+        ? activeAgents.reduce((sum, agent) => sum + agent.noteQualityScore, 0) / activeAgents.length
+        : 0;
+
+      // Peak hours analysis across all agents
+      const globalHourlyDistribution = Array(24).fill(0);
+      agentNotesAnalytics.forEach(agent => {
+        agent.hourlyDistribution.forEach((count, hour) => {
+          globalHourlyDistribution[hour] += count;
+        });
+      });
+      
+      const globalPeakHour = globalHourlyDistribution.indexOf(Math.max(...globalHourlyDistribution));
+
+      const summary = {
+        totalAgents: agentNotesAnalytics.length,
+        activeAgents: activeAgents.length,
+        totalNotes: totalNotesAllAgents,
+        averageNotesPerAgent: parseFloat(averageNotesPerAgent.toFixed(2)),
+        averageQualityScore: parseFloat(averageQualityScore.toFixed(1)),
+        globalPeakHour,
+        periodDays: days
+      };
+
+      res.json({
+        success: true,
+        data: {
+          summary,
+          agentAnalytics: agentNotesAnalytics,
+          globalHourlyDistribution,
+          topPerformers: sortedByProductivity.slice(0, 5)
+        }
+      });
+
+    } catch (error) {
+      console.error('Agent notes analytics error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch agent notes analytics',
+          code: 'AGENT_NOTES_ANALYTICS_ERROR',
+          statusCode: 500
+        }
+      });
+    }
+  }
 }

@@ -961,7 +961,7 @@ export default function AgentOrdersPage() {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
-                    placeholder="Search by reference, customer name, or phone..."
+                    placeholder={t('searchByReference')}
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1985,7 +1985,7 @@ export default function AgentOrdersPage() {
                     value={ticketTitle}
                     onChange={(e) => setTicketTitle(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Brief description of the problem"
+                    placeholder={t('briefDescription')}
                   />
                 </div>
 
@@ -2055,7 +2055,7 @@ export default function AgentOrdersPage() {
                     onChange={(e) => setTicketDescription(e.target.value)}
                     rows={4}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Describe the problem in detail..."
+                    placeholder={t('describeTheProblem')}
                   />
                 </div>
               </div>
