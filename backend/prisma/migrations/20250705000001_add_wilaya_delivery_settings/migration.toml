@@ -1,0 +1,4 @@
+[migration]
+name = "add_wilaya_delivery_settings"
+timestamp = "20250705000001"
+description = "Add wilaya delivery settings table for managing delivery time limits per wilaya"

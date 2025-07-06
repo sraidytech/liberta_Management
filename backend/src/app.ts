@@ -31,6 +31,7 @@ import schedulerRoutes from '@/modules/scheduler/scheduler.routes';
 import productAssignmentRoutes from '@/modules/product-assignments/product-assignments.routes';
 import ticketRoutes from '@/modules/tickets/tickets.routes';
 import noteTypesRoutes from '@/modules/note-types/note-types.routes';
+import wilayaSettingsRoutes from '@/modules/wilaya-settings/wilaya-settings.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -129,6 +130,7 @@ class App {
     this.app.use('/api/v1/product-assignments', productAssignmentRoutes); // Product assignment routes have their own auth middleware
     this.app.use('/api/v1/tickets', authMiddleware, userRateLimit, ticketRoutes); // Ticket system routes with rate limiting
     this.app.use('/api/v1/note-types', authMiddleware, userRateLimit, noteTypesRoutes); // Note types management routes
+    this.app.use('/api/v1/wilaya-settings', authMiddleware, userRateLimit, wilayaSettingsRoutes); // Wilaya delivery settings routes
 
     // Root route
     this.app.get('/', (req, res) => {

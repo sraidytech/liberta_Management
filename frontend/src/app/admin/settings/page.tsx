@@ -8,8 +8,9 @@ import { SchedulerSettings } from '@/components/admin/settings/scheduler-setting
 import { MaystroApiSettings } from '@/components/admin/settings/maystro-api-settings';
 import { SystemSettings } from '@/components/admin/settings/system-settings';
 import { NoteTypesSettings } from '@/components/admin/settings/note-types-settings';
+import { WilayaDeliverySettings } from '@/components/admin/settings/wilaya-delivery-settings';
 
-type SettingsTab = 'scheduler' | 'maystro' | 'system' | 'note-types';
+type SettingsTab = 'scheduler' | 'maystro' | 'system' | 'note-types' | 'wilaya-delivery';
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('scheduler');
@@ -19,6 +20,7 @@ export default function AdminSettingsPage() {
     { id: 'maystro' as SettingsTab, label: 'Maystro API Keys', icon: '🚚' },
     { id: 'system' as SettingsTab, label: 'System Settings', icon: '⚙️' },
     { id: 'note-types' as SettingsTab, label: 'Note Types', icon: '📝' },
+    { id: 'wilaya-delivery' as SettingsTab, label: 'Wilaya Delivery Times', icon: '🗺️' },
   ];
 
   return (
@@ -58,6 +60,7 @@ export default function AdminSettingsPage() {
           {activeTab === 'maystro' && <MaystroApiSettings />}
           {activeTab === 'system' && <SystemSettings />}
           {activeTab === 'note-types' && <NoteTypesSettings />}
+          {activeTab === 'wilaya-delivery' && <WilayaDeliverySettings />}
         </div>
       </div>
     </AdminLayout>

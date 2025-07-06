@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +58,7 @@ export default function AgentDashboard() {
   const [availability, setAvailability] = useState<string>('OFFLINE');
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchAgentData = async () => {
+  const fetchAgentData = useCallback(async () => {
     if (!user?.id) {
       console.log('❌ No user ID available for agent dashboard');
       setLoading(false);
@@ -105,9 +105,27 @@ export default function AgentDashboard() {
         if (statsData.success && statsData.data) {
           setStats(statsData.data);
           console.log('✅ Agent stats loaded successfully:', statsData.data);
+        } else {
+          console.warn('⚠️ Stats API returned success=false or no data');
+          // Set default stats if API returns success=false
+          setStats({
+            assignedOrders: 0,
+            maxOrders: (user as any).maxOrders || 50,
+            completedToday: 0,
+            pendingOrders: 0,
+            utilizationRate: 0
+          });
         }
       } else {
         console.error('❌ Failed to fetch agent stats:', statsResponse.status);
+        // Set default stats if API call fails
+        setStats({
+          assignedOrders: 0,
+          maxOrders: (user as any).maxOrders || 50,
+          completedToday: 0,
+          pendingOrders: 0,
+          utilizationRate: 0
+        });
       }
 
       // Fetch assigned orders for display (first 5 only)
@@ -134,17 +152,6 @@ export default function AgentDashboard() {
         console.error('❌ Failed to fetch orders:', ordersResponse.status, errorText);
       }
 
-      // Set default stats if no stats were loaded
-      if (!stats) {
-        setStats({
-          assignedOrders: 0,
-          maxOrders: (user as any).maxOrders || 50,
-          completedToday: 0,
-          pendingOrders: 0,
-          utilizationRate: 0
-        });
-      }
-
     } catch (error) {
       console.error('💥 Error fetching agent data:', error);
       
@@ -160,7 +167,7 @@ export default function AgentDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [user?.id]);
 
   const updateAvailability = async (newAvailability: string) => {
     if (!user?.id) return;
@@ -215,13 +222,15 @@ export default function AgentDashboard() {
   };
 
   useEffect(() => {
-    fetchAgentData();
-    
-    // 🔧 FIX: Reduce polling frequency to prevent 429 errors
-    // Refresh every 60 seconds instead of 30 seconds
-    const interval = setInterval(fetchAgentData, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    if (user?.id) {
+      fetchAgentData();
+      
+      // 🔧 FIX: Reduce polling frequency to prevent 429 errors
+      // Refresh every 60 seconds instead of 30 seconds
+      const interval = setInterval(fetchAgentData, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.id, fetchAgentData]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -319,7 +328,7 @@ export default function AgentDashboard() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div key={`stats-${stats.assignedOrders}-${stats.pendingOrders}-${stats.completedToday}-${stats.utilizationRate}`} className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card className="p-4">
             <div className="flex items-center space-x-3">
               <Package className="h-8 w-8 text-blue-600" />

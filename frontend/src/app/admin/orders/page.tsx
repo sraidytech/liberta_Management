@@ -10,6 +10,13 @@ import { useToast } from '@/components/ui/toast';
 import { useLanguage } from '@/lib/language-context';
 import { OrderDetailsModal } from '@/components/admin/order-details-modal';
 import {
+  calculateOrderDelay,
+  getDelayRowClasses,
+  getDelayBadgeProps,
+  type OrderDelayInfo,
+  type WilayaDeliverySettings
+} from '@/lib/delivery-delay-utils';
+import {
   User,
   Eye,
   UserPlus,
@@ -60,6 +67,7 @@ interface Order {
   createdAt: string;
   notes?: string;
   internalNotes?: string;
+  delayInfo?: OrderDelayInfo;
   customer: {
     id: string;
     fullName: string;
@@ -144,6 +152,7 @@ export default function OrdersPage() {
   const [assigningOrder, setAssigningOrder] = useState<string | null>(null);
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [wilayaSettings, setWilayaSettings] = useState<WilayaDeliverySettings[]>([]);
   
   // Ultra Modern Features
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -192,6 +201,26 @@ export default function OrdersPage() {
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+    }
+  };
+
+  // Fetch wilaya delivery settings
+  const fetchWilayaSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/wilaya-settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWilayaSettings(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching wilaya settings:', error);
     }
   };
 
@@ -871,6 +900,11 @@ export default function OrdersPage() {
     fetchStats();
   }, [currentPage, limit, search, statusFilter, sortBy, sortOrder, dateRange, customerFilter, wilayaFilter, agentFilter, shippingStatusFilter, totalRange]);
 
+  // Load wilaya settings on component mount
+  useEffect(() => {
+    fetchWilayaSettings();
+  }, []);
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -1388,11 +1422,31 @@ export default function OrdersPage() {
                     </td>
                   </tr>
                 ) : (
-                  orders.map((order) => (
-                    <tr
-                      key={order.id}
-                      className={`hover:bg-slate-50 transition-colors ${selectedOrders.has(order.id) ? 'bg-blue-50 border-l-4 border-blue-400' : ''}`}
-                    >
+                  orders.map((order) => {
+                    // Calculate delay info if not provided by backend
+                    const delayInfo = order.delayInfo || calculateOrderDelay(
+                      order.id,
+                      order.customer.wilaya,
+                      order.orderDate,
+                      order.shippingStatus,
+                      wilayaSettings
+                    );
+                    
+                    // Get delay-based row classes
+                    const delayClasses = getDelayRowClasses(delayInfo);
+                    
+                    // Combine all classes
+                    const rowClasses = [
+                      'hover:bg-slate-50 transition-colors',
+                      selectedOrders.has(order.id) ? 'bg-blue-50 border-l-4 border-blue-400' : '',
+                      !selectedOrders.has(order.id) ? delayClasses : '' // Only apply delay colors if not selected
+                    ].filter(Boolean).join(' ');
+
+                    return (
+                      <tr
+                        key={order.id}
+                        className={rowClasses}
+                      >
                       {/* Bulk Select Checkbox */}
                       <td className="px-3 py-3">
                         <button
@@ -1414,6 +1468,19 @@ export default function OrdersPage() {
                             <div className="text-sm font-bold text-slate-900">
                               {order.reference}
                             </div>
+                            {/* Delay Badge */}
+                            {(() => {
+                              const delayBadge = getDelayBadgeProps(delayInfo);
+                              if (delayBadge.show) {
+                                return (
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${delayBadge.className}`}>
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    {delayBadge.text}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                             {order.notes && (() => {
                               try {
                                 const notesCount = JSON.parse(order.notes).length;
@@ -1578,7 +1645,8 @@ export default function OrdersPage() {
                         </div>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

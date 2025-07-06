@@ -11,7 +11,6 @@ import Link from 'next/link';
 import {
   Package,
   BarChart3,
-  Settings,
   Bell,
   Search,
   Menu,
@@ -19,9 +18,7 @@ import {
   LogOut,
   User,
   ChevronLeft,
-  ChevronRight,
-  Phone,
-  Clock
+  ChevronRight
 } from 'lucide-react';
 
 interface AgentLayoutProps {
@@ -53,24 +50,6 @@ export default function AgentLayout({ children }: AgentLayoutProps) {
       icon: Bell,
       href: '/agent/notifications',
       active: pathname === '/agent/notifications'
-    },
-    {
-      name: language === 'fr' ? 'Appels' : 'Calls',
-      icon: Phone,
-      href: '/agent/calls',
-      active: pathname === '/agent/calls'
-    },
-    {
-      name: language === 'fr' ? 'Historique' : 'History',
-      icon: Clock,
-      href: '/agent/history',
-      active: pathname === '/agent/history'
-    },
-    {
-      name: language === 'fr' ? 'Paramètres' : 'Settings',
-      icon: Settings,
-      href: '/agent/settings',
-      active: pathname === '/agent/settings'
     }
   ];
 

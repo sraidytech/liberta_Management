@@ -1060,7 +1060,7 @@ export class AgentAssignmentService {
       pendingOrders: pendingCount,
       completedToday: completedTodayCount,
       maxOrders: agent.maxOrders,
-      utilizationRate: Math.round(utilizationRate * 100) / 100
+      utilizationRate: Math.round(utilizationRate)
     };
   }
 

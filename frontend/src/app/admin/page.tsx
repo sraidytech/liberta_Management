@@ -3,6 +3,7 @@
 import { useLanguage } from '@/lib/language-context';
 import AdminLayout from '@/components/admin/admin-layout';
 import DashboardChart from '@/components/admin/dashboard-chart';
+import OnlineUsersWidget from '@/components/admin/online-users-widget';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import Link from 'next/link';
 import { 
@@ -156,7 +157,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
           {/* Total Orders */}
           <div className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-xl">
             <div className="flex items-center justify-between">
@@ -272,6 +273,33 @@ export default function AdminDashboard() {
             </div>
             <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
           </div>
+
+          {/* Online Users */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Activity className="w-5 h-5 opacity-80" />
+                  <p className="text-cyan-100 font-medium">
+                    {language === 'fr' ? 'Utilisateurs En Ligne' : 'Online Users'}
+                  </p>
+                </div>
+                <p className="text-3xl font-bold mb-2">
+                  {(dashboardStats.overview as any).onlineUsers || 0}
+                </p>
+                <div className="flex items-center">
+                  <Globe className="w-4 h-4 mr-1" />
+                  <span className="text-sm font-medium">
+                    {language === 'fr' ? 'En temps réel' : 'Real-time'}
+                  </span>
+                </div>
+              </div>
+              <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+                <Activity className="w-8 h-8" />
+              </div>
+            </div>
+            <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+          </div>
         </div>
 
         {/* Chart Section */}
@@ -349,8 +377,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Recent Orders & Top Agents */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Orders, Top Agents & Online Users */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Recent Orders */}
           <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
             <div className="flex items-center justify-between mb-8">
@@ -433,6 +461,9 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
+
+          {/* Online Users Widget */}
+          <OnlineUsersWidget />
         </div>
 
         {/* Quick Actions */}

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '@/config/app';
 import prisma from '@/config/database';
+import redis from '@/config/redis';
 import { UserRole } from '@prisma/client';
 
 interface AuthRequest extends Request {
@@ -56,6 +57,26 @@ export const authMiddleware = async (
     }
 
     req.user = user;
+    
+    // 🔥 CRITICAL FIX: Update user activity in Redis for online status tracking
+    try {
+      const now = new Date().toISOString();
+      await redis.set(`activity:agent:${user.id}`, now);
+      
+      // Also update database availability if user is not already marked as online
+      // Only update database if necessary to avoid unnecessary writes
+      if (user.availability !== 'ONLINE') {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { availability: 'ONLINE' }
+        });
+        console.log(`✅ User ${user.name || user.email} marked as ONLINE`);
+      }
+    } catch (activityError) {
+      console.error('Error updating user activity:', activityError);
+      // Don't fail authentication if activity tracking fails
+    }
+    
     next();
   } catch (error) {
     res.status(401).json({

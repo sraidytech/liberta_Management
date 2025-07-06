@@ -220,7 +220,40 @@ class AuthController {
 
   async logout(req: Request, res: Response): Promise<void> {
     try {
-      // Placeholder for logout logic (token blacklisting, etc.)
+      // Extract user ID from token if provided
+      const token = req.header('Authorization')?.replace('Bearer ', '');
+      let userId: string | null = null;
+      
+      if (token) {
+        try {
+          const decoded = jwt.verify(token, config.jwtSecret) as any;
+          userId = decoded.userId;
+        } catch (tokenError) {
+          // Token might be expired or invalid, but we still want to allow logout
+          console.log('Token validation failed during logout, continuing...');
+        }
+      }
+
+      // If we have a user ID, mark them as offline
+      if (userId) {
+        try {
+          // Update user availability to OFFLINE
+          await prisma.user.update({
+            where: { id: userId },
+            data: { availability: 'OFFLINE' }
+          });
+
+          // Clean up Redis activity tracking
+          await redis.del(`activity:agent:${userId}`);
+          await redis.del(`socket:agent:${userId}`);
+          
+          console.log(`✅ User ${userId} logged out and marked as OFFLINE`);
+        } catch (cleanupError) {
+          console.error('Error during logout cleanup:', cleanupError);
+          // Don't fail logout if cleanup fails
+        }
+      }
+
       res.json({
         success: true,
         message: 'Logout successful',

@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import { EcoManagerService } from '@/services/ecomanager.service';
 import { getMaystroService } from '@/services/maystro.service';
 import { productAssignmentService } from '@/services/product-assignment.service';
+import { deliveryDelayService } from '@/services/delivery-delay.service';
 
 const prisma = new PrismaClient();
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -274,10 +275,19 @@ export class OrdersController {
 
       const totalPages = Math.ceil(totalCount / limitNum);
 
+      // Calculate delay information for all orders
+      const delayMap = await deliveryDelayService.calculateOrdersDelay(orders);
+      
+      // Add delay information to each order
+      const ordersWithDelay = orders.map(order => ({
+        ...order,
+        delayInfo: delayMap.get(order.id) || null
+      }));
+
       res.json({
         success: true,
         data: {
-          orders,
+          orders: ordersWithDelay,
           pagination: {
             currentPage: pageNum,
             totalPages,

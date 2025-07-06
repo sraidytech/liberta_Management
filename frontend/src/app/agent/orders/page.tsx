@@ -11,6 +11,13 @@ import { useLanguage } from '@/lib/language-context';
 import { createTranslator } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
 import {
+  calculateOrderDelay,
+  getDelayCardClasses,
+  getDelayBadgeProps,
+  type OrderDelayInfo,
+  type WilayaDeliverySettings
+} from '@/lib/delivery-delay-utils';
+import {
   Package,
   Phone,
   User,
@@ -55,6 +62,7 @@ interface Order {
   total: number;
   notes?: string;
   internalNotes?: string;
+  delayInfo?: OrderDelayInfo;
   orderDate: string;
   createdAt: string;
   assignedAt: string;
@@ -125,6 +133,9 @@ export default function AgentOrdersPage() {
   const [statusNotes, setStatusNotes] = useState('');
   const [noteType, setNoteType] = useState('');
   const [customNote, setCustomNote] = useState('');
+  
+  // Wilaya delivery settings for delay calculation
+  const [wilayaSettings, setWilayaSettings] = useState<WilayaDeliverySettings[]>([]);
   
   // Ticket system state
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -376,6 +387,26 @@ export default function AgentOrdersPage() {
       console.error('💥 Error fetching shipping statuses:', error);
     } finally {
       setLoadingShippingStatuses(false);
+    }
+  };
+
+  // Fetch wilaya delivery settings
+  const fetchWilayaSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/wilaya-settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWilayaSettings(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching wilaya settings:', error);
     }
   };
 
@@ -712,6 +743,7 @@ export default function AgentOrdersPage() {
   // Fetch shipping statuses on component mount
   useEffect(() => {
     fetchShippingStatuses();
+    fetchWilayaSettings();
   }, []);
 
   // Close dropdowns when clicking outside
@@ -1207,11 +1239,30 @@ export default function AgentOrdersPage() {
                 </p>
               </div>
             ) : (
-              filteredOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-sm transition-shadow"
-                >
+              filteredOrders.map((order) => {
+                // Calculate delay info if not provided by backend
+                const delayInfo = order.delayInfo || calculateOrderDelay(
+                  order.id,
+                  order.customer.wilaya,
+                  order.orderDate,
+                  order.shippingStatus,
+                  wilayaSettings
+                );
+                
+                // Get delay-based card classes
+                const delayClasses = getDelayCardClasses(delayInfo);
+                
+                // Combine all classes
+                const cardClasses = [
+                  'bg-white rounded-lg border p-4 hover:shadow-sm transition-shadow',
+                  delayClasses || 'border-gray-200'
+                ].filter(Boolean).join(' ');
+
+                return (
+                  <div
+                    key={order.id}
+                    className={cardClasses}
+                  >
                   {/* Header Row */}
                   <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-3">
@@ -1225,6 +1276,19 @@ export default function AgentOrdersPage() {
                             {order.shippingStatus}
                           </span>
                         )}
+                        {/* Delay Badge */}
+                        {(() => {
+                          const delayBadge = getDelayBadgeProps(delayInfo);
+                          if (delayBadge.show) {
+                            return (
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${delayBadge.className}`}>
+                                <Clock className="w-3 h-3 mr-1" />
+                                {delayBadge.text}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                     
@@ -1367,7 +1431,8 @@ export default function AgentOrdersPage() {
                     )}
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 

@@ -10,6 +10,13 @@ import { useToast } from '@/components/ui/toast';
 import { useLanguage } from '@/lib/language-context';
 import { OrderDetailsModal } from '@/components/coordinateur/order-details-modal';
 import {
+  calculateOrderDelay,
+  getDelayRowClasses,
+  getDelayBadgeProps,
+  type OrderDelayInfo,
+  type WilayaDeliverySettings
+} from '@/lib/delivery-delay-utils';
+import {
   User,
   Eye,
   UserPlus,
@@ -59,6 +66,7 @@ interface Order {
   createdAt: string;
   notes?: string;
   internalNotes?: string;
+  delayInfo?: OrderDelayInfo;
   customer: {
     id: string;
     fullName: string;
@@ -130,6 +138,9 @@ export default function CoordinateurOrdersPage() {
 
   // Available agents for filtering
   const [availableAgents, setAvailableAgents] = useState<Array<{id: string, name: string, agentCode: string}>>([]);
+  
+  // Wilaya delivery settings for delay calculation
+  const [wilayaSettings, setWilayaSettings] = useState<WilayaDeliverySettings[]>([]);
 
   // Fetch orders
   const fetchOrders = async () => {
@@ -231,6 +242,26 @@ export default function CoordinateurOrdersPage() {
     }
   };
 
+  // Fetch wilaya delivery settings
+  const fetchWilayaSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/wilaya-settings`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWilayaSettings(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching wilaya settings:', error);
+    }
+  };
+
   // Update order status
   const updateOrderStatus = async (orderId: string, newStatus: string, notes?: string) => {
     try {
@@ -307,6 +338,7 @@ export default function CoordinateurOrdersPage() {
     }
 
     fetchAvailableAgents();
+    fetchWilayaSettings();
   }, []);
 
   // Fetch orders when dependencies change - EXACT same pattern as admin
@@ -711,12 +743,46 @@ export default function CoordinateurOrdersPage() {
                     </td>
                   </tr>
                 ) : (
-                  orders.map((order) => (
-                    <tr key={order.id} className="hover:bg-gray-50">
+                  orders.map((order) => {
+                    // Calculate delay info if not provided by backend
+                    const delayInfo = order.delayInfo || calculateOrderDelay(
+                      order.id,
+                      order.customer.wilaya,
+                      order.orderDate,
+                      order.shippingStatus,
+                      wilayaSettings
+                    );
+                    
+                    // Get delay-based row classes
+                    const delayClasses = getDelayRowClasses(delayInfo);
+                    
+                    // Combine all classes
+                    const rowClasses = [
+                      'hover:bg-gray-50',
+                      delayClasses
+                    ].filter(Boolean).join(' ');
+
+                    return (
+                      <tr key={order.id} className={rowClasses}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {order.reference}
+                          <div className="flex items-center space-x-2">
+                            <div className="text-sm font-medium text-gray-900">
+                              {order.reference}
+                            </div>
+                            {/* Delay Badge */}
+                            {(() => {
+                              const delayBadge = getDelayBadgeProps(delayInfo);
+                              if (delayBadge.show) {
+                                return (
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${delayBadge.className}`}>
+                                    <Clock className="w-3 h-3 mr-1" />
+                                    {delayBadge.text}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                           <div className="text-sm text-gray-500">
                             {order._count.items} {t('items')}
@@ -786,7 +852,8 @@ export default function CoordinateurOrdersPage() {
                         </Button>
                       </td>
                     </tr>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
             </table>

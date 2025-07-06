@@ -527,3 +527,15 @@ model NoteType {
   
   @@map("note_types")
 }
+
+// Wilaya Delivery Settings Model
+model WilayaDeliverySettings {
+  id              String   @id @default(cuid())
+  wilayaName      String   @unique
+  maxDeliveryDays Int      @default(2)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("wilaya_delivery_settings")
+}

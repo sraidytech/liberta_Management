@@ -41,6 +41,7 @@ export class AnalyticsController {
         lastMonthRevenue,
         activeAgents,
         totalAgents,
+        onlineUsers,
         ordersByStatus,
         ordersByStore,
         recentOrders,
@@ -126,6 +127,42 @@ export class AnalyticsController {
             isActive: true
           }
         }),
+        
+        // Online users (using Redis activity tracking)
+        (async () => {
+          try {
+            const ACTIVITY_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+            const now = new Date();
+            
+            // Get all users
+            const users = await prisma.user.findMany({
+              where: { isActive: true },
+              select: { id: true }
+            });
+            
+            let onlineCount = 0;
+            
+            // Check each user's activity in Redis
+            for (const user of users) {
+              const activityKey = `activity:agent:${user.id}`;
+              const lastActivity = await redis.get(activityKey);
+              
+              if (lastActivity) {
+                const lastActivityTime = new Date(lastActivity);
+                const timeDiff = now.getTime() - lastActivityTime.getTime();
+                
+                if (timeDiff <= ACTIVITY_TIMEOUT) {
+                  onlineCount++;
+                }
+              }
+            }
+            
+            return onlineCount;
+          } catch (error) {
+            console.error('Error counting online users:', error);
+            return 0;
+          }
+        })(),
         
         // Orders by status
         prisma.order.groupBy({
@@ -218,6 +255,7 @@ export class AnalyticsController {
           revenueGrowth: `${revenueGrowth}%`,
           activeAgents,
           totalAgents,
+          onlineUsers,
           agentUtilization: totalAgents > 0 ? ((activeAgents / totalAgents) * 100).toFixed(1) : '0'
         },
         ordersByStatus: ordersByStatus.map(item => ({
