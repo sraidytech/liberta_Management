@@ -706,6 +706,83 @@ export interface Translations {
   manageYourNotifications: string;
   noAuthTokenFound: string;
   failedToFetchDashboardStats: string;
+  
+  // Product Filtering for Bulk Reassignment
+  productFiltering: string;
+  enableProductFiltering: string;
+  disableProductFiltering: string;
+  filterByProducts: string;
+  searchByProductTitle: string;
+  searchBySku: string;
+  selectedProducts: string;
+  addProduct: string;
+  removeProduct: string;
+  productMatchingLogic: string;
+  ordersContainingAllProducts: string;
+  ordersContainingAnyProducts: string;
+  allSelectedProducts: string;
+  anySelectedProducts: string;
+  noProductsSelected: string;
+  enterProductTitle: string;
+  enterSku: string;
+  productTitle: string;
+  sku: string;
+  ordersWithProducts: string;
+  failedToFetchProducts: string;
+  availableProducts: string;
+  enabled: string;
+  logic: string;
+  
+  // Missing translations found in agent/orders
+  showingOrdersFiltered: string;
+  pageOf: string;
+  hideDelivered: string;
+  noShippingStatusesFound: string;
+  tryAdjustingSearchOrFilters: string;
+  ordersWillAppearWhenAssigned: string;
+  lastNoteDetails: string;
+  noDetailsProvided: string;
+  
+  // Missing translations for admin/settings
+  schedulerSettings: string;
+  maystroApiSettings: string;
+  systemSettings: string;
+  wilayaDeliveryTimes: string;
+  activeJobs: string;
+  activeConnections: string;
+  noteTypesManagement: string;
+  manageNoteTypesDescription: string;
+  addNoteType: string;
+  totalNoteTypes: string;
+  areYouSureDeleteNoteType: string;
+  configureMaxDeliveryDays: string;
+  configuredWilayas: string;
+  uniqueWilayasInOrders: string;
+  averageDeliveryDays: string;
+  deliveryTimeSettings: string;
+  wilayasConfigured: string;
+  noWilayaSettings: string;
+  initializeFromExistingOrders: string;
+  wilayaName: string;
+  maxDeliveryDays: string;
+  missingWilayas: string;
+  wilayasExistInOrdersButNotConfigured: string;
+  
+  // Missing translations for admin/tickets
+  manageTicketsFromAgents: string;
+  searchByTitleOrderRefCustomer: string;
+  statusAndPriority: string;
+  priority: string;
+  
+  // Additional system and UI translations
+  systemConfiguration: string;
+  updateSystemSettings: string;
+  systemMonitoringActive: string;
+  automatedBackupsDaily: string;
+  securityUpdatesAutomatic: string;
+  contactSystemAdmin: string;
+  uptimeFormatted: string;
+  primary: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -1415,6 +1492,83 @@ export const translations: Record<Language, Translations> = {
     manageYourNotifications: 'Manage your notifications',
     noAuthTokenFound: 'No authentication token found',
     failedToFetchDashboardStats: 'Failed to fetch dashboard stats',
+    
+    // Product Filtering for Bulk Reassignment
+    productFiltering: 'Product Filtering',
+    enableProductFiltering: 'Enable Product Filtering',
+    disableProductFiltering: 'Disable Product Filtering',
+    filterByProducts: 'Filter by Products',
+    searchByProductTitle: 'Search by product title...',
+    searchBySku: 'Search by SKU...',
+    selectedProducts: 'Selected Products',
+    addProduct: 'Add Product',
+    removeProduct: 'Remove Product',
+    productMatchingLogic: 'Product Matching Logic',
+    ordersContainingAllProducts: 'Orders containing ALL selected products',
+    ordersContainingAnyProducts: 'Orders containing ANY selected products',
+    allSelectedProducts: 'ALL selected products',
+    anySelectedProducts: 'ANY selected products',
+    noProductsSelected: 'No products selected',
+    enterProductTitle: 'Enter product title...',
+    enterSku: 'Enter SKU...',
+    productTitle: 'Product Title',
+    sku: 'SKU',
+    ordersWithProducts: 'orders with these products',
+    failedToFetchProducts: 'Failed to fetch products',
+    availableProducts: 'Available Products',
+    enabled: 'Enabled',
+    logic: 'Logic',
+    
+    // Missing translations found in agent/orders
+    showingOrdersFiltered: 'Showing {count} orders (filtered by product assignments)',
+    pageOf: 'Page {current} of {total}',
+    hideDelivered: 'Hide Delivered',
+    noShippingStatusesFound: 'No shipping statuses found',
+    tryAdjustingSearchOrFilters: 'Try adjusting your search or filters to find more orders',
+    ordersWillAppearWhenAssigned: 'Orders will appear here when assigned to you',
+    lastNoteDetails: 'Last Note Details',
+    noDetailsProvided: 'No details provided',
+    
+    // Missing translations for admin/settings
+    schedulerSettings: 'Scheduler Settings',
+    maystroApiSettings: 'Maystro API Settings',
+    systemSettings: 'System Settings',
+    wilayaDeliveryTimes: 'Wilaya Delivery Times',
+    activeJobs: 'Active Jobs',
+    activeConnections: 'Active Connections',
+    noteTypesManagement: 'Note Types Management',
+    manageNoteTypesDescription: 'Manage the note types that agents can select when updating orders',
+    addNoteType: 'Add Note Type',
+    totalNoteTypes: 'Total Note Types',
+    areYouSureDeleteNoteType: 'Are you sure you want to delete the note type "{name}"? This action cannot be undone.',
+    configureMaxDeliveryDays: 'Configure maximum delivery days for each wilaya. Orders exceeding these limits will be highlighted.',
+    configuredWilayas: 'Configured Wilayas',
+    uniqueWilayasInOrders: 'Unique Wilayas in Orders',
+    averageDeliveryDays: 'Average Delivery Days',
+    deliveryTimeSettings: 'Delivery Time Settings',
+    wilayasConfigured: 'wilayas configured',
+    noWilayaSettings: 'No Wilaya Settings',
+    initializeFromExistingOrders: 'Initialize settings from existing orders or add wilayas manually.',
+    wilayaName: 'Wilaya Name',
+    maxDeliveryDays: 'Max Delivery Days',
+    missingWilayas: 'Missing Wilayas',
+    wilayasExistInOrdersButNotConfigured: 'These wilayas exist in your orders but don\'t have delivery settings configured:',
+    
+    // Missing translations for admin/tickets
+    manageTicketsFromAgents: 'Manage support tickets from agents',
+    searchByTitleOrderRefCustomer: 'Search by title, order reference, or customer...',
+    statusAndPriority: 'Status & Priority',
+    priority: 'Priority',
+    
+    // Additional system and UI translations
+    systemConfiguration: 'System Configuration',
+    updateSystemSettings: 'Update system settings',
+    systemMonitoringActive: 'System monitoring is active 24/7',
+    automatedBackupsDaily: 'Automated backups are performed daily',
+    securityUpdatesAutomatic: 'Security updates are applied automatically',
+    contactSystemAdmin: 'For technical support, contact your system administrator',
+    uptimeFormatted: '{days} days, {hours} hours, {minutes} minutes',
+    primary: 'Primary',
   },
   fr: {
     // Common
@@ -2122,6 +2276,83 @@ export const translations: Record<Language, Translations> = {
     manageYourNotifications: 'Gérez vos notifications',
     noAuthTokenFound: 'Aucun token d\'authentification trouvé',
     failedToFetchDashboardStats: 'Échec de récupération des statistiques du tableau de bord',
+    
+    // Product Filtering for Bulk Reassignment
+    productFiltering: 'Filtrage par Produits',
+    enableProductFiltering: 'Activer le Filtrage par Produits',
+    disableProductFiltering: 'Désactiver le Filtrage par Produits',
+    filterByProducts: 'Filtrer par Produits',
+    searchByProductTitle: 'Rechercher par titre de produit...',
+    searchBySku: 'Rechercher par SKU...',
+    selectedProducts: 'Produits Sélectionnés',
+    addProduct: 'Ajouter Produit',
+    removeProduct: 'Supprimer Produit',
+    productMatchingLogic: 'Logique de Correspondance des Produits',
+    ordersContainingAllProducts: 'Commandes contenant TOUS les produits sélectionnés',
+    ordersContainingAnyProducts: 'Commandes contenant N\'IMPORTE QUEL produit sélectionné',
+    allSelectedProducts: 'TOUS les produits sélectionnés',
+    anySelectedProducts: 'N\'IMPORTE QUEL produit sélectionné',
+    noProductsSelected: 'Aucun produit sélectionné',
+    enterProductTitle: 'Entrez le titre du produit...',
+    enterSku: 'Entrez le SKU...',
+    productTitle: 'Titre du Produit',
+    sku: 'SKU',
+    ordersWithProducts: 'commandes avec ces produits',
+    failedToFetchProducts: 'Échec de récupération des produits',
+    availableProducts: 'Produits Disponibles',
+    enabled: 'Activé',
+    logic: 'Logique',
+    
+    // Missing translations found in agent/orders
+    showingOrdersFiltered: 'Affichage de {count} commandes (filtrées par assignations de produits)',
+    pageOf: 'Page {current} sur {total}',
+    hideDelivered: 'Masquer Livrées',
+    noShippingStatusesFound: 'Aucun statut de livraison trouvé',
+    tryAdjustingSearchOrFilters: 'Essayez d\'ajuster votre recherche ou vos filtres pour trouver plus de commandes',
+    ordersWillAppearWhenAssigned: 'Les commandes apparaîtront ici quand elles vous seront assignées',
+    lastNoteDetails: 'Détails de la Dernière Note',
+    noDetailsProvided: 'Aucun détail fourni',
+    
+    // Missing translations for admin/settings
+    schedulerSettings: 'Paramètres du Planificateur',
+    maystroApiSettings: 'Paramètres API Maystro',
+    systemSettings: 'Paramètres Système',
+    wilayaDeliveryTimes: 'Temps de Livraison par Wilaya',
+    activeJobs: 'Tâches Actives',
+    activeConnections: 'Connexions Actives',
+    noteTypesManagement: 'Gestion des Types de Notes',
+    manageNoteTypesDescription: 'Gérer les types de notes que les agents peuvent sélectionner lors de la mise à jour des commandes',
+    addNoteType: 'Ajouter Type de Note',
+    totalNoteTypes: 'Total Types de Notes',
+    areYouSureDeleteNoteType: 'Êtes-vous sûr de vouloir supprimer le type de note "{name}" ? Cette action ne peut pas être annulée.',
+    configureMaxDeliveryDays: 'Configurer les jours de livraison maximum pour chaque wilaya. Les commandes dépassant ces limites seront mises en évidence.',
+    configuredWilayas: 'Wilayas Configurées',
+    uniqueWilayasInOrders: 'Wilayas Uniques dans les Commandes',
+    averageDeliveryDays: 'Jours de Livraison Moyens',
+    deliveryTimeSettings: 'Paramètres de Temps de Livraison',
+    wilayasConfigured: 'wilayas configurées',
+    noWilayaSettings: 'Aucun Paramètre de Wilaya',
+    initializeFromExistingOrders: 'Initialiser les paramètres à partir des commandes existantes ou ajouter des wilayas manuellement.',
+    wilayaName: 'Nom de la Wilaya',
+    maxDeliveryDays: 'Jours de Livraison Max',
+    missingWilayas: 'Wilayas Manquantes',
+    wilayasExistInOrdersButNotConfigured: 'Ces wilayas existent dans vos commandes mais n\'ont pas de paramètres de livraison configurés :',
+    
+    // Missing translations for admin/tickets
+    manageTicketsFromAgents: 'Gérer les tickets de support des agents',
+    searchByTitleOrderRefCustomer: 'Rechercher par titre, référence de commande ou client...',
+    statusAndPriority: 'Statut et Priorité',
+    priority: 'Priorité',
+    
+    // Additional system and UI translations
+    systemConfiguration: 'Configuration Système',
+    updateSystemSettings: 'Mettre à jour les paramètres système',
+    systemMonitoringActive: 'La surveillance du système est active 24h/24 et 7j/7',
+    automatedBackupsDaily: 'Les sauvegardes automatisées sont effectuées quotidiennement',
+    securityUpdatesAutomatic: 'Les mises à jour de sécurité sont appliquées automatiquement',
+    contactSystemAdmin: 'Pour le support technique, contactez votre administrateur système',
+    uptimeFormatted: '{days} jours, {hours} heures, {minutes} minutes',
+    primary: 'Principal',
   },
 };
 

@@ -302,9 +302,9 @@ export function NoteTypesSettings() {
       <Card className="p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Note Types Management</h2>
+            <h2 className="text-2xl font-bold text-gray-900">{t('noteTypesManagement')}</h2>
             <p className="text-gray-600 mt-1">
-              Manage the note types that agents can select when updating orders
+              {t('manageNoteTypesDescription')}
             </p>
           </div>
           <Button
@@ -313,7 +313,7 @@ export function NoteTypesSettings() {
             disabled={showAddForm}
           >
             <Plus className="h-4 w-4" />
-            Add Note Type
+            {t('addNoteType')}
           </Button>
         </div>
 
@@ -466,7 +466,7 @@ export function NoteTypesSettings() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-blue-600">{noteTypes.length}</div>
-              <div className="text-sm text-gray-600">Total Note Types</div>
+              <div className="text-sm text-gray-600">{t('totalNoteTypes')}</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">

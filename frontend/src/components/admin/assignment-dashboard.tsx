@@ -167,13 +167,6 @@ export default function AssignmentDashboard() {
           >
             {t('bulkReassignment')}
           </Button>
-          <Button
-            onClick={triggerAssignment}
-            disabled={assigning}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {assigning ? t('assigning') : t('triggerAssignment')}
-          </Button>
         </div>
       </div>
 

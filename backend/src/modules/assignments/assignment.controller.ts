@@ -202,7 +202,8 @@ export class AssignmentController {
         selectionType, // 'global' or 'agents'
         orderCount,
         sourceAgentIds, // for 'agents' type
-        targetAgents // array of { agentId, percentage }
+        targetAgents, // array of { agentId, percentage }
+        productFilter // optional product filtering
       } = req.body;
 
       // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to bulk reassign orders
@@ -236,24 +237,13 @@ export class AssignmentController {
         });
       }
 
-      // Get orders to reassign based on selection type
-      let ordersToReassign;
-      if (selectionType === 'global') {
-        // Get last N orders globally by creation date
-        ordersToReassign = await prisma.order.findMany({
-          where: {
-            assignedAgentId: { not: null } // Only assigned orders can be reassigned
-          },
-          orderBy: {
-            orderDate: 'desc'
-          },
-          take: orderCount,
-          include: {
-            assignedAgent: true
-          }
-        });
-      } else if (selectionType === 'agents') {
-        // Get last N orders from specific agents
+      // Build base where clause
+      let baseWhereClause: any = {
+        assignedAgentId: { not: null } // Only assigned orders can be reassigned
+      };
+
+      // Add agent-specific filtering if needed
+      if (selectionType === 'agents') {
         if (!sourceAgentIds || !Array.isArray(sourceAgentIds) || sourceAgentIds.length === 0) {
           return res.status(400).json({
             success: false,
@@ -262,20 +252,8 @@ export class AssignmentController {
             }
           });
         }
-
-        ordersToReassign = await prisma.order.findMany({
-          where: {
-            assignedAgentId: { in: sourceAgentIds }
-          },
-          orderBy: {
-            orderDate: 'desc'
-          },
-          take: orderCount,
-          include: {
-            assignedAgent: true
-          }
-        });
-      } else {
+        baseWhereClause.assignedAgentId = { in: sourceAgentIds };
+      } else if (selectionType !== 'global') {
         return res.status(400).json({
           success: false,
           error: {
@@ -283,6 +261,50 @@ export class AssignmentController {
           }
         });
       }
+
+      // Add product filtering if enabled
+      if (productFilter && productFilter.enabled && productFilter.products && productFilter.products.length > 0) {
+        const productConditions = productFilter.products.map((product: any) => {
+          const condition: any = {};
+          if (product.title) {
+            condition.title = { contains: product.title, mode: 'insensitive' };
+          }
+          if (product.sku) {
+            condition.sku = { contains: product.sku, mode: 'insensitive' };
+          }
+          return condition;
+        });
+
+        // Apply ALL or ANY logic for product matching
+        if (productFilter.logic === 'ALL') {
+          // Orders must contain ALL selected products
+          baseWhereClause.AND = productConditions.map((condition: any) => ({
+            items: {
+              some: condition
+            }
+          }));
+        } else {
+          // Orders must contain ANY of the selected products (default)
+          baseWhereClause.items = {
+            some: {
+              OR: productConditions
+            }
+          };
+        }
+      }
+
+      // Get orders to reassign based on selection type and filters
+      const ordersToReassign = await prisma.order.findMany({
+        where: baseWhereClause,
+        orderBy: {
+          orderDate: 'desc'
+        },
+        take: orderCount,
+        include: {
+          assignedAgent: true,
+          items: true // Include items for product filtering verification
+        }
+      });
 
       if (ordersToReassign.length === 0) {
         return res.status(404).json({
@@ -480,6 +502,64 @@ export class AssignmentController {
         success: false,
         error: {
           message: 'Failed to fetch available agents'
+        }
+      });
+    }
+  }
+
+  /**
+   * Get available products for bulk reassignment filtering
+   */
+  async getAvailableProducts(req: Request, res: Response) {
+    try {
+      const userRole = (req as any).user?.role;
+
+      // Only allow ADMIN, TEAM_MANAGER, and COORDINATEUR to view products
+      if (!['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            message: 'Insufficient permissions to view products'
+          }
+        });
+      }
+
+      // Get distinct products from order items with usage count
+      const products = await prisma.orderItem.groupBy({
+        by: ['title', 'sku'],
+        _count: {
+          id: true
+        },
+        where: {
+          order: {
+            assignedAgentId: { not: null } // Only from assigned orders
+          }
+        },
+        orderBy: {
+          _count: {
+            id: 'desc'
+          }
+        }
+      });
+
+      // Format the response
+      const formattedProducts = products.map((product, index) => ({
+        id: `${product.title}-${product.sku || 'no-sku'}-${index}`,
+        title: product.title,
+        sku: product.sku || '',
+        orderCount: product._count.id
+      }));
+
+      res.json({
+        success: true,
+        data: formattedProducts
+      });
+    } catch (error) {
+      console.error('Get available products error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch available products'
         }
       });
     }

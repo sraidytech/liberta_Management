@@ -929,10 +929,10 @@ export default function AgentOrdersPage() {
                 {totalCount > 0 ? (
                   <div>
                     <div className="font-medium">
-                      Showing {((currentPage - 1) * limit) + 1} to {Math.min(currentPage * limit, totalCount)} of {totalCount} {t('orders')}
+                      {t('showingOrdersFiltered').replace('{count}', `${((currentPage - 1) * limit) + 1} to ${Math.min(currentPage * limit, totalCount)} of ${totalCount}`)} {t('orders')}
                     </div>
                     <div className="text-xs text-blue-600 mt-1">
-                      Page {currentPage} of {totalPages}
+                      {t('pageOf').replace('{current}', currentPage.toString()).replace('{total}', totalPages.toString())}
                     </div>
                   </div>
                 ) : (
@@ -942,7 +942,7 @@ export default function AgentOrdersPage() {
                     </div>
                     {totalAssignedOrders > orders.length && (
                       <div className="text-xs text-blue-600 mt-1">
-                        Showing {orders.length} orders (filtered by product assignments)
+                        {t('showingOrdersFiltered').replace('{count}', orders.length.toString())}
                       </div>
                     )}
                   </div>
@@ -1063,11 +1063,11 @@ export default function AgentOrdersPage() {
                           {loadingShippingStatuses ? (
                             <div className="flex items-center justify-center py-4">
                               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
-                              <span className="ml-2 text-sm text-gray-500">Loading...</span>
+                              <span className="ml-2 text-sm text-gray-500">{t('loading')}</span>
                             </div>
                           ) : shippingStatusOptions.length === 0 ? (
                             <div className="text-center py-4 text-sm text-gray-500">
-                              No shipping statuses found
+                              {t('noShippingStatusesFound')}
                             </div>
                           ) : (
                             shippingStatusOptions.map((option) => (
@@ -1146,7 +1146,7 @@ export default function AgentOrdersPage() {
                 ) : (
                   <ToggleLeft className="w-4 h-4" />
                 )}
-                Hide Delivered
+                {t('hideDelivered')}
               </button>
 
               <button
@@ -1233,8 +1233,8 @@ export default function AgentOrdersPage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">No orders found</h3>
                 <p className="text-gray-600">
                   {searchTerm || (statusFilter.length > 0 && !statusFilter.includes('ALL'))
-                    ? 'Try adjusting your search or filters to find more orders'
-                    : 'Orders will appear here when assigned to you'
+                    ? t('tryAdjustingSearchOrFilters')
+                    : t('ordersWillAppearWhenAssigned')
                   }
                 </p>
               </div>
@@ -1375,7 +1375,7 @@ export default function AgentOrdersPage() {
                               )}
                             </div>
                             <p className="text-sm text-gray-700">
-                              {lastNote.text || 'No details provided'}
+                              {lastNote.text || t('noDetailsProvided')}
                             </p>
                           </div>
                         ) : null;
@@ -1393,7 +1393,7 @@ export default function AgentOrdersPage() {
                       className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium"
                     >
                       <Eye className="h-4 w-4" />
-                      View Details
+                      {t('viewDetails')}
                     </button>
                     
                     <button
@@ -1405,7 +1405,7 @@ export default function AgentOrdersPage() {
                       className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium"
                     >
                       <Edit className="h-4 w-4" />
-                      Edit Status
+                      {t('editStatus')}
                     </button>
                     
                     <button
@@ -1417,7 +1417,7 @@ export default function AgentOrdersPage() {
                       className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
                     >
                       <MessageSquare className="h-4 w-4" />
-                      Report Issue
+                      {t('reportProblem')}
                     </button>
                     
                     {orderTicketCounts[order.id] > 0 && (
@@ -1426,7 +1426,7 @@ export default function AgentOrdersPage() {
                         className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
                       >
                         <Eye className="h-4 w-4" />
-                        View Tickets ({orderTicketCounts[order.id]})
+                        {t('viewTickets')} ({orderTicketCounts[order.id]})
                       </button>
                     )}
                   </div>

@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/toast';
+import { useLanguage } from '@/lib/language-context';
 import {
   MapPin,
   Clock,
@@ -28,6 +29,7 @@ interface WilayaSetting {
 
 export function WilayaDeliverySettings() {
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const [settings, setSettings] = useState<WilayaSetting[]>([]);
   const [uniqueWilayas, setUniqueWilayas] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -165,7 +167,7 @@ export function WilayaDeliverySettings() {
     }
   };
 
-  // Update delivery days for a wilaya
+  // Update delivery {t('days')} for a wilaya
   const updateDeliveryDays = (wilayaName: string, days: number) => {
     setSettings(prev => prev.map(setting => 
       setting.wilayaName === wilayaName 
@@ -219,7 +221,7 @@ export function WilayaDeliverySettings() {
       <Card className="p-8">
         <div className="flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-3 text-lg">Loading wilaya settings...</span>
+          <span className="ml-3 text-lg">{t('loadingWilayaSettings')}</span>
         </div>
       </Card>
     );
@@ -235,9 +237,9 @@ export function WilayaDeliverySettings() {
               <MapPin className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Wilaya Delivery Settings</h2>
+              <h2 className="text-xl font-semibold text-gray-900">{t('wilayaDeliveryTimes')}</h2>
               <p className="text-sm text-gray-600">
-                Configure maximum delivery days for each wilaya. Orders exceeding these limits will be highlighted.
+                Configure maximum delivery {t('days')} for each wilaya. Orders exceeding these limits will be highlighted.
               </p>
             </div>
           </div>
@@ -265,7 +267,7 @@ export function WilayaDeliverySettings() {
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              <span>Save All Settings</span>
+              <span>{t('saveChanges')}</span>
             </Button>
           </div>
         </div>
@@ -279,7 +281,7 @@ export function WilayaDeliverySettings() {
               <CheckCircle2 className="h-6 w-6 text-green-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Configured Wilayas</p>
+              <p className="text-sm text-gray-600">{t('configuredWilayas')}</p>
               <p className="text-2xl font-bold text-gray-900">{settings.length}</p>
             </div>
           </div>
@@ -291,7 +293,7 @@ export function WilayaDeliverySettings() {
               <AlertCircle className="h-6 w-6 text-yellow-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Unique Wilayas in Orders</p>
+              <p className="text-sm text-gray-600">{t('uniqueWilayasInOrders')}</p>
               <p className="text-2xl font-bold text-gray-900">{uniqueWilayas.length}</p>
             </div>
           </div>
@@ -303,7 +305,7 @@ export function WilayaDeliverySettings() {
               <Clock className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-sm text-gray-600">Average Delivery Days</p>
+              <p className="text-sm text-gray-600">{t('averageDeliveryDays')}</p>
               <p className="text-2xl font-bold text-gray-900">
                 {settings.length > 0 
                   ? Math.round(settings.reduce((sum, s) => sum + s.maxDeliveryDays, 0) / settings.length * 10) / 10
@@ -319,7 +321,7 @@ export function WilayaDeliverySettings() {
       <Card className="p-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Delivery Time Settings</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('deliveryTimeSettings')}</h3>
             <div className="text-sm text-gray-600">
               {settings.length} wilaya{settings.length !== 1 ? 's' : ''} configured
             </div>
@@ -328,7 +330,7 @@ export function WilayaDeliverySettings() {
           {settings.length === 0 ? (
             <div className="text-center py-12">
               <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Wilaya Settings</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">{t('noWilayaSettings')}</h3>
               <p className="text-gray-600 mb-4">
                 Initialize settings from existing orders or add wilayas manually.
               </p>
@@ -351,16 +353,16 @@ export function WilayaDeliverySettings() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Wilaya Name
+                      {t('wilayaName')}
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Max Delivery Days
+                      {t('maxDeliveryDays')}
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Status
+                      {t('status')}
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">
-                      Actions
+                      {t('actions')}
                     </th>
                   </tr>
                 </thead>
@@ -389,7 +391,7 @@ export function WilayaDeliverySettings() {
                             className="w-20 text-center"
                           />
                           <Clock className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">days</span>
+                          <span className="text-sm text-gray-600">{t('days')}</span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -398,7 +400,7 @@ export function WilayaDeliverySettings() {
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-gray-100 text-gray-800'
                         }`}>
-                          {setting.isActive ? 'Active' : 'Inactive'}
+                          {setting.isActive ? t('active') : t('inactive')}
                         </span>
                       </td>
                       <td className="px-4 py-3">
@@ -424,7 +426,7 @@ export function WilayaDeliverySettings() {
       {uniqueWilayas.length > settings.length && (
         <Card className="p-6">
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-900">Missing Wilayas</h3>
+            <h3 className="text-lg font-semibold text-gray-900">{t('missingWilayas')}</h3>
             <p className="text-sm text-gray-600">
               These wilayas exist in your orders but don't have delivery settings configured:
             </p>

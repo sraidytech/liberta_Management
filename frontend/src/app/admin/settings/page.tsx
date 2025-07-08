@@ -9,27 +9,31 @@ import { MaystroApiSettings } from '@/components/admin/settings/maystro-api-sett
 import { SystemSettings } from '@/components/admin/settings/system-settings';
 import { NoteTypesSettings } from '@/components/admin/settings/note-types-settings';
 import { WilayaDeliverySettings } from '@/components/admin/settings/wilaya-delivery-settings';
+import { useLanguage } from '@/lib/language-context';
+import { createTranslator } from '@/lib/i18n';
 
 type SettingsTab = 'scheduler' | 'maystro' | 'system' | 'note-types' | 'wilaya-delivery';
 
 export default function AdminSettingsPage() {
+  const { language } = useLanguage();
+  const t = createTranslator(language);
   const [activeTab, setActiveTab] = useState<SettingsTab>('scheduler');
 
   const tabs = [
-    { id: 'scheduler' as SettingsTab, label: 'Background Jobs & Scheduler', icon: '📅' },
-    { id: 'maystro' as SettingsTab, label: 'Maystro API Keys', icon: '🚚' },
-    { id: 'system' as SettingsTab, label: 'System Settings', icon: '⚙️' },
-    { id: 'note-types' as SettingsTab, label: 'Note Types', icon: '📝' },
-    { id: 'wilaya-delivery' as SettingsTab, label: 'Wilaya Delivery Times', icon: '🗺️' },
+    { id: 'scheduler' as SettingsTab, label: t('backgroundJobs'), icon: '📅' },
+    { id: 'maystro' as SettingsTab, label: t('maystroApiSettings'), icon: '🚚' },
+    { id: 'system' as SettingsTab, label: t('systemSettings'), icon: '⚙️' },
+    { id: 'note-types' as SettingsTab, label: t('noteTypes'), icon: '📝' },
+    { id: 'wilaya-delivery' as SettingsTab, label: t('wilayaDeliveryTimes'), icon: '🗺️' },
   ];
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">System Settings</h1>
+          <h1 className="text-3xl font-bold">{t('systemSettings')}</h1>
           <div className="text-sm text-gray-500">
-            Configure system-wide settings and integrations
+            {t('updateSystemSettings')}
           </div>
         </div>
 

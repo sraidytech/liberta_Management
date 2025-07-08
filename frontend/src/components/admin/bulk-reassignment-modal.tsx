@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/toast';
 import { useLanguage } from '@/lib/language-context';
-import { X, Users, ArrowRight, Percent, Hash } from 'lucide-react';
+import { X, Users, ArrowRight, Percent, Hash, Package, Search, Filter } from 'lucide-react';
 
 interface Agent {
   id: string;
@@ -16,10 +16,27 @@ interface Agent {
   maxOrders: number;
 }
 
+interface Product {
+  id: string;
+  title: string;
+  sku: string;
+  orderCount: number;
+}
+
 interface TargetAgent {
   agentId: string;
   agentName: string;
   percentage: number;
+}
+
+interface ProductFilter {
+  enabled: boolean;
+  products: Array<{
+    title?: string;
+    sku?: string;
+    productId?: string;
+  }>;
+  logic: 'ALL' | 'ANY';
 }
 
 interface BulkReassignmentModalProps {
@@ -35,11 +52,24 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loadingAgents, setLoadingAgents] = useState(false);
   
+  // Product filtering state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearchTerm, setProductSearchTerm] = useState('');
+  const [skuSearchTerm, setSkuSearchTerm] = useState('');
+  
   // Form state
   const [selectionType, setSelectionType] = useState<'global' | 'agents'>('global');
   const [orderCount, setOrderCount] = useState<number>(10);
   const [sourceAgentIds, setSourceAgentIds] = useState<string[]>([]);
   const [targetAgents, setTargetAgents] = useState<TargetAgent[]>([]);
+  
+  // Product filter state
+  const [productFilter, setProductFilter] = useState<ProductFilter>({
+    enabled: false,
+    products: [],
+    logic: 'ANY'
+  });
 
   // Fetch available agents
   const fetchAgents = async () => {
@@ -77,9 +107,46 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
     }
   };
 
+  // Fetch available products
+  const fetchProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/v1/assignments/products`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data.data || []);
+      } else {
+        showToast({
+          type: 'error',
+          title: t('error'),
+          message: 'Failed to fetch products'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      showToast({
+        type: 'error',
+        title: t('error'),
+        message: 'Failed to fetch products'
+      });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       fetchAgents();
+      fetchProducts();
     }
   }, [isOpen]);
 
@@ -110,6 +177,41 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
 
   const getTotalPercentage = () => {
     return targetAgents.reduce((sum, ta) => sum + ta.percentage, 0);
+  };
+
+  // Product filtering helper functions
+  const getFilteredProducts = () => {
+    return products.filter(product => {
+      const matchesTitle = !productSearchTerm ||
+        product.title.toLowerCase().includes(productSearchTerm.toLowerCase());
+      const matchesSku = !skuSearchTerm ||
+        product.sku.toLowerCase().includes(skuSearchTerm.toLowerCase());
+      return matchesTitle && matchesSku;
+    });
+  };
+
+  const addProductToFilter = (product: Product) => {
+    const isAlreadySelected = productFilter.products.some(p =>
+      p.title === product.title && p.sku === product.sku
+    );
+    
+    if (!isAlreadySelected) {
+      setProductFilter(prev => ({
+        ...prev,
+        products: [...prev.products, {
+          title: product.title,
+          sku: product.sku,
+          productId: product.id
+        }]
+      }));
+    }
+  };
+
+  const removeProductFromFilter = (index: number) => {
+    setProductFilter(prev => ({
+      ...prev,
+      products: prev.products.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async () => {
@@ -166,7 +268,8 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
           selectionType,
           orderCount,
           sourceAgentIds: selectionType === 'agents' ? sourceAgentIds : undefined,
-          targetAgents
+          targetAgents,
+          productFilter: productFilter.enabled ? productFilter : undefined
         })
       });
 
@@ -185,6 +288,13 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
         setOrderCount(10);
         setSourceAgentIds([]);
         setTargetAgents([]);
+        setProductFilter({
+          enabled: false,
+          products: [],
+          logic: 'ANY'
+        });
+        setProductSearchTerm('');
+        setSkuSearchTerm('');
       } else {
         showToast({
           type: 'error',
@@ -296,6 +406,143 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
             </div>
           </Card>
 
+          {/* Product Filtering */}
+          <Card className="p-4">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-lg font-medium flex items-center">
+                <Package className="w-5 h-5 mr-2 text-purple-600" />
+                {t('productFiltering')}
+              </h3>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={productFilter.enabled}
+                  onChange={(e) => setProductFilter(prev => ({ ...prev, enabled: e.target.checked }))}
+                  className="mr-2"
+                />
+                <span className="text-sm">{t('enableProductFiltering')}</span>
+              </label>
+            </div>
+
+            {productFilter.enabled && (
+              <div className="space-y-4">
+                {/* Product Search */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('searchByProductTitle')}:</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        placeholder={t('enterProductTitle')}
+                        className="border rounded px-10 py-2 w-full"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">{t('searchBySku')}:</label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={skuSearchTerm}
+                        onChange={(e) => setSkuSearchTerm(e.target.value)}
+                        placeholder={t('enterSku')}
+                        className="border rounded px-10 py-2 w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Available Products */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">{t('availableProducts')}:</label>
+                  <div className="border rounded p-3 max-h-32 overflow-y-auto bg-gray-50">
+                    {loadingProducts ? (
+                      <div className="text-center py-2 text-gray-500">{t('loadingProducts')}</div>
+                    ) : (
+                      <div className="space-y-1">
+                        {getFilteredProducts().map((product) => (
+                          <div
+                            key={product.id}
+                            onClick={() => addProductToFilter(product)}
+                            className="flex justify-between items-center p-2 hover:bg-white rounded cursor-pointer text-sm"
+                          >
+                            <div>
+                              <span className="font-medium">{product.title}</span>
+                              {product.sku && <span className="text-gray-500 ml-2">({product.sku})</span>}
+                            </div>
+                            <span className="text-xs text-blue-600">{product.orderCount} {t('orders')}</span>
+                          </div>
+                        ))}
+                        {getFilteredProducts().length === 0 && (
+                          <div className="text-center py-2 text-gray-500">{t('noProductsFound')}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selected Products */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">{t('selectedProducts')}:</label>
+                  <div className="space-y-2">
+                    {productFilter.products.map((product, index) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-blue-50 rounded">
+                        <div>
+                          <span className="font-medium">{product.title}</span>
+                          {product.sku && <span className="text-gray-500 ml-2">({product.sku})</span>}
+                        </div>
+                        <Button
+                          onClick={() => removeProductFromFilter(index)}
+                          className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 text-xs"
+                        >
+                          {t('remove')}
+                        </Button>
+                      </div>
+                    ))}
+                    {productFilter.products.length === 0 && (
+                      <div className="text-center py-4 text-gray-500 border-2 border-dashed border-gray-300 rounded">
+                        {t('noProductsSelected')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Product Matching Logic */}
+                {productFilter.products.length > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">{t('productMatchingLogic')}:</label>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          value="ANY"
+                          checked={productFilter.logic === 'ANY'}
+                          onChange={(e) => setProductFilter(prev => ({ ...prev, logic: e.target.value as 'ALL' | 'ANY' }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">{t('ordersContainingAnyProducts')}</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="radio"
+                          value="ALL"
+                          checked={productFilter.logic === 'ALL'}
+                          onChange={(e) => setProductFilter(prev => ({ ...prev, logic: e.target.value as 'ALL' | 'ANY' }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm">{t('ordersContainingAllProducts')}</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+
           {/* Target Agents */}
           <Card className="p-4">
             <div className="flex justify-between items-center mb-3">
@@ -380,6 +627,25 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
                 <ArrowRight className="w-5 h-5 mr-2 text-blue-600" />
                 {t('distributionPreviewRoundRobin')}
               </h3>
+              
+              {/* Product Filter Summary */}
+              {productFilter.enabled && productFilter.products.length > 0 && (
+                <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded">
+                  <div className="flex items-center mb-2">
+                    <Filter className="w-4 h-4 mr-2 text-purple-600" />
+                    <span className="text-sm font-medium text-purple-800">{t('productFiltering')} {t('enabled')}</span>
+                  </div>
+                  <div className="text-xs text-purple-700">
+                    <div className="mb-1">
+                      <strong>{t('selectedProducts')}:</strong> {productFilter.products.map(p => p.title).join(', ')}
+                    </div>
+                    <div>
+                      <strong>{t('logic')}:</strong> {productFilter.logic === 'ALL' ? t('allSelectedProducts') : t('anySelectedProducts')}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-3">
                 <div className="space-y-2">
                   {targetAgents.map((targetAgent, index) => {

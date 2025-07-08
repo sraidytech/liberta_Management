@@ -72,6 +72,15 @@ router.get('/agents', async (req, res) => {
 });
 
 /**
+ * @route GET /api/v1/assignments/products
+ * @desc Get available products for bulk reassignment filtering
+ * @access ADMIN, TEAM_MANAGER, COORDINATEUR
+ */
+router.get('/products', async (req, res) => {
+  await assignmentController.getAvailableProducts(req, res);
+});
+
+/**
  * @route PUT /api/v1/assignments/agent/:agentId/availability
  * @desc Update agent availability status
  * @access ADMIN, TEAM_MANAGER, Own Agent

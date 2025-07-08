@@ -314,7 +314,7 @@ export default function AdminTicketsPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold">{t('tickets')}</h1>
-            <p className="text-gray-600">Manage support tickets from agents</p>
+            <p className="text-gray-600">{t('manageTicketsFromAgents')}</p>
           </div>
           <div className="text-sm text-gray-500">
             {filteredTickets.length} / {tickets.length} {t('tickets')}
@@ -330,7 +330,7 @@ export default function AdminTicketsPage() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search by title, order reference, or customer..."
+                  placeholder={t('searchByTitleOrderRefCustomer')}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -345,7 +345,7 @@ export default function AdminTicketsPage() {
                 onChange={(e) => setStatusFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="ALL">All Statuses</option>
+                <option value="ALL">{t('allStatuses')}</option>
                 <option value="OPEN">{t('openTicket')}</option>
                 <option value="IN_PROGRESS">{t('inProgressTicket')}</option>
                 <option value="WAITING_RESPONSE">{t('waitingResponse')}</option>
@@ -358,7 +358,7 @@ export default function AdminTicketsPage() {
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="ALL">All Priorities</option>
+                <option value="ALL">{t('allPriorities')}</option>
                 <option value="LOW">{t('lowPriority')}</option>
                 <option value="MEDIUM">{t('mediumPriority')}</option>
                 <option value="HIGH">{t('highPriority')}</option>
@@ -370,7 +370,7 @@ export default function AdminTicketsPage() {
                 onChange={(e) => setCategoryFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <option value="ALL">All Categories</option>
+                <option value="ALL">{t('allCategories')}</option>
                 <option value="CUSTOMER_ISSUE">{t('customerIssue')}</option>
                 <option value="PRODUCT_ISSUE">{t('productIssue')}</option>
                 <option value="DELIVERY_ISSUE">{t('deliveryIssue')}</option>
@@ -515,20 +515,20 @@ export default function AdminTicketsPage() {
                   <div className="space-y-4">
                     {/* Status and Priority */}
                     <div>
-                      <h3 className="font-medium mb-2">Status & Priority</h3>
+                      <h3 className="font-medium mb-2">{t('statusAndPriority')}</h3>
                       <div className="space-y-2">
                         <Badge className={`${getStatusColor(selectedTicket.status)} w-full justify-center`}>
                           {selectedTicket.status.replace('_', ' ')}
                         </Badge>
                         <Badge className={`${getPriorityColor(selectedTicket.priority)} w-full justify-center`}>
-                          {selectedTicket.priority} Priority
+                          {selectedTicket.priority} {t('priority')}
                         </Badge>
                       </div>
                     </div>
 
-                    {/* Quick Actions */}
+                    {/* {t('actions')} */}
                     <div>
-                      <h3 className="font-medium mb-2">Quick Actions</h3>
+                      <h3 className="font-medium mb-2">{t('actions')}</h3>
                       <div className="space-y-2">
                         {selectedTicket.status === 'OPEN' && (
                           <Button
@@ -565,19 +565,19 @@ export default function AdminTicketsPage() {
 
                     {/* Ticket Details */}
                     <div>
-                      <h3 className="font-medium mb-2">Details</h3>
+                      <h3 className="font-medium mb-2">{t('orderDetails')}</h3>
                       <div className="space-y-2 text-sm">
-                        <div><strong>Category:</strong> {getCategoryLabel(selectedTicket.category)}</div>
-                        <div><strong>Reporter:</strong> {selectedTicket.reporter.name}</div>
-                        <div><strong>Customer:</strong> {selectedTicket.order.customer.fullName}</div>
-                        <div><strong>Phone:</strong> {selectedTicket.order.customer.telephone}</div>
-                        <div><strong>Created:</strong> {formatDate(selectedTicket.createdAt)}</div>
+                        <div><strong>{t('category')}:</strong> {getCategoryLabel(selectedTicket.category)}</div>
+                        <div><strong>{t('ticketReportedBy')}:</strong> {selectedTicket.reporter.name}</div>
+                        <div><strong>{t('customer')}:</strong> {selectedTicket.order.customer.fullName}</div>
+                        <div><strong>{t('phone')}:</strong> {selectedTicket.order.customer.telephone}</div>
+                        <div><strong>{t('ticketCreatedAt')}:</strong> {formatDate(selectedTicket.createdAt)}</div>
                       </div>
                     </div>
 
                     {/* Description */}
                     <div>
-                      <h3 className="font-medium mb-2">Description</h3>
+                      <h3 className="font-medium mb-2">{t('ticketDescription')}</h3>
                       <p className="text-sm text-gray-600 bg-white p-3 rounded border">
                         {selectedTicket.description}
                       </p>
@@ -589,7 +589,7 @@ export default function AdminTicketsPage() {
                 <div className="flex-1 flex flex-col">
                   {/* Messages */}
                   <div className="flex-1 p-6 overflow-y-auto">
-                    <h3 className="font-medium mb-4">Messages ({selectedTicket.messages?.length || 0})</h3>
+                    <h3 className="font-medium mb-4">{t('ticketMessages')} ({selectedTicket.messages?.length || 0})</h3>
                     <div className="space-y-4">
                       {selectedTicket.messages?.length === 0 ? (
                         <p className="text-gray-500 text-center py-8">{t('noMessagesYet')}</p>
