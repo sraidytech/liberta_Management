@@ -1,5 +1,5 @@
-# Production Docker Compose Override
-# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# FIXED Optimized Production Docker Compose Override for 2-CPU VPS
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml up -d
 
 services:
   postgres:
@@ -13,8 +13,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 512M  # Reduced for 2-CPU server
           cpus: '0.5'
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c max_connections=50
+      -c effective_cache_size=256MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
 
   redis:
     volumes:
@@ -25,6 +34,13 @@ services:
         limits:
           memory: 256M
           cpus: '0.25'
+    command: >
+      redis-server
+      --maxmemory 200mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
 
   backend:
     environment:
@@ -44,11 +60,6 @@ services:
       - MAYSTRO_API_KEY_1=${MAYSTRO_API_KEY_1}
       - MAYSTRO_API_KEY_2=${MAYSTRO_API_KEY_2}
       - MAYSTRO_API_KEY_3=${MAYSTRO_API_KEY_3}
-      - MAYSTRO_API_KEY_4=${MAYSTRO_API_KEY_4}
-      - MAYSTRO_API_KEY_5=${MAYSTRO_API_KEY_5}
-      - MAYSTRO_API_KEY_1_NAME=${MAYSTRO_API_KEY_1_NAME}
-      - MAYSTRO_API_KEY_2_NAME=${MAYSTRO_API_KEY_2_NAME}
-      - MAYSTRO_API_KEY_3_NAME=${MAYSTRO_API_KEY_3_NAME}
       - MAYSTRO_BASE_URL=${MAYSTRO_BASE_URL}
     volumes:
       - ./backend:/app
@@ -58,8 +69,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
-          cpus: '1.0'
+          memory: 768M  # Reduced for 2-CPU server
+          cpus: '0.75'
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -85,7 +96,7 @@ services:
           memory: 512M
           cpus: '0.5'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
       timeout: 10s
       retries: 3
