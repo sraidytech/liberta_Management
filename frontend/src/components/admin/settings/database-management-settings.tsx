@@ -27,7 +27,7 @@ export function DatabaseManagementSettings() {
     setResults(prev => ({ ...prev, deleteOrders: null }));
     
     try {
-      const response = await fetch('/api/admin/delete-orders', {
+      const response = await fetch('/api/v1/admin/delete-orders', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ export function DatabaseManagementSettings() {
     setResults(prev => ({ ...prev, syncStores: null }));
     
     try {
-      const response = await fetch('/api/admin/sync-stores', {
+      const response = await fetch('/api/v1/admin/sync-stores', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -83,7 +83,7 @@ export function DatabaseManagementSettings() {
     setResults(prev => ({ ...prev, cleanupAssignments: null }));
     
     try {
-      const response = await fetch('/api/admin/cleanup-assignments', {
+      const response = await fetch('/api/v1/admin/cleanup-assignments', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
