@@ -143,7 +143,7 @@ export function DatabaseManagementSettings() {
           <Trash2 className="h-5 w-5 text-red-600" />
           Order Management
         </h3>
-        <p className="text-gray-600 mb-4">Delete all orders from the system. This action cannot be undone.</p>
+        <p className="text-gray-600 mb-4">Delete all orders from the system. This action cannot be undone. [UPDATED API ENDPOINT]</p>
         <Button
           onClick={handleDeleteAllOrders}
           disabled={loading === 'deleteOrders'}
