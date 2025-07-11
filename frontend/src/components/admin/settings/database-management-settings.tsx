@@ -59,17 +59,18 @@ export function DatabaseManagementSettings() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
       });
       
       const result = await response.json();
       setResults(prev => ({ ...prev, syncStores: result }));
     } catch (error) {
-      setResults(prev => ({ 
-        ...prev, 
-        syncStores: { 
-          success: false, 
-          message: error instanceof Error ? error.message : 'Unknown error' 
+      setResults(prev => ({
+        ...prev,
+        syncStores: {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error'
         }
       }));
     } finally {
@@ -88,6 +89,7 @@ export function DatabaseManagementSettings() {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
       });
       
