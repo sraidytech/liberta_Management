@@ -1,4 +1,4 @@
-import prisma from '@/config/database';
+import { prisma } from '@/config/database';
 import redis from '@/config/redis';
 import { NotificationType, UserRole } from '@prisma/client';
 

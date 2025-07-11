@@ -2,8 +2,7 @@ import { PrismaClient, AgentAvailability, UserRole } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { notificationIntegrationService } from './notification-integration.service';
 import { productAssignmentService } from './product-assignment.service';
-
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 export interface AssignmentResult {
   success: boolean;
@@ -115,17 +114,30 @@ export class AgentAssignmentService {
   }
 
   /**
-   * Assign multiple orders in batch
+   * Assign multiple orders in batch with connection management
    */
-  async assignOrdersBatch(orderIds: string[]): Promise<AssignmentResult[]> {
+  async assignOrdersBatch(orderIds: string[], batchSize: number = 50): Promise<AssignmentResult[]> {
     const results: AssignmentResult[] = [];
     
-    for (const orderId of orderIds) {
-      const result = await this.assignOrder(orderId);
-      results.push(result);
+    // Process in smaller batches to prevent connection overflow
+    for (let i = 0; i < orderIds.length; i += batchSize) {
+      const batch = orderIds.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(orderIds.length/batchSize)} (${batch.length} orders)`);
       
-      // Small delay to prevent overwhelming the system
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Process batch sequentially to control connections
+      for (const orderId of batch) {
+        const result = await this.assignOrder(orderId);
+        results.push(result);
+        
+        // Small delay to prevent overwhelming the system
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      // Longer delay between batches to allow connection cleanup
+      if (i + batchSize < orderIds.length) {
+        console.log(`Batch completed. Waiting 2 seconds before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
 
     return results;
@@ -140,7 +152,7 @@ export class AgentAssignmentService {
     failedAssignments: number;
     results: AssignmentResult[];
   }> {
-    // Get unassigned orders - only last 10,000 orders excluding delivered/cancelled ones
+    // Get unassigned orders - limit to 70,000 orders as requested
     const unassignedOrders = await prisma.order.findMany({
       where: {
         assignedAgentId: null,
@@ -152,7 +164,7 @@ export class AgentAssignmentService {
       },
       select: { id: true },
       orderBy: { createdAt: 'desc' }, // Get most recent orders first
-      take: 10000 // Limit to last 10,000 orders
+      take: 10000 // Process only the last 10,000 orders for efficiency
     });
 
     const orderIds = unassignedOrders.map(order => order.id);

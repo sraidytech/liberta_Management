@@ -2,7 +2,7 @@ import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 export interface EcoManagerOrder {
   id: number;

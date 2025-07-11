@@ -9,10 +9,11 @@ import { MaystroApiSettings } from '@/components/admin/settings/maystro-api-sett
 import { SystemSettings } from '@/components/admin/settings/system-settings';
 import { NoteTypesSettings } from '@/components/admin/settings/note-types-settings';
 import { WilayaDeliverySettings } from '@/components/admin/settings/wilaya-delivery-settings';
+import { DatabaseManagementSettings } from '@/components/admin/settings/database-management-settings';
 import { useLanguage } from '@/lib/language-context';
 import { createTranslator } from '@/lib/i18n';
 
-type SettingsTab = 'scheduler' | 'maystro' | 'system' | 'note-types' | 'wilaya-delivery';
+type SettingsTab = 'scheduler' | 'maystro' | 'system' | 'note-types' | 'wilaya-delivery' | 'database-management';
 
 export default function AdminSettingsPage() {
   const { language } = useLanguage();
@@ -25,6 +26,7 @@ export default function AdminSettingsPage() {
     { id: 'system' as SettingsTab, label: t('systemSettings'), icon: '⚙️' },
     { id: 'note-types' as SettingsTab, label: t('noteTypes'), icon: '📝' },
     { id: 'wilaya-delivery' as SettingsTab, label: t('wilayaDeliveryTimes'), icon: '🗺️' },
+    { id: 'database-management' as SettingsTab, label: 'Database Management', icon: '🗄️' },
   ];
 
   return (
@@ -65,6 +67,7 @@ export default function AdminSettingsPage() {
           {activeTab === 'system' && <SystemSettings />}
           {activeTab === 'note-types' && <NoteTypesSettings />}
           {activeTab === 'wilaya-delivery' && <WilayaDeliverySettings />}
+          {activeTab === 'database-management' && <DatabaseManagementSettings />}
         </div>
       </div>
     </AdminLayout>

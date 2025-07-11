@@ -356,8 +356,8 @@ ECOMANAGER_WEBHOOK_SECRET=your_production_ecomanager_webhook_secret
 MAYSTRO_WEBHOOK_SECRET=your_production_maystro_webhook_secret
 
 # Maystro API Configuration (configure with your actual keys)
-MAYSTRO_API_KEY=your_production_maystro_api_key
-MAYSTRO_API_KEY_1=your_client_a_production_api_key
+MAYSTRO_API_KEY=33ab96ca7b3b640a82793f252cded720b1788c09
+MAYSTRO_API_KEY_1=33ab96ca7b3b640a82793f252cded720b1788c09
 MAYSTRO_API_KEY_2=your_client_b_production_api_key
 MAYSTRO_API_KEY_3=your_backup_production_api_key
 
@@ -640,7 +640,7 @@ server {
     gzip on;
     gzip_vary on;
     gzip_min_length 1024;
-    gzip_proxied expired no-cache no-store private must-revalidate auth;
+    gzip_proxied expired no-cache no-store private auth;
     gzip_types text/plain text/css text/xml text/javascript application/x-javascript application/xml+rss application/javascript;
 }
 ```

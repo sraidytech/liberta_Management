@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { config } from '@/config/app';
-import prisma from '@/config/database';
+import { prisma } from '@/config/database';
 import { LoginRequest, RegisterRequest, AuthResponse } from '@/types';
 import { AgentAssignmentService } from '@/services/agent-assignment.service';
 import redis from '@/config/redis';

@@ -3,7 +3,7 @@ import { Redis } from 'ioredis';
 import { EcoManagerService } from './ecomanager.service';
 import { AgentAssignmentService } from './agent-assignment.service';
 
-const prisma = new PrismaClient();
+import { prisma } from '../config/database';
 
 export class SyncService {
   private redis: Redis;

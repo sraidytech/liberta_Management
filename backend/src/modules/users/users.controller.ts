@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { generateAgentCode } from '@/utils/helpers';
 import redis from '@/config/redis';
 
-const prisma = new PrismaClient();
+import { prisma } from '../../config/database';
 
 export class UsersController {
   // Check if an agent is online based on recent activity

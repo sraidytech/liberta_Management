@@ -6,7 +6,7 @@ import { getMaystroService } from '@/services/maystro.service';
 import { productAssignmentService } from '@/services/product-assignment.service';
 import { deliveryDelayService } from '@/services/delivery-delay.service';
 
-const prisma = new PrismaClient();
+import { prisma } from '../../config/database';
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 export class OrdersController {

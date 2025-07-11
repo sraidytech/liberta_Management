@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient, UserRole, AgentAvailability, OrderStatus } from '@prisma/client';
 import redis from '@/config/redis';
-import prisma from '@/config/database';
+import { prisma } from '@/config/database';
 
 export class AnalyticsController {
   /**

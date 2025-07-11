@@ -6,8 +6,7 @@ import rateLimit from 'express-rate-limit';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import { config, validateConfig } from '@/config/app';
-import { connectDatabase } from '@/config/database';
-import prisma from '@/config/database';
+import { prisma } from '@/config/database';
 import redis from '@/config/redis';
 import { SyncService } from '@/services/sync.service';
 import { AgentAssignmentService } from '@/services/agent-assignment.service';
@@ -32,6 +31,7 @@ import productAssignmentRoutes from '@/modules/product-assignments/product-assig
 import ticketRoutes from '@/modules/tickets/tickets.routes';
 import noteTypesRoutes from '@/modules/note-types/note-types.routes';
 import wilayaSettingsRoutes from '@/modules/wilaya-settings/wilaya-settings.routes';
+import adminRoutes from '@/modules/admin/admin.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -131,6 +131,7 @@ class App {
     this.app.use('/api/v1/tickets', authMiddleware, userRateLimit, ticketRoutes); // Ticket system routes with rate limiting
     this.app.use('/api/v1/note-types', authMiddleware, userRateLimit, noteTypesRoutes); // Note types management routes
     this.app.use('/api/v1/wilaya-settings', authMiddleware, userRateLimit, wilayaSettingsRoutes); // Wilaya delivery settings routes
+    this.app.use('/api/v1/admin', adminRoutes); // Admin management routes (auth middleware included in routes)
 
     // Root route
     this.app.get('/', (req, res) => {
@@ -358,7 +359,7 @@ class App {
       validateConfig();
 
       // Connect to database
-      await connectDatabase();
+      await prisma.$connect();
 
       // Test Redis connection
       await redis.ping();
