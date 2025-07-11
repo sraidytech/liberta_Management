@@ -7,48 +7,97 @@ export class AdminController {
   }
 
   /**
-   * Delete all orders from the database
+   * Delete all orders from the database in batches
    */
   async deleteAllOrders(req: Request, res: Response) {
     try {
-      console.log('🗑️ Starting deletion of all orders...');
+      console.log('🗑️ Starting batch deletion of all orders...');
 
-      // Delete in correct order to respect foreign key constraints
-      await prisma.$transaction(async (tx) => {
-        // Delete order items first
-        const deletedItems = await tx.orderItem.deleteMany({});
-        console.log(`Deleted ${deletedItems.count} order items`);
+      // Get total count first
+      const totalOrders = await prisma.order.count();
+      console.log(`📊 Total orders to delete: ${totalOrders}`);
 
-        // Delete activity logs
-        const deletedLogs = await tx.activityLog.deleteMany({});
-        console.log(`Deleted ${deletedLogs.count} activity logs`);
+      if (totalOrders === 0) {
+        return res.json({
+          success: true,
+          message: 'No orders to delete',
+          data: { totalDeleted: 0 }
+        });
+      }
 
-        // Delete agent activities related to orders
-        const deletedActivities = await tx.agentActivity.deleteMany({});
-        console.log(`Deleted ${deletedActivities.count} agent activities`);
+      const BATCH_SIZE = 1000; // Process 1000 orders at a time
+      let totalDeleted = 0;
+      let batchCount = 0;
 
-        // Delete notifications related to orders
-        const deletedNotifications = await tx.notification.deleteMany({});
-        console.log(`Deleted ${deletedNotifications.count} notifications`);
+      // Process in batches to prevent timeout and connection issues
+      while (true) {
+        batchCount++;
+        console.log(`🔄 Processing batch ${batchCount} (${BATCH_SIZE} orders)...`);
 
-        // Finally delete orders
-        const deletedOrders = await tx.order.deleteMany({});
-        console.log(`Deleted ${deletedOrders.count} orders`);
+        const batchResult = await prisma.$transaction(async (tx) => {
+          // Get a batch of order IDs
+          const orderBatch = await tx.order.findMany({
+            select: { id: true },
+            take: BATCH_SIZE
+          });
 
-        return {
-          orders: deletedOrders.count,
-          items: deletedItems.count,
-          logs: deletedLogs.count,
-          activities: deletedActivities.count,
-          notifications: deletedNotifications.count
-        };
-      });
+          if (orderBatch.length === 0) {
+            return { deletedCount: 0, finished: true };
+          }
 
-      console.log('✅ All orders deleted successfully');
+          const orderIds = orderBatch.map(order => order.id);
+
+          // Delete related data for this batch
+          const deletedItems = await tx.orderItem.deleteMany({
+            where: { orderId: { in: orderIds } }
+          });
+
+          // Delete activity logs (no orderId field, so delete all for simplicity)
+          const deletedLogs = await tx.activityLog.deleteMany({});
+
+          // Delete agent activities (no orderId field, so delete all for simplicity)
+          const deletedActivities = await tx.agentActivity.deleteMany({});
+
+          // Delete notifications related to orders
+          const deletedNotifications = await tx.notification.deleteMany({
+            where: { orderId: { in: orderIds } }
+          });
+
+          // Delete the orders themselves
+          const deletedOrders = await tx.order.deleteMany({
+            where: { id: { in: orderIds } }
+          });
+
+          console.log(`   ✅ Batch ${batchCount}: Deleted ${deletedOrders.count} orders, ${deletedItems.count} items, ${deletedLogs.count} logs`);
+
+          return {
+            deletedCount: deletedOrders.count,
+            finished: orderBatch.length < BATCH_SIZE
+          };
+        }, {
+          timeout: 60000 // 60 second timeout per batch
+        });
+
+        totalDeleted += batchResult.deletedCount;
+
+        // Small delay between batches to prevent overwhelming the database
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        if (batchResult.finished) {
+          break;
+        }
+      }
+
+      console.log(`✅ All orders deleted successfully! Total: ${totalDeleted} orders in ${batchCount} batches`);
 
       res.json({
         success: true,
-        message: 'All orders deleted successfully',
+        message: `Successfully deleted ${totalDeleted} orders in ${batchCount} batches`,
+        data: {
+          totalDeleted,
+          batchCount,
+          batchSize: BATCH_SIZE
+        },
         timestamp: new Date().toISOString()
       });
 
