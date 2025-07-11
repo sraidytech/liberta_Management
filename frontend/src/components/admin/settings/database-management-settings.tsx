@@ -27,10 +27,11 @@ export function DatabaseManagementSettings() {
     setResults(prev => ({ ...prev, deleteOrders: null }));
     
     try {
-      const response = await fetch('/api/v1/admin/delete-orders', {
+      const response = await fetch('/api/v1/orders/delete-all', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
       });
       
