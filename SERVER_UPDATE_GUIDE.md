@@ -51,6 +51,30 @@ docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up --b
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
 ```
 
+### Step 6: If Changes Don't Appear (Clear Docker Cache)
+```bash
+# Complete Docker cache clear and rebuild
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
+
+# Remove all containers, networks, and volumes
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down -v --remove-orphans
+
+# Clear Docker cache completely
+docker system prune -af --volumes
+
+# Remove all images (forces complete rebuild)
+docker image prune -af
+
+# Rebuild from scratch (no cache)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+
+# Start containers
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# Monitor startup
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
+```
+
 ---
 
 ## 🔧 Different Types of Updates
@@ -86,6 +110,130 @@ docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build 
 
 # Start containers
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+```
+
+### 🛡️ Database Safety Guide
+
+**IMPORTANT:** Understanding which commands affect your database:
+
+#### ✅ SAFE Commands (Database Preserved):
+```bash
+# These commands only clear Docker build cache and images - DATABASE IS SAFE
+docker system prune -af                    # Safe - no volumes
+docker image prune -af                     # Safe - only removes images
+docker builder prune -af                   # Safe - only build cache
+docker-compose build --no-cache            # Safe - only rebuilds code
+docker-compose down                        # Safe - stops containers but keeps volumes
+```
+
+#### ⚠️ DANGEROUS Commands (Can Delete Database):
+```bash
+# These commands include volume operations - CAN DELETE DATABASE
+docker-compose down -v                     # DANGER - removes volumes
+docker volume prune -f                     # DANGER - removes ALL volumes
+docker system prune -af --volumes          # DANGER - removes volumes
+```
+
+#### 🔒 Database Protection Types:
+
+**External Database (SAFE):**
+- If using AWS RDS, DigitalOcean Database, or external PostgreSQL
+- Docker cache clearing **CANNOT** affect external databases
+- **100% SAFE** to use any Docker commands
+
+**Docker Database Container (RISKY):**
+- Database runs in Docker container with volumes
+- Commands with `-v` or `--volumes` **WILL DELETE** database
+- Always avoid volume-related commands
+
+### 🧹 SAFE Cache Clear & Rebuild (Database Protected)
+```bash
+# RECOMMENDED: Safe cache clear that preserves database
+# ✅ This method is 100% safe for your database
+
+# Stop containers (but keep volumes/database)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
+
+# Clear cache safely (no volumes touched)
+docker system prune -af                    # Safe - no --volumes flag
+docker image prune -af                     # Safe - only removes images
+docker builder prune -af                   # Safe - only build cache
+
+# Rebuild from scratch
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull
+
+# Start with fresh containers
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# Monitor startup
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
+```
+
+### 🚨 NUCLEAR OPTION (Use Only If Necessary)
+```bash
+# ⚠️ WARNING: This WILL remove database data if using Docker database
+# Only use if you have database backups or using external database
+
+# Stop all containers and remove volumes
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down -v --remove-orphans
+
+# Remove ALL Docker data (including database)
+docker container prune -f
+docker image prune -af
+docker volume prune -f                     # ⚠️ DELETES DATABASE
+docker network prune -f
+docker builder prune -af
+docker system prune -af --volumes          # ⚠️ DELETES DATABASE
+
+# Rebuild everything from scratch
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+```
+
+### 🔄 Git + Docker SAFE Reset (Recommended)
+```bash
+# Fix Git ownership issue first
+git config --global --add safe.directory /home/liberta/liberta_Management
+
+# Pull latest changes
+git pull origin main
+
+# Safe Docker reset (preserves database)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
+docker system prune -af                    # Safe - no volumes
+docker image prune -af
+
+# Rebuild from scratch
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# Verify deployment
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml ps
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
+```
+
+### 🔄 Git + Docker COMPLETE Reset (Database Will Be Deleted)
+```bash
+# ⚠️ WARNING: This will delete your database - use only with backups
+
+# Fix Git ownership issue first
+git config --global --add safe.directory /home/liberta/liberta_Management
+
+# Pull latest changes
+git pull origin main
+
+# Complete Docker reset (DELETES DATABASE)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down -v --remove-orphans
+docker system prune -af --volumes          # ⚠️ DELETES DATABASE
+docker image prune -af
+
+# Rebuild from scratch
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# Verify deployment
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml ps
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
 ```
 
 ### 🌱 Seed Data Updates
@@ -126,7 +274,38 @@ docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -
 
 ## 🚨 Troubleshooting Common Issues
 
-### Issue 1: Containers Won't Start
+### Issue 1: Changes Not Showing After Rebuild
+```bash
+# This is the most common issue - Docker is using cached layers
+
+# SOLUTION 1: Force rebuild without cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# SOLUTION 2: Safe cache clear (preserves database)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
+docker system prune -af                    # Safe - no volumes
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# SOLUTION 3: Complete cache clear (⚠️ may delete database)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down -v
+docker system prune -af --volumes          # ⚠️ DELETES DATABASE
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# SOLUTION 4: Nuclear option (⚠️ DELETES DATABASE)
+docker stop $(docker ps -aq) 2>/dev/null || true
+docker rm $(docker ps -aq) 2>/dev/null || true
+docker rmi $(docker images -q) 2>/dev/null || true
+docker volume prune -f                     # ⚠️ DELETES DATABASE
+docker network prune -f
+docker system prune -af --volumes          # ⚠️ DELETES DATABASE
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+```
+
+### Issue 2: Containers Won't Start
 ```bash
 # Check Docker system status
 docker system df
@@ -139,7 +318,7 @@ docker image prune -f
 sudo systemctl restart docker
 ```
 
-### Issue 2: Database Connection Issues
+### Issue 3: Database Connection Issues
 ```bash
 # Check database container
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs postgres
@@ -148,7 +327,7 @@ docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs p
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml restart postgres backend
 ```
 
-### Issue 3: Migration Conflicts
+### Issue 4: Migration Conflicts
 ```bash
 # Check migration status
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec backend npx prisma migrate status
@@ -157,7 +336,16 @@ docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec b
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec backend npx prisma migrate reset --force
 ```
 
-### Issue 4: SSL Certificate Issues
+### Issue 5: Git Ownership Problems
+```bash
+# Fix Git ownership issue
+git config --global --add safe.directory /home/liberta/liberta_Management
+
+# Alternative: Fix directory ownership
+chown -R liberta:liberta /home/liberta/liberta_Management
+```
+
+### Issue 6: SSL Certificate Issues
 ```bash
 # Check certificate status
 sudo certbot certificates
@@ -274,8 +462,52 @@ docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml restar
 # Full rebuild
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up --build -d --force-recreate
 
+# Force rebuild (no cache)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# Safe cache clear and rebuild (preserves database)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
+docker system prune -af
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
+# Complete cache clear (⚠️ deletes database)
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down -v
+docker system prune -af --volumes
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
+
 # Emergency stop
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
+```
+
+### 🚀 One-Command SAFE Update (Recommended)
+```bash
+# Safe update with cache clearing (preserves database)
+cd /home/liberta/liberta_Management && \
+git config --global --add safe.directory /home/liberta/liberta_Management && \
+git pull origin main && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down && \
+docker system prune -af && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d && \
+echo "✅ Safe update complete! Monitoring logs..." && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
+```
+
+### 🚀 One-Command COMPLETE Update (⚠️ Deletes Database)
+```bash
+# Complete update with full cache clearing (⚠️ DELETES DATABASE)
+cd /home/liberta/liberta_Management && \
+git config --global --add safe.directory /home/liberta/liberta_Management && \
+git pull origin main && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down -v --remove-orphans && \
+docker system prune -af --volumes && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d && \
+echo "⚠️ Complete update finished (database was reset)! Monitoring logs..." && \
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f
 ```
 
 ### Application URLs
