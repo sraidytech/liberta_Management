@@ -93,8 +93,7 @@ services:
       # REMOVED: frontend_next volume to prevent caching issues
       # - frontend_next:/app/.next
     restart: always
-    # Force rebuild and start with cache clearing
-    command: ["sh", "-c", "rm -rf .next && npm run build && npm run start"]
+    command: ["npm", "run", "start"]
     deploy:
       resources:
         limits:
@@ -105,7 +104,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s  # Give more time for initial build
 
 volumes:
   postgres_prod_data:
