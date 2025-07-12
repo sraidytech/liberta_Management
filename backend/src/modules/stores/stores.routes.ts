@@ -9,6 +9,15 @@ router.post('/test-connection', requireAdmin as any, async (req, res) => {
   await StoresController.testConnection(req, res);
 });
 
+// Rate limit monitoring routes
+router.get('/rate-limits', requireAdmin as any, async (req, res) => {
+  await StoresController.getRateLimitStatus(req, res);
+});
+
+router.get('/:storeIdentifier/rate-limits', requireAdmin as any, async (req, res) => {
+  await StoresController.getStoreRateLimitStatus(req, res);
+});
+
 // Store management routes
 router.get('/', requireAdmin as any, async (req, res) => {
   await StoresController.getAllStores(req, res);

@@ -46,9 +46,17 @@ export class EcoManagerService {
   private axiosInstance: any;
   private redis: Redis;
   private config: EcoManagerConfig;
-  private readonly RATE_LIMIT_DELAY = 1000; // 1 second
+  private readonly RATE_LIMIT_DELAY = 250; // 250ms between requests (4 req/sec max)
   private readonly MAX_RETRIES = 3;
-  private readonly BATCH_SIZE = 100;
+  private readonly BATCH_SIZE = 20; // Reduced batch size to be safer
+  
+  // EcoManager API Rate Limits
+  private readonly RATE_LIMITS = {
+    perSecond: 4,     // Conservative: 4 instead of 5
+    perMinute: 40,    // Conservative: 40 instead of 50
+    perHour: 800,     // Conservative: 800 instead of 1000
+    perDay: 8000      // Conservative: 8000 instead of 10000
+  };
 
   constructor(config: EcoManagerConfig, redis: Redis) {
     this.config = config;
@@ -63,21 +71,9 @@ export class EcoManagerService {
       timeout: 30000 // 30 seconds timeout
     });
 
-    // Add request interceptor for rate limiting
+    // Add request interceptor for comprehensive rate limiting
     this.axiosInstance.interceptors.request.use(async (config: any) => {
-      const lastRequestKey = `ecomanager:last_request:${this.config.storeIdentifier}`;
-      const lastRequest = await this.redis.get(lastRequestKey);
-      
-      if (lastRequest) {
-        const timeSinceLastRequest = Date.now() - parseInt(lastRequest);
-        if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
-          await new Promise(resolve => 
-            setTimeout(resolve, this.RATE_LIMIT_DELAY - timeSinceLastRequest)
-          );
-        }
-      }
-      
-      await this.redis.set(lastRequestKey, Date.now().toString(), 'EX', 60);
+      await this.enforceRateLimit();
       return config;
     });
 
@@ -86,13 +82,143 @@ export class EcoManagerService {
       (response: any) => response,
       async (error: any) => {
         if (error.response?.status === 429) {
-          // Rate limit exceeded, wait longer
-          await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY * 2));
-          return this.axiosInstance.request(error.config);
+          // Rate limit exceeded - implement exponential backoff
+          const retryAfter = error.response.headers['retry-after'];
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : 60000; // Default 1 minute
+          
+          console.log(`🚫 Rate limit exceeded for ${this.config.storeName}. Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+          
+          // Don't retry automatically - let the calling code handle it
+          throw new Error(`Rate limit exceeded. Waited ${waitTime}ms. Please retry manually.`);
         }
+        
+        if (error.response?.status === 403) {
+          console.error(`🚫 403 Forbidden for ${this.config.storeName}. Check API token validity.`);
+          throw new Error(`API access forbidden. Please check your API token for ${this.config.storeName}.`);
+        }
+        
         throw error;
       }
     );
+  }
+
+  /**
+   * Enforce comprehensive rate limiting for EcoManager API
+   */
+  private async enforceRateLimit(): Promise<void> {
+    const storeId = this.config.storeIdentifier;
+    const now = Date.now();
+    
+    try {
+      // Check per-second rate limit
+      const secondKey = `ecomanager:rate:second:${storeId}:${Math.floor(now / 1000)}`;
+      const secondCount = await this.redis.incr(secondKey);
+      await this.redis.expire(secondKey, 2); // Expire after 2 seconds
+      
+      if (secondCount > this.RATE_LIMITS.perSecond) {
+        const waitTime = 1000 - (now % 1000) + 100; // Wait until next second + 100ms buffer
+        console.log(`⚠️ Per-second rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      // Check per-minute rate limit
+      const minuteKey = `ecomanager:rate:minute:${storeId}:${Math.floor(now / 60000)}`;
+      const minuteCount = await this.redis.incr(minuteKey);
+      await this.redis.expire(minuteKey, 120); // Expire after 2 minutes
+      
+      if (minuteCount > this.RATE_LIMITS.perMinute) {
+        const waitTime = 60000 - (now % 60000) + 1000; // Wait until next minute + 1s buffer
+        console.log(`⚠️ Per-minute rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      // Check per-hour rate limit
+      const hourKey = `ecomanager:rate:hour:${storeId}:${Math.floor(now / 3600000)}`;
+      const hourCount = await this.redis.incr(hourKey);
+      await this.redis.expire(hourKey, 7200); // Expire after 2 hours
+      
+      if (hourCount > this.RATE_LIMITS.perHour) {
+        const waitTime = 3600000 - (now % 3600000) + 5000; // Wait until next hour + 5s buffer
+        console.log(`⚠️ Per-hour rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      // Check per-day rate limit
+      const dayKey = `ecomanager:rate:day:${storeId}:${Math.floor(now / 86400000)}`;
+      const dayCount = await this.redis.incr(dayKey);
+      await this.redis.expire(dayKey, 172800); // Expire after 2 days
+      
+      if (dayCount > this.RATE_LIMITS.perDay) {
+        const waitTime = 86400000 - (now % 86400000) + 10000; // Wait until next day + 10s buffer
+        console.log(`⚠️ Per-day rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+      
+      // Always add minimum delay between requests
+      const lastRequestKey = `ecomanager:last_request:${storeId}`;
+      const lastRequest = await this.redis.get(lastRequestKey);
+      
+      if (lastRequest) {
+        const timeSinceLastRequest = now - parseInt(lastRequest);
+        if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
+          const waitTime = this.RATE_LIMIT_DELAY - timeSinceLastRequest;
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+      
+      await this.redis.set(lastRequestKey, Date.now().toString(), 'EX', 60);
+      
+    } catch (error) {
+      console.error(`❌ Rate limiting error for ${this.config.storeName}:`, error);
+      // Fallback to simple delay if Redis fails
+      await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
+    }
+  }
+
+  /**
+   * Get current rate limit status for monitoring
+   */
+  async getRateLimitStatus(): Promise<{
+    perSecond: number;
+    perMinute: number;
+    perHour: number;
+    perDay: number;
+    limits: {
+      perSecond: number;
+      perMinute: number;
+      perHour: number;
+      perDay: number;
+    };
+  }> {
+    const storeId = this.config.storeIdentifier;
+    const now = Date.now();
+    
+    try {
+      const [secondCount, minuteCount, hourCount, dayCount] = await Promise.all([
+        this.redis.get(`ecomanager:rate:second:${storeId}:${Math.floor(now / 1000)}`),
+        this.redis.get(`ecomanager:rate:minute:${storeId}:${Math.floor(now / 60000)}`),
+        this.redis.get(`ecomanager:rate:hour:${storeId}:${Math.floor(now / 3600000)}`),
+        this.redis.get(`ecomanager:rate:day:${storeId}:${Math.floor(now / 86400000)}`)
+      ]);
+      
+      return {
+        perSecond: parseInt(secondCount || '0'),
+        perMinute: parseInt(minuteCount || '0'),
+        perHour: parseInt(hourCount || '0'),
+        perDay: parseInt(dayCount || '0'),
+        limits: this.RATE_LIMITS
+      };
+    } catch (error) {
+      console.error(`❌ Failed to get rate limit status for ${this.config.storeName}:`, error);
+      return {
+        perSecond: 0,
+        perMinute: 0,
+        perHour: 0,
+        perDay: 0,
+        limits: this.RATE_LIMITS
+      };
+    }
   }
 
   /**
@@ -132,12 +258,18 @@ export class EcoManagerService {
 
     while (allOrders.length < maxOrders && consecutiveEmptyPages < maxEmptyPages) {
       try {
-        console.log(`Fetching page ${page} for ${this.config.storeName}...`);
+        // Reduced logging - only log every 10 pages
+        if (page % 10 === 1) {
+          console.log(`Fetching page ${page} for ${this.config.storeName}...`);
+        }
         const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
 
         if (!orders || orders.length === 0) {
           consecutiveEmptyPages++;
-          console.log(`Empty page ${page} for ${this.config.storeName} (${consecutiveEmptyPages}/${maxEmptyPages})`);
+          // Only log empty pages if verbose logging is needed
+          if (consecutiveEmptyPages === 1) {
+            console.log(`Reached empty pages for ${this.config.storeName} starting at page ${page}`);
+          }
           page++;
           continue;
         }
@@ -145,8 +277,10 @@ export class EcoManagerService {
         allOrders.push(...orders);
         consecutiveEmptyPages = 0;
         
-        console.log(`Fetched ${orders.length} orders from page ${page} for ${this.config.storeName}`);
-        console.log(`Total orders so far: ${allOrders.length}`);
+        // Reduced logging - only log progress every 10 pages
+        if (page % 10 === 0) {
+          console.log(`Progress: ${allOrders.length} orders fetched for ${this.config.storeName} (page ${page})`);
+        }
 
         // Break if we got less than batch size (last page)
         if (orders.length < this.BATCH_SIZE) {

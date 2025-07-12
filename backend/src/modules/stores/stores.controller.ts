@@ -437,4 +437,128 @@ export class StoresController {
       });
     }
   }
+
+  /**
+   * Get rate limit status for all stores
+   */
+  static async getRateLimitStatus(req: Request, res: Response) {
+    try {
+      const stores = await prisma.apiConfiguration.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          storeName: true,
+          storeIdentifier: true,
+          baseUrl: true
+        }
+      });
+
+      const rateLimitStatuses = await Promise.all(
+        stores.map(async (store) => {
+          try {
+            const ecoService = new EcoManagerService({
+              storeName: store.storeName,
+              storeIdentifier: store.storeIdentifier,
+              apiToken: 'dummy', // We only need rate limit status, not actual API calls
+              baseUrl: store.baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
+            }, redis);
+
+            const rateLimitStatus = await ecoService.getRateLimitStatus();
+            
+            return {
+              storeId: store.id,
+              storeName: store.storeName,
+              storeIdentifier: store.storeIdentifier,
+              rateLimits: rateLimitStatus,
+              status: 'active'
+            };
+          } catch (error) {
+            return {
+              storeId: store.id,
+              storeName: store.storeName,
+              storeIdentifier: store.storeIdentifier,
+              rateLimits: null,
+              status: 'error',
+              error: error instanceof Error ? error.message : 'Unknown error'
+            };
+          }
+        })
+      );
+
+      res.json({
+        success: true,
+        data: rateLimitStatuses,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error getting rate limit status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get rate limit status',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Get rate limit status for a specific store
+   */
+  static async getStoreRateLimitStatus(req: Request, res: Response) {
+    try {
+      const { storeIdentifier } = req.params;
+
+      const store = await prisma.apiConfiguration.findUnique({
+        where: { storeIdentifier },
+        select: {
+          id: true,
+          storeName: true,
+          storeIdentifier: true,
+          apiToken: true,
+          baseUrl: true,
+          isActive: true
+        }
+      });
+
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          message: 'Store not found'
+        });
+      }
+
+      if (!store.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: 'Store is not active'
+        });
+      }
+
+      const ecoService = new EcoManagerService({
+        storeName: store.storeName,
+        storeIdentifier: store.storeIdentifier,
+        apiToken: store.apiToken,
+        baseUrl: store.baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
+      }, redis);
+
+      const rateLimitStatus = await ecoService.getRateLimitStatus();
+
+      res.json({
+        success: true,
+        data: {
+          storeId: store.id,
+          storeName: store.storeName,
+          storeIdentifier: store.storeIdentifier,
+          rateLimits: rateLimitStatus,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.error('Error getting store rate limit status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get store rate limit status',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
 }
