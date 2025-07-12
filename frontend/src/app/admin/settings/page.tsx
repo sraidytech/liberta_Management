@@ -33,7 +33,7 @@ export default function AdminSettingsPage() {
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">{t('systemSettings')} - Updated</h1>
+          <h1 className="text-3xl font-bold">{t('systemSettings')} - Update</h1>
           <div className="text-sm text-gray-500">
             {t('updateSystemSettings')}
           </div>
