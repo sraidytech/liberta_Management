@@ -42,11 +42,11 @@ print_status "Checking current system status..."
 
 # Check current container status
 print_status "Current container status:"
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml ps
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml ps
 
 # Check database connections before fix
 print_status "Checking current database connections..."
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -c "SELECT count(*) as active_connections FROM pg_stat_activity;" || print_warning "Could not check current connections"
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -c "SELECT count(*) as active_connections FROM pg_stat_activity;" || print_warning "Could not check current connections"
 
 print_status "Starting deployment of connection pool fixes..."
 
@@ -57,11 +57,11 @@ BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
 
 # Backup database
 print_status "Backing up database..."
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml exec -T postgres pg_dump -U ${POSTGRES_USER:-libertaphonix_prod} ${POSTGRES_DB:-libertaphonix_production} > $BACKUP_DIR/database_backup.sql
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec -T postgres pg_dump -U ${POSTGRES_USER:-libertaphonix_prod} ${POSTGRES_DB:-libertaphonix_production} > $BACKUP_DIR/database_backup.sql
 print_success "Database backup created: $BACKUP_DIR/database_backup.sql"
 
 # Backup configuration files
-cp docker-compose.prod-optimized-fixed.yml $BACKUP_DIR/
+cp docker-compose.prod-optimized.yml $BACKUP_DIR/
 cp backend/src/config/database.ts $BACKUP_DIR/
 cp backend/src/services/agent-assignment.service.ts $BACKUP_DIR/
 cp backend/src/services/sync.service.ts $BACKUP_DIR/
@@ -72,16 +72,16 @@ print_success "Configuration files backed up to $BACKUP_DIR/"
 print_status "Step 2: Deploying connection pool fixes..."
 
 print_status "Stopping containers gracefully..."
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml down
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
 
 print_status "Clearing Docker cache safely (preserving database)..."
 docker system prune -af  # Safe - no volumes flag
 
 print_status "Rebuilding containers with connection pool fixes..."
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml build --no-cache --pull
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache --pull
 
 print_status "Starting containers with new configuration..."
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml up -d
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
 
 # Step 3: Wait for services to be ready
 print_status "Step 3: Waiting for services to be ready..."
@@ -89,7 +89,7 @@ print_status "Step 3: Waiting for services to be ready..."
 # Wait for PostgreSQL
 print_status "Waiting for PostgreSQL to be ready..."
 for i in {1..30}; do
-    if docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml exec -T postgres pg_isready -U ${POSTGRES_USER:-libertaphonix_prod} > /dev/null 2>&1; then
+    if docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec -T postgres pg_isready -U ${POSTGRES_USER:-libertaphonix_prod} > /dev/null 2>&1; then
         print_success "PostgreSQL is ready!"
         break
     fi
@@ -124,7 +124,7 @@ print_status "Step 4: Verifying connection pool fixes..."
 
 # Check PostgreSQL configuration
 print_status "Checking PostgreSQL max_connections setting..."
-MAX_CONN=$(docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -t -c "SHOW max_connections;" | xargs)
+MAX_CONN=$(docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -t -c "SHOW max_connections;" | xargs)
 if [ "$MAX_CONN" = "200" ]; then
     print_success "✅ PostgreSQL max_connections set to 200"
 else
@@ -133,12 +133,12 @@ fi
 
 # Check current connections
 print_status "Checking current database connections..."
-CURRENT_CONN=$(docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -t -c "SELECT count(*) FROM pg_stat_activity;" | xargs)
+CURRENT_CONN=$(docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -t -c "SELECT count(*) FROM pg_stat_activity;" | xargs)
 print_success "✅ Current active connections: $CURRENT_CONN"
 
 # Check container status
 print_status "Checking container health..."
-docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml ps
+docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml ps
 
 # Step 5: Monitor for connection issues
 print_status "Step 5: Monitoring for connection issues..."
@@ -148,15 +148,15 @@ for i in {1..10}; do
     echo "Monitor check $i/10..."
     
     # Check for connection errors in logs
-    if docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml logs --tail=50 backend | grep -i "too many clients" > /dev/null; then
+    if docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs --tail=50 backend | grep -i "too many clients" > /dev/null; then
         print_error "❌ Still seeing 'too many clients' errors!"
         print_status "Recent backend logs:"
-        docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml logs --tail=20 backend
+        docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs --tail=20 backend
         exit 1
     fi
     
     # Check connection count
-    CONN_COUNT=$(docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -t -c "SELECT count(*) FROM pg_stat_activity;" | xargs)
+    CONN_COUNT=$(docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml exec -T postgres psql -U ${POSTGRES_USER:-libertaphonix_prod} -d ${POSTGRES_DB:-libertaphonix_production} -t -c "SELECT count(*) FROM pg_stat_activity;" | xargs)
     echo "  Active connections: $CONN_COUNT"
     
     if [ "$CONN_COUNT" -gt 150 ]; then
@@ -222,5 +222,5 @@ echo "  • Admin Login: contact@libertaphoenix.com"
 echo ""
 print_success "Your LibertaPhonix system is now optimized for high-volume order processing!"
 print_status "Monitor the logs for the next hour to ensure stability:"
-print_status "docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml logs -f backend"
+print_status "docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml logs -f backend"
 echo ""
