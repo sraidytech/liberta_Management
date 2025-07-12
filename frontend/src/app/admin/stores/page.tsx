@@ -58,7 +58,8 @@ export default function StoresPage() {
   const fetchStores = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/v1/stores', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/stores`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -86,7 +87,8 @@ export default function StoresPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const url = editingStore ? `http://localhost:5000/api/v1/stores/${editingStore.id}` : 'http://localhost:5000/api/v1/stores';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const url = editingStore ? `${apiUrl}/api/v1/stores/${editingStore.id}` : `${apiUrl}/api/v1/stores`;
       const method = editingStore ? 'PUT' : 'POST';
 
       const response = await fetch(url, {
@@ -128,7 +130,8 @@ export default function StoresPage() {
   const handleToggleStatus = async (store: Store) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/v1/stores/${store.id}/toggle`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/stores/${store.id}/toggle`, {
         method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -156,7 +159,8 @@ export default function StoresPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/api/v1/stores/${store.id}`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/stores/${store.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -182,7 +186,8 @@ export default function StoresPage() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/v1/stores/test-connection', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/stores/test-connection`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

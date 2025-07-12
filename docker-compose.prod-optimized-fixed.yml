@@ -78,6 +78,8 @@ services:
       retries: 3
 
   frontend:
+    env_file:
+      - ./frontend/.env
     environment:
       - NODE_ENV=production
       - BACKEND_INTERNAL_URL=${BACKEND_INTERNAL_URL}
