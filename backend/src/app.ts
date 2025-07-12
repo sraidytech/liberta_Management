@@ -257,10 +257,23 @@ class App {
     // Make assignment service available globally
     (global as any).assignmentService = this.assignmentService;
     
-    // Start periodic assignment check (every 5 minutes)
+    // Start periodic assignment check with process locking (every 10 minutes)
     setInterval(async () => {
+      const lockKey = 'assignment:periodic_lock';
+      const lockValue = Date.now().toString();
+      
       try {
+        // Try to acquire lock with 15-minute expiration
+        const lockAcquired = await redis.set(lockKey, lockValue, 'PX', 15 * 60 * 1000, 'NX');
+        
+        if (!lockAcquired) {
+          console.log('⏳ Periodic assignment already running, skipping...');
+          return;
+        }
+        
+        console.log('🔒 Acquired periodic assignment lock');
         const result = await this.assignmentService.autoAssignUnassignedOrders();
+        
         if (result.successfulAssignments > 0) {
           console.log(`🎯 Periodic assignment: ${result.successfulAssignments} orders assigned`);
           
@@ -270,10 +283,25 @@ class App {
             source: 'periodic'
           });
         }
+        
+        // Release lock
+        await redis.del(lockKey);
+        console.log('🔓 Released periodic assignment lock');
+        
       } catch (error) {
         console.error('Periodic assignment error:', error);
+        // Ensure lock is released on error
+        try {
+          const currentLock = await redis.get(lockKey);
+          if (currentLock === lockValue) {
+            await redis.del(lockKey);
+            console.log('🔓 Released periodic assignment lock after error');
+          }
+        } catch (lockError) {
+          console.error('Error releasing lock:', lockError);
+        }
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 10 * 60 * 1000); // Increased from 5 to 10 minutes
     
     // Start periodic cleanup of inactive users (every 5 minutes)
     setInterval(async () => {

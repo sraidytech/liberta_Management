@@ -18,12 +18,18 @@ services:
     command: >
       postgres
       -c shared_buffers=128MB
-      -c max_connections=50
+      -c max_connections=200
       -c effective_cache_size=256MB
       -c maintenance_work_mem=64MB
       -c checkpoint_completion_target=0.9
       -c wal_buffers=16MB
       -c default_statistics_target=100
+      -c idle_in_transaction_session_timeout=300000
+      -c statement_timeout=300000
+      -c lock_timeout=30000
+      -c log_connections=on
+      -c log_disconnections=on
+      -c log_lock_waits=on
 
   redis:
     volumes:

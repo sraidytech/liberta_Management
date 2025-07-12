@@ -7,7 +7,7 @@ declare global {
   var __prisma: PrismaClient | undefined;
 }
 
-// Create connection URL with proper parameters
+// Create connection URL with optimized parameters for high-volume operations
 function createDatabaseUrl(maxConnections: number = 10) {
   const baseUrl = process.env.DATABASE_URL;
   if (!baseUrl) {
@@ -16,16 +16,17 @@ function createDatabaseUrl(maxConnections: number = 10) {
   
   // Check if URL already has parameters
   const separator = baseUrl.includes('?') ? '&' : '?';
-  return `${baseUrl}${separator}connection_limit=${maxConnections}&pool_timeout=20&connect_timeout=60`;
+  return `${baseUrl}${separator}connection_limit=${maxConnections}&pool_timeout=10&connect_timeout=30&socket_timeout=30&pgbouncer=true`;
 }
 
 if (process.env.NODE_ENV === 'production') {
-  // Production: Create a single instance with connection pooling for 30+ concurrent users
-  // Each user might need 1-2 connections, so we set to 40 to handle peak loads
+  // Production: Optimized connection pooling for high-volume operations
+  // Reduced from 40 to 15 to prevent connection exhaustion
+  // PostgreSQL max_connections is now 200, so we use 15 per service instance
   prisma = new PrismaClient({
     datasources: {
       db: {
-        url: createDatabaseUrl(40)
+        url: createDatabaseUrl(15)
       }
     },
     log: ['error', 'warn'],
@@ -48,8 +49,24 @@ if (process.env.NODE_ENV === 'production') {
   prisma = global.__prisma;
 }
 
+// Add connection monitoring
+setInterval(async () => {
+  try {
+    // Simple query to check connection health
+    await prisma.$queryRaw`SELECT 1`;
+    
+    // Log connection pool status in development
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔗 Database connection healthy');
+    }
+  } catch (error) {
+    console.error('❌ Database connection check failed:', error);
+  }
+}, 60000); // Check every minute
+
 // Graceful shutdown
 process.on('beforeExit', async () => {
+  console.log('🔌 Disconnecting from database...');
   await prisma.$disconnect();
 });
 

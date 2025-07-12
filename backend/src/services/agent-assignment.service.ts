@@ -116,27 +116,42 @@ export class AgentAssignmentService {
   /**
    * Assign multiple orders in batch with connection management
    */
-  async assignOrdersBatch(orderIds: string[], batchSize: number = 50): Promise<AssignmentResult[]> {
+  async assignOrdersBatch(orderIds: string[], batchSize: number = 5): Promise<AssignmentResult[]> {
     const results: AssignmentResult[] = [];
     
-    // Process in smaller batches to prevent connection overflow
+    // Process in much smaller batches to prevent connection overflow
+    // Reduced from 50 to 5 orders per batch to manage connections better
     for (let i = 0; i < orderIds.length; i += batchSize) {
       const batch = orderIds.slice(i, i + batchSize);
       console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(orderIds.length/batchSize)} (${batch.length} orders)`);
       
       // Process batch sequentially to control connections
       for (const orderId of batch) {
-        const result = await this.assignOrder(orderId);
-        results.push(result);
-        
-        // Small delay to prevent overwhelming the system
-        await new Promise(resolve => setTimeout(resolve, 50));
+        try {
+          const result = await this.assignOrder(orderId);
+          results.push(result);
+          
+          // Small delay to prevent overwhelming the system
+          await new Promise(resolve => setTimeout(resolve, 100));
+        } catch (error) {
+          console.error(`Error assigning order ${orderId}:`, error);
+          results.push({
+            success: false,
+            message: error instanceof Error ? error.message : 'Assignment failed',
+            orderId
+          });
+        }
       }
       
       // Longer delay between batches to allow connection cleanup
       if (i + batchSize < orderIds.length) {
-        console.log(`Batch completed. Waiting 2 seconds before next batch...`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log(`Batch completed. Waiting 5 seconds before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        
+        // Force garbage collection if available
+        if (global.gc) {
+          global.gc();
+        }
       }
     }
 
@@ -152,7 +167,7 @@ export class AgentAssignmentService {
     failedAssignments: number;
     results: AssignmentResult[];
   }> {
-    // Get unassigned orders - limit to 70,000 orders as requested
+    // Get unassigned orders - reduced limit to prevent connection exhaustion
     const unassignedOrders = await prisma.order.findMany({
       where: {
         assignedAgentId: null,
@@ -164,7 +179,7 @@ export class AgentAssignmentService {
       },
       select: { id: true },
       orderBy: { createdAt: 'desc' }, // Get most recent orders first
-      take: 10000 // Process only the last 10,000 orders for efficiency
+      take: 1000 // Reduced from 10,000 to 1,000 orders per run to prevent connection exhaustion
     });
 
     const orderIds = unassignedOrders.map(order => order.id);

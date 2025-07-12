@@ -70,7 +70,7 @@ export class SyncService {
 
     const results: { [storeIdentifier: string]: any } = {};
 
-    // Process each store
+    // Process each store with connection management
     for (const config of apiConfigs) {
       try {
         console.log(`Syncing store: ${config.storeName} (${config.storeIdentifier})`);
@@ -78,8 +78,13 @@ export class SyncService {
         const result = await this.syncStore(config.storeIdentifier);
         results[config.storeIdentifier] = result;
         
-        // Add delay between stores to respect rate limits
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Longer delay between stores to prevent connection exhaustion
+        await new Promise(resolve => setTimeout(resolve, 10000)); // Increased from 2s to 10s
+        
+        // Force garbage collection if available
+        if (global.gc) {
+          global.gc();
+        }
       } catch (error) {
         console.error(`Error syncing store ${config.storeIdentifier}:`, error);
         results[config.storeIdentifier] = {
@@ -136,10 +141,11 @@ export class SyncService {
     let syncedCount = 0;
     let errorCount = 0;
 
-    // Process orders in batches
-    const batchSize = 25;
+    // Process orders in smaller batches to prevent connection exhaustion
+    const batchSize = 10; // Reduced from 25 to 10
     for (let i = 0; i < newOrders.length; i += batchSize) {
       const batch = newOrders.slice(i, i + batchSize);
+      console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(newOrders.length/batchSize)} for ${apiConfig.storeName}`);
       
       for (const ecoOrder of batch) {
         try {
@@ -156,20 +162,23 @@ export class SyncService {
             });
             syncedCount++;
 
-            // Attempt to assign the new order immediately
-            try {
-              const assignmentResult = await this.assignmentService.assignOrder(newOrder.id);
-              if (assignmentResult.success) {
-                console.log(`✅ Order ${newOrder.reference} assigned to ${assignmentResult.assignedAgentName}`);
-              }
-            } catch (assignmentError) {
-              console.log(`⚠️ Could not assign order ${newOrder.reference} immediately, will be picked up by periodic assignment`);
-            }
+            // Skip immediate assignment to prevent connection exhaustion
+            // Orders will be assigned by the periodic assignment process
+            console.log(`📝 Order ${newOrder.reference} created, will be assigned by periodic process`);
           }
+          
+          // Small delay between orders to prevent overwhelming the database
+          await new Promise(resolve => setTimeout(resolve, 100));
         } catch (orderError) {
           console.error(`Error processing order ${ecoOrder.id}:`, orderError);
           errorCount++;
         }
+      }
+      
+      // Delay between batches to allow connection cleanup
+      if (i + batchSize < newOrders.length) {
+        console.log(`Batch completed. Waiting 3 seconds before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
 
