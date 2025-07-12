@@ -406,7 +406,7 @@ export class MaystroService {
                 trackingNumber: maystroOrder.tracking_number || maystroOrder.display_id || maystroOrder.instance_uuid,
                 alertedAt: maystroOrder.alerted_at ? new Date(maystroOrder.alerted_at) : null,
                 alertReason: maystroOrder.alert_reason,
-                abortReason: maystroOrder.abort_reason,
+                abortReason: maystroOrder.abort_reason ? String(maystroOrder.abort_reason) : null,
                 additionalMetaData,
                 maystroStatusCode: maystroOrder.status
               });
@@ -452,7 +452,7 @@ export class MaystroService {
               trackingNumber: orderUpdate.trackingNumber,
               alertedAt: orderUpdate.alertedAt,
               alertReason: orderUpdate.alertReason,
-              abortReason: orderUpdate.abortReason,
+              abortReason: orderUpdate.abortReason ? String(orderUpdate.abortReason) : null,
               additionalMetaData: orderUpdate.additionalMetaData,
               updatedAt: new Date()
             };
@@ -568,7 +568,7 @@ export class MaystroService {
             trackingNumber: maystroOrder.tracking_number || maystroOrder.display_id,
             alertedAt: maystroOrder.alerted_at ? new Date(maystroOrder.alerted_at) : null,
             alertReason: maystroOrder.alert_reason,
-            abortReason: maystroOrder.abort_reason,
+            abortReason: maystroOrder.abort_reason ? String(maystroOrder.abort_reason) : null,
             additionalMetaData: {
               maystro_id: maystroOrder.id,
               instance_uuid: maystroOrder.instance_uuid,
@@ -612,7 +612,7 @@ export class MaystroService {
                 trackingNumber: orderUpdate.trackingNumber,
                 alertedAt: orderUpdate.alertedAt,
                 alertReason: orderUpdate.alertReason,
-                abortReason: orderUpdate.abortReason,
+                abortReason: orderUpdate.abortReason ? String(orderUpdate.abortReason) : null,
                 additionalMetaData: orderUpdate.additionalMetaData,
                 updatedAt: orderUpdate.updatedAt
               }
