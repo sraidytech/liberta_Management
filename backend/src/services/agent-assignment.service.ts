@@ -145,8 +145,8 @@ export class AgentAssignmentService {
       
       // Longer delay between batches to allow connection cleanup
       if (i + batchSize < orderIds.length) {
-        console.log(`Batch completed. Waiting 1 second before next batch...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`Batch completed. Waiting 3 seconds before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
         
         // Force garbage collection if available
         if (global.gc) {

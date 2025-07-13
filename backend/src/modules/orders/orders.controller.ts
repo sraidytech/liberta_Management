@@ -252,29 +252,12 @@ export class OrdersController {
         }
       }
 
-      // 🚀 OPTIMIZED QUERY: Reduce data transfer and improve performance
-      const includeDetails = req.query.includeDetails !== 'false'; // Default true for backward compatibility
-      
+      // 🚀 OPTIMIZED QUERY: Always include required fields for frontend compatibility
       const [orders, totalCount] = await Promise.all([
         prisma.order.findMany({
           where,
-          select: {
-            id: true,
-            reference: true,
-            ecoManagerId: true,
-            status: true,
-            shippingStatus: true,
-            total: true,
-            createdAt: true,
-            updatedAt: true,
-            trackingNumber: true,
-            maystroOrderId: true,
-            assignedAgentId: true,
-            storeIdentifier: true,
-            notes: true,
-            internalNotes: true,
-            // Conditional includes based on request
-            customer: includeDetails ? {
+          include: {
+            customer: {
               select: {
                 id: true,
                 fullName: true,
@@ -282,15 +265,15 @@ export class OrdersController {
                 wilaya: true,
                 commune: true
               }
-            } : false,
-            assignedAgent: includeDetails ? {
+            },
+            assignedAgent: {
               select: {
                 id: true,
                 name: true,
                 agentCode: true
               }
-            } : false,
-            items: includeDetails ? {
+            },
+            items: {
               select: {
                 id: true,
                 title: true,
@@ -300,7 +283,7 @@ export class OrdersController {
                 sku: true,
                 productId: true
               }
-            } : false,
+            },
             _count: {
               select: {
                 items: true,
@@ -323,7 +306,7 @@ export class OrdersController {
       const includeDelay = req.query.includeDelay === 'true';
       let ordersWithDelay = orders;
       
-      if (includeDelay && includeDetails) {
+      if (includeDelay) {
         // Only calculate delays when explicitly requested and we have customer data
         const cacheKey = `order_delays:${JSON.stringify(orders.map(o => o.id))}`;
         let cachedDelays = await redis.get(cacheKey);

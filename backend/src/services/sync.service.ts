@@ -177,8 +177,8 @@ export class SyncService {
       
       // Delay between batches to allow connection cleanup
       if (i + batchSize < newOrders.length) {
-        console.log(`Batch completed. Waiting 1 second before next batch...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        console.log(`Batch completed. Waiting 5 seconds before next batch...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
     }
 

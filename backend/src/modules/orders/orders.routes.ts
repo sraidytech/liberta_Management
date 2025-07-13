@@ -1,20 +1,22 @@
 import { Router } from 'express';
 import { OrdersController } from './orders.controller';
+import { OptimizedOrdersController } from './orders-optimized.controller';
 import { authMiddleware, requireAdmin } from '@/common/middleware/auth';
 
 const router = Router();
 const ordersController = new OrdersController();
+const optimizedOrdersController = new OptimizedOrdersController();
 
 // Authentication is already applied at the app level
 
-// Get all orders with pagination and filtering
+// Get all orders with pagination and filtering - OPTIMIZED VERSION
 router.get('/', async (req, res) => {
-  await ordersController.getOrders(req, res);
+  await optimizedOrdersController.getOrders(req, res);
 });
 
-// Get unique shipping statuses
+// Get unique shipping statuses - OPTIMIZED VERSION
 router.get('/shipping-statuses', async (req, res) => {
-  await ordersController.getShippingStatuses(req, res);
+  await optimizedOrdersController.getShippingStatuses(req, res);
 });
 
 // Get dashboard statistics
