@@ -1,10 +1,10 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
-import { EcoManagerService } from '@/services/ecomanager.service';
-import { getMaystroService } from '@/services/maystro.service';
-import { productAssignmentService } from '@/services/product-assignment.service';
-import { deliveryDelayService } from '@/services/delivery-delay.service';
+import { EcoManagerService } from '../../services/ecomanager.service';
+import { getMaystroService } from '../../services/maystro.service';
+import { productAssignmentService } from '../../services/product-assignment.service';
+import { deliveryDelayService } from '../../services/delivery-delay.service';
 
 import { prisma } from '../../config/database';
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');

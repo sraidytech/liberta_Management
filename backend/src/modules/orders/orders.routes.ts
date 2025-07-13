@@ -9,14 +9,14 @@ const optimizedOrdersController = new OptimizedOrdersController();
 
 // Authentication is already applied at the app level
 
-// Get all orders with pagination and filtering - OPTIMIZED VERSION
+// Get all orders with pagination and filtering
 router.get('/', async (req, res) => {
-  await optimizedOrdersController.getOrders(req, res);
+  await ordersController.getOrders(req, res);
 });
 
-// Get unique shipping statuses - OPTIMIZED VERSION
+// Get unique shipping statuses
 router.get('/shipping-statuses', async (req, res) => {
-  await optimizedOrdersController.getShippingStatuses(req, res);
+  await ordersController.getShippingStatuses(req, res);
 });
 
 // Get dashboard statistics
