@@ -7,7 +7,7 @@
 
 set -e
 
-echo "🚀 LibertaPhonix Production Issues Fix Script"
+echo "� LibertaPhonix Production Issues Fix Script"
 echo "=============================================="
 
 # Colors for output

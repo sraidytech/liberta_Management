@@ -78,8 +78,31 @@ export class SyncService {
         const result = await this.syncStore(config.storeIdentifier);
         results[config.storeIdentifier] = result;
         
+        // After successful EcoManager sync, sync Maystro shipping status for this store
+        if (result.success) {
+          try {
+            console.log(`🚚 Syncing Maystro shipping status for ${config.storeIdentifier}...`);
+            const { getMaystroService } = await import('./maystro.service');
+            const maystroService = getMaystroService(this.redis);
+            
+            const maystroResult = await maystroService.syncShippingStatus(undefined, config.storeIdentifier);
+            console.log(`✅ Maystro sync for ${config.storeIdentifier}: ${maystroResult.updated} orders updated`);
+            
+            // Add Maystro results to the store result
+            result.maystroSync = {
+              updated: maystroResult.updated,
+              errors: maystroResult.errors
+            };
+          } catch (maystroError) {
+            console.error(`❌ Maystro sync failed for ${config.storeIdentifier}:`, maystroError);
+            result.maystroSync = {
+              error: maystroError instanceof Error ? maystroError.message : 'Unknown error'
+            };
+          }
+        }
+        
         // Longer delay between stores to prevent connection exhaustion
-        await new Promise(resolve => setTimeout(resolve, 10000)); // Increased from 2s to 10s
+        await new Promise(resolve => setTimeout(resolve, 15000)); // Increased to 15s for stability
         
         // Force garbage collection if available
         if (global.gc) {

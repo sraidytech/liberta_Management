@@ -815,18 +815,47 @@ export class EcoManagerService {
   }
 
   /**
-   * Test API connection
+   * Test API connection with retry mechanism
    */
-  async testConnection(): Promise<boolean> {
-    try {
-      const response = await this.axiosInstance.get('/orders', {
-        params: { per_page: 1, page: 1 }
-      });
-      
-      return response.status === 200;
-    } catch (error) {
-      console.error(`Connection test failed for ${this.config.storeName}:`, error);
-      return false;
+  async testConnection(maxRetries: number = 3): Promise<boolean> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Testing connection for ${this.config.storeName} (attempt ${attempt}/${maxRetries})`);
+        
+        const response = await this.axiosInstance.get('/orders', {
+          params: { per_page: 1, page: 1 },
+          timeout: 10000 // 10 second timeout
+        });
+        
+        if (response.status === 200) {
+          console.log(`✅ Connection successful for ${this.config.storeName}`);
+          return true;
+        }
+      } catch (error: any) {
+        console.error(`❌ Connection test failed for ${this.config.storeName} (attempt ${attempt}/${maxRetries}):`, error.message);
+        
+        // Handle specific error types
+        if (error.response?.status === 403) {
+          console.error(`🚫 403 Forbidden for ${this.config.storeName}. Check API token validity.`);
+          // Don't retry on 403 - it's an auth issue
+          return false;
+        }
+        
+        if (error.response?.status === 401) {
+          console.error(`🔐 401 Unauthorized for ${this.config.storeName}. API token may be invalid.`);
+          return false;
+        }
+        
+        // For other errors, wait before retrying
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000; // Exponential backoff
+          console.log(`⏳ Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
     }
+    
+    console.error(`❌ All connection attempts failed for ${this.config.storeName}`);
+    return false;
   }
 }

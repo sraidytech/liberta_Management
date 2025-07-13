@@ -252,17 +252,31 @@ export class OrdersController {
         }
       }
 
-      // 🚀 CRITICAL FIX: Add timeout protection to prevent database timeouts
+      // 🚀 OPTIMIZED QUERY: Simplified query to prevent timeouts
       let orders: any[] = [];
       let totalCount = 0;
 
       try {
-        // Add timeout protection - 15 seconds max
+        // Use optimized query with reduced timeout - 5 seconds max
         const [ordersResult, countResult] = await Promise.race([
           Promise.all([
             prisma.order.findMany({
               where,
-              include: {
+              select: {
+                id: true,
+                reference: true,
+                status: true,
+                shippingStatus: true,
+                total: true,
+                orderDate: true,
+                createdAt: true,
+                updatedAt: true,
+                storeIdentifier: true,
+                trackingNumber: true,
+                maystroOrderId: true,
+                alertedAt: true,
+                alertReason: true,
+                notes: true,
                 customer: {
                   select: {
                     id: true,
@@ -279,17 +293,6 @@ export class OrdersController {
                     agentCode: true
                   }
                 },
-                items: {
-                  select: {
-                    id: true,
-                    title: true,
-                    quantity: true,
-                    unitPrice: true,
-                    totalPrice: true,
-                    sku: true,
-                    productId: true
-                  }
-                },
                 _count: {
                   select: {
                     items: true,
@@ -298,16 +301,16 @@ export class OrdersController {
                 }
               },
               orderBy: {
-                [sortBy as string]: sortOrder
+                createdAt: 'desc' // Use indexed field for better performance
               },
               skip,
               take: Math.min(limitNum, 50) // Cap at 50 for performance
             }),
             prisma.order.count({ where })
           ]),
-          // 15 second timeout
+          // Reduced timeout to 5 seconds
           new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Database query timeout')), 15000)
+            setTimeout(() => reject(new Error('Database query timeout')), 5000)
           )
         ]) as [any[], number];
 
@@ -317,46 +320,41 @@ export class OrdersController {
       } catch (timeoutError) {
         console.error('❌ Database query timeout, using fallback query:', timeoutError);
         
-        // Fallback to simple query without complex joins
+        // Ultra-simple fallback query
         const [fallbackOrders, fallbackCount] = await Promise.all([
           prisma.order.findMany({
-            where: {
-              // Remove complex filters for fallback
-              status: where.status,
-              shippingStatus: where.shippingStatus,
-              storeIdentifier: where.storeIdentifier,
-              assignedAgentId: where.assignedAgentId,
-              createdAt: where.createdAt
-            },
-            include: {
+            select: {
+              id: true,
+              reference: true,
+              status: true,
+              shippingStatus: true,
+              total: true,
+              createdAt: true,
+              storeIdentifier: true,
               customer: {
                 select: {
                   id: true,
                   fullName: true,
-                  telephone: true,
-                  wilaya: true,
-                  commune: true
-                }
-              },
-              _count: {
-                select: {
-                  items: true,
-                  tickets: true
+                  telephone: true
                 }
               }
             },
-            orderBy: {
-              createdAt: 'desc' // Force simple sort
+            where: {
+              // Only use simple filters for fallback
+              ...(where.status && { status: where.status }),
+              ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
+              ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
             },
-            take: 25 // Limit for fallback
+            orderBy: {
+              createdAt: 'desc'
+            },
+            take: 25 // Smaller limit for fallback
           }),
           prisma.order.count({
             where: {
-              status: where.status,
-              shippingStatus: where.shippingStatus,
-              storeIdentifier: where.storeIdentifier,
-              assignedAgentId: where.assignedAgentId,
-              createdAt: where.createdAt
+              ...(where.status && { status: where.status }),
+              ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
+              ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
             }
           })
         ]);
@@ -364,7 +362,8 @@ export class OrdersController {
         orders = fallbackOrders.map(order => ({
           ...order,
           assignedAgent: null,
-          items: []
+          items: [],
+          _count: { items: 0, tickets: 0 }
         }));
         totalCount = fallbackCount;
       }

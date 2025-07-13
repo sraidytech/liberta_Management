@@ -308,9 +308,9 @@ export class MaystroService {
   }
 
   /**
-   * Sync shipping status for orders - OPTIMIZED APPROACH like Google Sheets script
+   * Sync shipping status for orders from ALL STORES - OPTIMIZED APPROACH
    */
-  async syncShippingStatus(orderReferences?: string[]): Promise<{
+  async syncShippingStatus(orderReferences?: string[], storeIdentifier?: string): Promise<{
     updated: number;
     errors: number;
     details: Array<{ reference: string; status: string; error?: string }>;
@@ -322,39 +322,48 @@ export class MaystroService {
     };
 
     try {
-      // Step 1: Fetch all orders from Maystro API first (like fetchLastOrders in your script)
-      console.log('🔄 Fetching orders from Maystro API...');
+      // Step 1: Fetch all orders from Maystro API first
+      console.log('🔄 Fetching orders from Maystro API for all stores...');
       const maystroOrders = await this.fetchAllOrders(7000); // Fetch 7000 orders from Maystro
       
-      // Step 2: Create a Map for fast lookup (like orderMap in your script)
+      // Step 2: Create a Map for fast lookup
       const orderMap = new Map(maystroOrders.map(order => [order.external_order_id, order]));
       console.log(`📦 Created order map with ${orderMap.size} Maystro orders`);
 
-      // Step 3: Get orders from database to sync
+      // Step 3: Get orders from database to sync (ALL STORES)
       let ordersToSync: any[] = [];
 
       if (orderReferences && orderReferences.length > 0) {
         // Sync specific orders
         ordersToSync = await prisma.order.findMany({
           where: {
-            reference: { in: orderReferences }
+            reference: { in: orderReferences },
+            ...(storeIdentifier && { storeIdentifier })
           },
           select: {
             id: true,
             reference: true,
             shippingStatus: true,
-            maystroOrderId: true
+            maystroOrderId: true,
+            storeIdentifier: true
           }
         });
       } else {
-        // Sync latest 10,000 orders (newest first)
+        // Sync latest orders from ALL STORES
+        const whereClause: any = {};
+        if (storeIdentifier) {
+          whereClause.storeIdentifier = storeIdentifier;
+        }
+
         ordersToSync = await prisma.order.findMany({
           select: {
             id: true,
             reference: true,
             shippingStatus: true,
-            maystroOrderId: true
+            maystroOrderId: true,
+            storeIdentifier: true
           },
+          where: whereClause,
           orderBy: {
             createdAt: 'desc' // Get newest orders first
           },
@@ -362,7 +371,7 @@ export class MaystroService {
         });
       }
 
-      console.log(`🔄 Syncing shipping status for ${ordersToSync.length} orders...`);
+      console.log(`🔄 Syncing shipping status for ${ordersToSync.length} orders from ${storeIdentifier || 'ALL STORES'}...`);
 
       // Step 4: Process orders in batches (like your script)
       const BATCH_SIZE = 100; // Process 100 orders at a time
