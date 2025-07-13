@@ -45,7 +45,7 @@ git log --oneline -5
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
 
 # These commands only clear Docker build cache and images - DATABASE IS SAFE
-docker system prune -af      
+docker system prune -af
 
 # Rebuild and restart with latest code
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up --build -d

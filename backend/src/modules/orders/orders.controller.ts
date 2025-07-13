@@ -73,11 +73,19 @@ export class OrdersController {
         hasAgentNotes
       } = req.query;
 
+      // 🚀 PERFORMANCE: Cache frequently accessed queries
+      const cacheKey = `orders:${JSON.stringify(req.query)}:${req.user?.id || 'anonymous'}`;
+      const cachedResult = await redis.get(cacheKey);
+      
+      if (cachedResult && !search) { // Don't cache search results as they change frequently
+        return res.json(JSON.parse(cachedResult));
+      }
+
       const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
+      const limitNum = Math.min(parseInt(limit as string), 100); // Cap at 100 for performance
       const skip = (pageNum - 1) * limitNum;
 
-      // Build where clause
+      // 🚀 PERFORMANCE: Build optimized where clause
       const where: any = {};
 
       // Handle multi-select status filter
@@ -174,14 +182,24 @@ export class OrdersController {
         
         if (!assignedAgentId) {
           // Only apply product filtering when browsing unassigned orders (no assignedAgentId filter)
-          const userAssignedProducts = await productAssignmentService.getUserAssignedProducts(user.id);
+          // 🚀 PERFORMANCE: Cache user product assignments for 5 minutes
+          const cacheKey = `user_products:${user.id}`;
+          let userAssignedProducts = await redis.get(cacheKey);
           
-          if (userAssignedProducts.length > 0) {
+          if (!userAssignedProducts) {
+            const products = await productAssignmentService.getUserAssignedProducts(user.id);
+            userAssignedProducts = JSON.stringify(products);
+            await redis.setex(cacheKey, 300, userAssignedProducts); // Cache for 5 minutes
+          }
+          
+          const products = JSON.parse(userAssignedProducts);
+          
+          if (products.length > 0) {
             // Filter orders that contain at least one product assigned to the user
             where.items = {
               some: {
                 title: {
-                  in: userAssignedProducts
+                  in: products
                 }
               }
             };
@@ -234,13 +252,29 @@ export class OrdersController {
         }
       }
 
-      // 🚀 PROFESSIONAL SOLUTION: Include ticket counts directly in the query
-      // This eliminates the need for separate API calls and prevents 429 errors
+      // 🚀 OPTIMIZED QUERY: Reduce data transfer and improve performance
+      const includeDetails = req.query.includeDetails !== 'false'; // Default true for backward compatibility
+      
       const [orders, totalCount] = await Promise.all([
         prisma.order.findMany({
           where,
-          include: {
-            customer: {
+          select: {
+            id: true,
+            reference: true,
+            ecoManagerId: true,
+            status: true,
+            shippingStatus: true,
+            total: true,
+            createdAt: true,
+            updatedAt: true,
+            trackingNumber: true,
+            maystroOrderId: true,
+            assignedAgentId: true,
+            storeIdentifier: true,
+            notes: true,
+            internalNotes: true,
+            // Conditional includes based on request
+            customer: includeDetails ? {
               select: {
                 id: true,
                 fullName: true,
@@ -248,19 +282,29 @@ export class OrdersController {
                 wilaya: true,
                 commune: true
               }
-            },
-            assignedAgent: {
+            } : false,
+            assignedAgent: includeDetails ? {
               select: {
                 id: true,
                 name: true,
                 agentCode: true
               }
-            },
-            items: true,
+            } : false,
+            items: includeDetails ? {
+              select: {
+                id: true,
+                title: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true,
+                sku: true,
+                productId: true
+              }
+            } : false,
             _count: {
               select: {
                 items: true,
-                tickets: true  // 🎯 CRITICAL: Include ticket count in the main query
+                tickets: true
               }
             }
           },
@@ -275,16 +319,39 @@ export class OrdersController {
 
       const totalPages = Math.ceil(totalCount / limitNum);
 
-      // Calculate delay information for all orders
-      const delayMap = await deliveryDelayService.calculateOrdersDelay(orders);
+      // 🚀 PERFORMANCE: Make delay calculation optional and cached
+      const includeDelay = req.query.includeDelay === 'true';
+      let ordersWithDelay = orders;
       
-      // Add delay information to each order
-      const ordersWithDelay = orders.map(order => ({
-        ...order,
-        delayInfo: delayMap.get(order.id) || null
-      }));
+      if (includeDelay && includeDetails) {
+        // Only calculate delays when explicitly requested and we have customer data
+        const cacheKey = `order_delays:${JSON.stringify(orders.map(o => o.id))}`;
+        let cachedDelays = await redis.get(cacheKey);
+        
+        if (!cachedDelays) {
+          // Transform orders to match the expected interface for delay service
+          const ordersForDelay = orders.map(order => ({
+            id: order.id,
+            orderDate: order.createdAt,
+            shippingStatus: order.shippingStatus,
+            customer: order.customer || { wilaya: '' }
+          }));
+          
+          const delayMap = await deliveryDelayService.calculateOrdersDelay(ordersForDelay);
+          cachedDelays = JSON.stringify(Array.from(delayMap.entries()));
+          await redis.setex(cacheKey, 180, cachedDelays); // Cache for 3 minutes
+        }
+        
+        const delayEntries = JSON.parse(cachedDelays);
+        const delayMap = new Map(delayEntries);
+        
+        ordersWithDelay = orders.map(order => ({
+          ...order,
+          delayInfo: delayMap.get(order.id) || null
+        }));
+      }
 
-      res.json({
+      const response = {
         success: true,
         data: {
           orders: ordersWithDelay,
@@ -297,7 +364,14 @@ export class OrdersController {
             hasPrev: pageNum > 1
           }
         }
-      });
+      };
+
+      // 🚀 PERFORMANCE: Cache the response for 60 seconds (non-search queries only)
+      if (!search && totalCount < 1000) { // Only cache smaller result sets
+        await redis.setex(cacheKey, 60, JSON.stringify(response));
+      }
+
+      res.json(response);
     } catch (error) {
       console.error('Get orders error:', error);
       res.status(500).json({
