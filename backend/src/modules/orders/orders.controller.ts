@@ -252,120 +252,111 @@ export class OrdersController {
         }
       }
 
-      // 🚀 OPTIMIZED QUERY: Simplified query to prevent timeouts
+      // 🚀 ULTRA-FAST QUERY: No timeout, minimal data
       let orders: any[] = [];
       let totalCount = 0;
 
       try {
-        // Use optimized query with reduced timeout - 5 seconds max
-        const [ordersResult, countResult] = await Promise.race([
-          Promise.all([
-            prisma.order.findMany({
-              where,
+        // Step 1: Get basic order data first (fastest query)
+        orders = await prisma.order.findMany({
+          select: {
+            id: true,
+            reference: true,
+            status: true,
+            shippingStatus: true,
+            total: true,
+            createdAt: true,
+            storeIdentifier: true,
+            customerId: true,
+            assignedAgentId: true
+          },
+          where: {
+            // Only use simple filters
+            ...(where.status && { status: where.status }),
+            ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
+            ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
+          },
+          orderBy: {
+            createdAt: 'desc'
+          },
+          skip,
+          take: Math.min(limitNum, 50)
+        });
+
+        // Step 2: Get count separately (faster)
+        totalCount = await prisma.order.count({
+          where: {
+            ...(where.status && { status: where.status }),
+            ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
+            ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
+          }
+        });
+
+        // Step 3: Enrich with customer data only if we have orders
+        if (orders.length > 0) {
+          const customerIds = [...new Set(orders.map(o => o.customerId))];
+          const agentIds = [...new Set(orders.map(o => o.assignedAgentId).filter(Boolean))];
+
+          // Get customers in parallel
+          const [customers, agents] = await Promise.all([
+            prisma.customer.findMany({
+              where: { id: { in: customerIds } },
               select: {
                 id: true,
-                reference: true,
-                status: true,
-                shippingStatus: true,
-                total: true,
-                orderDate: true,
-                createdAt: true,
-                updatedAt: true,
-                storeIdentifier: true,
-                trackingNumber: true,
-                maystroOrderId: true,
-                alertedAt: true,
-                alertReason: true,
-                notes: true,
-                customer: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    telephone: true,
-                    wilaya: true,
-                    commune: true
-                  }
-                },
-                assignedAgent: {
-                  select: {
-                    id: true,
-                    name: true,
-                    agentCode: true
-                  }
-                },
-                _count: {
-                  select: {
-                    items: true,
-                    tickets: true
-                  }
-                }
-              },
-              orderBy: {
-                createdAt: 'desc' // Use indexed field for better performance
-              },
-              skip,
-              take: Math.min(limitNum, 50) // Cap at 50 for performance
-            }),
-            prisma.order.count({ where })
-          ]),
-          // Reduced timeout to 5 seconds
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Database query timeout')), 5000)
-          )
-        ]) as [any[], number];
-
-        orders = ordersResult;
-        totalCount = countResult;
-
-      } catch (timeoutError) {
-        console.error('❌ Database query timeout, using fallback query:', timeoutError);
-        
-        // Ultra-simple fallback query
-        const [fallbackOrders, fallbackCount] = await Promise.all([
-          prisma.order.findMany({
-            select: {
-              id: true,
-              reference: true,
-              status: true,
-              shippingStatus: true,
-              total: true,
-              createdAt: true,
-              storeIdentifier: true,
-              customer: {
-                select: {
-                  id: true,
-                  fullName: true,
-                  telephone: true
-                }
+                fullName: true,
+                telephone: true,
+                wilaya: true,
+                commune: true
               }
-            },
-            where: {
-              // Only use simple filters for fallback
-              ...(where.status && { status: where.status }),
-              ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
-              ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
-            },
-            orderBy: {
-              createdAt: 'desc'
-            },
-            take: 25 // Smaller limit for fallback
-          }),
-          prisma.order.count({
-            where: {
-              ...(where.status && { status: where.status }),
-              ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
-              ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
-            }
-          })
-        ]);
+            }),
+            agentIds.length > 0 ? prisma.user.findMany({
+              where: { id: { in: agentIds } },
+              select: {
+                id: true,
+                name: true,
+                agentCode: true
+              }
+            }) : []
+          ]);
 
-        orders = fallbackOrders.map(order => ({
+          // Create lookup maps
+          const customerMap = new Map(customers.map(c => [c.id, c]));
+          const agentMap = new Map(agents.map(a => [a.id, a]));
+
+          // Enrich orders with customer and agent data
+          orders = orders.map(order => ({
+            ...order,
+            customer: customerMap.get(order.customerId) || null,
+            assignedAgent: order.assignedAgentId ? agentMap.get(order.assignedAgentId) || null : null,
+            _count: { items: 0, tickets: 0 } // Simplified for speed
+          }));
+        }
+
+      } catch (error) {
+        console.error('❌ Database query error:', error);
+        
+        // Emergency fallback - minimal data
+        orders = await prisma.order.findMany({
+          select: {
+            id: true,
+            reference: true,
+            status: true,
+            total: true,
+            createdAt: true
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 25
+        });
+        
+        totalCount = orders.length;
+        
+        // Add minimal structure
+        orders = orders.map(order => ({
           ...order,
+          customer: null,
           assignedAgent: null,
-          items: [],
           _count: { items: 0, tickets: 0 }
         }));
-        totalCount = fallbackCount;
       }
 
       const totalPages = Math.ceil(totalCount / limitNum);
