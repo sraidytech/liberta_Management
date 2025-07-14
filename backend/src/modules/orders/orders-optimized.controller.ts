@@ -66,7 +66,7 @@ export class OptimizedOrdersController {
         search,
         startDate,
         endDate,
-        sortBy = 'createdAt',
+        sortBy = 'orderDate',
         sortOrder = 'desc',
         excludeStatus,
         noteTypes,
@@ -277,7 +277,7 @@ export class OptimizedOrdersController {
               storeIdentifier: true
             },
             orderBy: {
-              createdAt: 'desc' // Force simple sort
+              orderDate: 'desc' // Force simple sort by order date
             },
             take: Math.min(limitNum, 25) // Limit for fallback
           }),

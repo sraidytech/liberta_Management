@@ -817,32 +817,247 @@ export class EcoManagerService {
   /**
    * Test API connection with retry mechanism
    */
+  /**
+   * Validate API token format and presence
+   */
+  private validateApiToken(): {
+    isValid: boolean;
+    issues: string[];
+    tokenPreview: string;
+  } {
+    const issues: string[] = [];
+    let tokenPreview = 'MISSING';
+
+    if (!this.config.apiToken) {
+      issues.push('API token is missing');
+    } else if (this.config.apiToken.trim() === '') {
+      issues.push('API token is empty');
+    } else {
+      tokenPreview = `...${this.config.apiToken.slice(-4)}`;
+      
+      if (this.config.apiToken.length < 10) {
+        issues.push('API token appears to be too short');
+      }
+      
+      if (!/^[a-zA-Z0-9]+$/.test(this.config.apiToken)) {
+        issues.push('API token contains invalid characters');
+      }
+    }
+
+    return {
+      isValid: issues.length === 0,
+      issues,
+      tokenPreview
+    };
+  }
+
+  /**
+   * Diagnose connection error and provide specific solutions
+   */
+  private diagnoseConnectionError(error: any, attempt: number): {
+    errorType: string;
+    description: string;
+    solutions: string[];
+    shouldRetry: boolean;
+  } {
+    const status = error.response?.status;
+    const message = error.message || 'Unknown error';
+
+    if (status === 403) {
+      return {
+        errorType: 'API_AUTHENTICATION_FAILED',
+        description: 'API access forbidden - token invalid or expired',
+        solutions: [
+          'Login to EcoManager dashboard',
+          'Navigate to API settings',
+          `Regenerate API token for ${this.config.storeName}`,
+          'Update token in LibertaPhonix admin panel',
+          'Verify API permissions for your account'
+        ],
+        shouldRetry: false
+      };
+    }
+
+    if (status === 401) {
+      return {
+        errorType: 'API_TOKEN_UNAUTHORIZED',
+        description: 'API token is invalid or missing',
+        solutions: [
+          'Check API token format and validity',
+          'Ensure token has proper permissions',
+          'Regenerate token if expired',
+          'Contact EcoManager support if issue persists'
+        ],
+        shouldRetry: false
+      };
+    }
+
+    if (status === 429) {
+      return {
+        errorType: 'RATE_LIMIT_EXCEEDED',
+        description: 'Too many requests - rate limit exceeded',
+        solutions: [
+          'Wait for rate limit to reset',
+          'Reduce sync frequency',
+          'Check rate limit quotas in EcoManager',
+          'Contact support to increase limits'
+        ],
+        shouldRetry: true
+      };
+    }
+
+    if (message.includes('timeout') || message.includes('ECONNRESET')) {
+      return {
+        errorType: 'NETWORK_CONNECTIVITY',
+        description: 'Network connection timeout or reset',
+        solutions: [
+          'Check server internet connectivity',
+          'Verify EcoManager API endpoints are accessible',
+          'Check firewall settings',
+          'Try again in a few minutes'
+        ],
+        shouldRetry: true
+      };
+    }
+
+    if (status >= 500) {
+      return {
+        errorType: 'SERVER_ERROR',
+        description: 'EcoManager server error',
+        solutions: [
+          'EcoManager API is experiencing issues',
+          'Wait and retry in a few minutes',
+          'Check EcoManager status page',
+          'Contact EcoManager support if persistent'
+        ],
+        shouldRetry: true
+      };
+    }
+
+    return {
+      errorType: 'UNKNOWN_ERROR',
+      description: `Unexpected error: ${message}`,
+      solutions: [
+        'Check network connectivity',
+        'Verify API configuration',
+        'Contact technical support',
+        'Check server logs for more details'
+      ],
+      shouldRetry: attempt < 2 // Only retry once for unknown errors
+    };
+  }
+
+  /**
+   * Get comprehensive connection diagnostics
+   */
+  private async getConnectionDiagnostics(): Promise<{
+    endpoint: string;
+    tokenStatus: any;
+    rateLimitStatus: any;
+    networkTest: string;
+  }> {
+    const endpoint = `${this.config.baseUrl}/orders`;
+    const tokenStatus = this.validateApiToken();
+    
+    let rateLimitStatus;
+    try {
+      rateLimitStatus = await this.getRateLimitStatus();
+    } catch (error) {
+      rateLimitStatus = { error: 'Could not check rate limits' };
+    }
+
+    // Simple network test
+    let networkTest = 'Unknown';
+    try {
+      const url = new URL(this.config.baseUrl);
+      networkTest = `Connecting to ${url.hostname}:${url.port || (url.protocol === 'https:' ? 443 : 80)}`;
+    } catch (error) {
+      networkTest = 'Invalid base URL format';
+    }
+
+    return {
+      endpoint,
+      tokenStatus,
+      rateLimitStatus,
+      networkTest
+    };
+  }
+
+  /**
+   * Test connection with comprehensive diagnostics and logging
+   */
   async testConnection(maxRetries: number = 3): Promise<boolean> {
+    console.log(`🔌 [Connection Test] Starting comprehensive API connectivity test...`);
+    
+    // Get initial diagnostics
+    const diagnostics = await this.getConnectionDiagnostics();
+    
+    console.log(`📋 [Connection Diagnostics] ${this.config.storeName}:`);
+    console.log(`   - API Endpoint: ${diagnostics.endpoint}`);
+    console.log(`   - Token Status: ${diagnostics.tokenStatus.isValid ? '✅' : '❌'} ${diagnostics.tokenStatus.tokenPreview}`);
+    console.log(`   - Network Test: ${diagnostics.networkTest}`);
+    
+    if (diagnostics.tokenStatus.issues.length > 0) {
+      console.log(`   ⚠️ Token Issues:`);
+      diagnostics.tokenStatus.issues.forEach((issue: string) => {
+        console.log(`      - ${issue}`);
+      });
+    }
+
+    if (diagnostics.rateLimitStatus.error) {
+      console.log(`   ⚠️ Rate Limit Check: ${diagnostics.rateLimitStatus.error}`);
+    } else {
+      console.log(`   📊 Rate Limits: ${diagnostics.rateLimitStatus.perSecond}/${diagnostics.rateLimitStatus.limits.perSecond} per second`);
+    }
+
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const attemptStartTime = Date.now();
+      
       try {
         console.log(`🔄 Testing connection for ${this.config.storeName} (attempt ${attempt}/${maxRetries})`);
+        console.log(`   - Request: GET /orders?per_page=1&page=1`);
+        console.log(`   - Timeout: 10 seconds`);
+        console.log(`   - Headers: Authorization: Bearer ${diagnostics.tokenStatus.tokenPreview}`);
         
         const response = await this.axiosInstance.get('/orders', {
           params: { per_page: 1, page: 1 },
           timeout: 10000 // 10 second timeout
         });
         
+        const responseTime = Date.now() - attemptStartTime;
+        
         if (response.status === 200) {
-          console.log(`✅ Connection successful for ${this.config.storeName}`);
+          console.log(`✅ [Connection Success] ${this.config.storeName} API test passed:`);
+          console.log(`   - Response Time: ${responseTime}ms`);
+          console.log(`   - Status Code: ${response.status}`);
+          console.log(`   - Response Size: ${JSON.stringify(response.data).length} bytes`);
+          console.log(`   - API Version: ${response.headers['api-version'] || 'Unknown'}`);
+          console.log(`   - Server: ${response.headers['server'] || 'Unknown'}`);
           return true;
         }
       } catch (error: any) {
-        console.error(`❌ Connection test failed for ${this.config.storeName} (attempt ${attempt}/${maxRetries}):`, error.message);
+        const responseTime = Date.now() - attemptStartTime;
+        const diagnosis = this.diagnoseConnectionError(error, attempt);
         
-        // Handle specific error types
-        if (error.response?.status === 403) {
-          console.error(`🚫 403 Forbidden for ${this.config.storeName}. Check API token validity.`);
-          // Don't retry on 403 - it's an auth issue
-          return false;
+        console.error(`❌ Connection test failed for ${this.config.storeName} (attempt ${attempt}/${maxRetries}):`);
+        console.error(`   - Response Time: ${responseTime}ms`);
+        console.error(`   - Error Type: ${diagnosis.errorType}`);
+        console.error(`   - Description: ${diagnosis.description}`);
+        console.error(`   - HTTP Status: ${error.response?.status || 'No response'}`);
+        console.error(`   - Error Message: ${error.message}`);
+        
+        if (error.response?.data) {
+          console.error(`   - Response Data: ${JSON.stringify(error.response.data).substring(0, 200)}`);
         }
-        
-        if (error.response?.status === 401) {
-          console.error(`🔐 401 Unauthorized for ${this.config.storeName}. API token may be invalid.`);
+
+        console.log(`💡 [Solutions] Recommended actions:`);
+        diagnosis.solutions.forEach((solution, index) => {
+          console.log(`   ${index + 1}. ${solution}`);
+        });
+
+        // Don't retry for authentication errors
+        if (!diagnosis.shouldRetry) {
+          console.error(`🚫 [No Retry] ${diagnosis.errorType} - stopping retry attempts`);
           return false;
         }
         
@@ -856,6 +1071,12 @@ export class EcoManagerService {
     }
     
     console.error(`❌ All connection attempts failed for ${this.config.storeName}`);
+    console.error(`📞 [Support Information]:`);
+    console.error(`   - EcoManager Support: Check their documentation or contact support`);
+    console.error(`   - API Documentation: Verify endpoint and authentication requirements`);
+    console.error(`   - LibertaPhonix Admin: https://app.libertadz.shop/admin/stores`);
+    console.error(`   - Store Configuration: Update API token for ${this.config.storeIdentifier}`);
+    
     return false;
   }
 }

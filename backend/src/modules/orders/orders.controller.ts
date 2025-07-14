@@ -66,7 +66,7 @@ export class OrdersController {
         search,
         startDate,
         endDate,
-        sortBy = 'createdAt',
+        sortBy = 'orderDate',
         sortOrder = 'desc',
         excludeStatus,
         noteTypes,
@@ -300,7 +300,7 @@ export class OrdersController {
             ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
           },
           orderBy: {
-            createdAt: 'desc'
+            [sortBy as string]: sortOrder as 'asc' | 'desc'
           },
           skip,
           take: Math.min(limitNum, 50)
@@ -386,7 +386,7 @@ export class OrdersController {
               }
             }
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { orderDate: 'desc' },
           take: 25
         });
         

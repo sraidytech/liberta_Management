@@ -201,15 +201,200 @@ export class SchedulerService {
   }
 
   /**
-   * Execute EcoManager sync
+   * Get count of active stores for logging
+   */
+  private async getActiveStoreCount(): Promise<number> {
+    try {
+      const count = await prisma.apiConfiguration.count({
+        where: { isActive: true }
+      });
+      return count;
+    } catch (error) {
+      console.error('Error getting active store count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate next sync time for display
+   */
+  private calculateNextSyncTime(): string {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    let nextSyncHour: number;
+    let nextSyncDate = new Date(now);
+    
+    if (currentHour < 8) {
+      nextSyncHour = 8;
+    } else if (currentHour >= 8 && currentHour < 20) {
+      nextSyncHour = currentHour + 1;
+      if (nextSyncHour > 20) {
+        nextSyncHour = 8;
+        nextSyncDate.setDate(nextSyncDate.getDate() + 1);
+      }
+    } else {
+      nextSyncHour = 8;
+      nextSyncDate.setDate(nextSyncDate.getDate() + 1);
+    }
+
+    nextSyncDate.setHours(nextSyncHour, 0, 0, 0);
+    return nextSyncDate.toLocaleString();
+  }
+
+  /**
+   * Analyze store errors and provide categorized insights
+   */
+  private analyzeStoreErrors(results: { [storeIdentifier: string]: any }): {
+    errorCategories: { [category: string]: string[] };
+    suggestions: string[];
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  } {
+    const errorCategories: { [category: string]: string[] } = {};
+    const suggestions: string[] = [];
+    
+    const storeResults = Object.entries(results);
+    const failedStores = storeResults.filter(([_, result]: [string, any]) => !result.success);
+    
+    if (failedStores.length === 0) {
+      return { errorCategories: {}, suggestions: [], severity: 'LOW' };
+    }
+
+    // Categorize errors
+    failedStores.forEach(([storeId, result]: [string, any]) => {
+      const error = result.error || 'Unknown error';
+      
+      if (error.includes('403') || error.includes('Forbidden') || error.includes('API access forbidden')) {
+        if (!errorCategories['API_AUTHENTICATION']) errorCategories['API_AUTHENTICATION'] = [];
+        errorCategories['API_AUTHENTICATION'].push(storeId);
+      } else if (error.includes('401') || error.includes('Unauthorized')) {
+        if (!errorCategories['API_TOKEN_INVALID']) errorCategories['API_TOKEN_INVALID'] = [];
+        errorCategories['API_TOKEN_INVALID'].push(storeId);
+      } else if (error.includes('429') || error.includes('rate limit')) {
+        if (!errorCategories['RATE_LIMIT']) errorCategories['RATE_LIMIT'] = [];
+        errorCategories['RATE_LIMIT'].push(storeId);
+      } else if (error.includes('timeout') || error.includes('ECONNRESET')) {
+        if (!errorCategories['NETWORK_CONNECTIVITY']) errorCategories['NETWORK_CONNECTIVITY'] = [];
+        errorCategories['NETWORK_CONNECTIVITY'].push(storeId);
+      } else {
+        if (!errorCategories['OTHER']) errorCategories['OTHER'] = [];
+        errorCategories['OTHER'].push(storeId);
+      }
+    });
+
+    // Generate suggestions based on error categories
+    if (errorCategories['API_AUTHENTICATION']) {
+      suggestions.push('Update API tokens in admin panel for affected stores');
+      suggestions.push('Check EcoManager dashboard for token expiration status');
+      suggestions.push('Verify API permissions for each store');
+    }
+    
+    if (errorCategories['RATE_LIMIT']) {
+      suggestions.push('Reduce sync frequency or implement better rate limiting');
+      suggestions.push('Check EcoManager API rate limit quotas');
+    }
+    
+    if (errorCategories['NETWORK_CONNECTIVITY']) {
+      suggestions.push('Check server network connectivity');
+      suggestions.push('Verify EcoManager API endpoints are accessible');
+    }
+
+    // Determine severity
+    const failurePercentage = (failedStores.length / storeResults.length) * 100;
+    let severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    
+    if (failurePercentage === 100) {
+      severity = 'CRITICAL';
+    } else if (failurePercentage >= 75) {
+      severity = 'HIGH';
+    } else if (failurePercentage >= 25) {
+      severity = 'MEDIUM';
+    } else {
+      severity = 'LOW';
+    }
+
+    return { errorCategories, suggestions, severity };
+  }
+
+  /**
+   * Format comprehensive sync summary
+   */
+  private formatSyncSummary(
+    results: { [storeIdentifier: string]: any },
+    duration: number,
+    storeCount: number
+  ): string {
+    const storeResults = Object.entries(results);
+    const successfulStores = storeResults.filter(([_, result]: [string, any]) => result.success);
+    const failedStores = storeResults.filter(([_, result]: [string, any]) => !result.success);
+    const totalSynced = storeResults.reduce((total: number, [_, result]: [string, any]) =>
+      total + (result.syncedCount || 0), 0);
+
+    const durationSeconds = (duration / 1000).toFixed(1);
+    const successPercentage = storeResults.length > 0 ? ((successfulStores.length / storeResults.length) * 100).toFixed(1) : '0';
+    const failurePercentage = storeResults.length > 0 ? ((failedStores.length / storeResults.length) * 100).toFixed(1) : '0';
+
+    let summary = `📊 Final Results:\n`;
+    summary += `   - Duration: ${durationSeconds}s (${duration}ms)\n`;
+    summary += `   - Stores Processed: ${storeResults.length}/${storeCount}\n`;
+    summary += `   - Successful Syncs: ${successfulStores.length}/${storeResults.length} (${successPercentage}%)\n`;
+    summary += `   - Failed Syncs: ${failedStores.length}/${storeResults.length} (${failurePercentage}%)\n`;
+    summary += `   - New Orders Synced: ${totalSynced}\n`;
+
+    // Add successful stores details
+    if (successfulStores.length > 0) {
+      summary += `\n✅ Successful Stores:\n`;
+      successfulStores.forEach(([storeId, result]: [string, any]) => {
+        const orders = result.syncedCount || 0;
+        const maystroInfo = result.maystroSync ? ` (Maystro: ${result.maystroSync.updated || 0} updated)` : '';
+        summary += `   - ${storeId}: ${orders} orders synced${maystroInfo}\n`;
+      });
+    }
+
+    // Add failed stores details
+    if (failedStores.length > 0) {
+      summary += `\n❌ Failed Stores:\n`;
+      failedStores.forEach(([storeId, result]: [string, any]) => {
+        const error = result.error || 'Unknown error';
+        const shortError = error.length > 60 ? error.substring(0, 60) + '...' : error;
+        summary += `   - ${storeId}: ${shortError}\n`;
+      });
+    }
+
+    return summary;
+  }
+
+  /**
+   * Execute EcoManager sync with comprehensive logging
    */
   private async runEcoManagerSync(): Promise<void> {
     const startTime = new Date();
-    console.log(`🔄 [${startTime.toLocaleString()}] Starting scheduled EcoManager sync...`);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    console.log(`🚀 [${startTime.toLocaleString()} ${timezone}] SCHEDULED EcoManager Sync Started`);
+    console.log(`📅 Sync Type: Hourly Scheduled Sync`);
+    console.log(`⏰ Started At: ${startTime.toISOString()}`);
 
     try {
       // Log sync start
       await this.redis.set('scheduler:last_ecomanager_sync_start', startTime.toISOString());
+
+      // Get store count and configuration info
+      const storeCount = await this.getActiveStoreCount();
+      const storeConfigs = await prisma.apiConfiguration.findMany({
+        where: { isActive: true },
+        select: { storeIdentifier: true, storeName: true }
+      });
+      
+      const storeList = storeConfigs.map(config => config.storeIdentifier).join(', ');
+      
+      console.log(`📊 Sync Configuration:`);
+      console.log(`   - Total Active Stores: ${storeCount}`);
+      console.log(`   - Store List: ${storeList}`);
+      console.log(`   - Expected Duration: 30-90 seconds`);
+      console.log(`   - Sync Strategy: Connection test → Order fetch → Assignment`);
+      console.log(`   - Rate Limits: 4 req/sec per store`);
+      console.log(`─────────────────────────────────────────────────────────────`);
 
       // Run the sync
       const results = await this.syncService.syncAllStores();
@@ -221,14 +406,39 @@ export class SchedulerService {
       await this.redis.set('scheduler:last_ecomanager_sync_end', endTime.toISOString());
       await this.redis.set('scheduler:last_ecomanager_sync_results', JSON.stringify(results));
 
-      // Count successful syncs
-      const successfulStores = Object.values(results).filter((result: any) => result.success).length;
-      const totalSynced = Object.values(results).reduce((total: number, result: any) => 
-        total + (result.syncedCount || 0), 0);
+      console.log(`─────────────────────────────────────────────────────────────`);
+      console.log(`✅ [${endTime.toLocaleString()} ${timezone}] EcoManager Sync Completed`);
+      console.log(this.formatSyncSummary(results, duration, storeCount));
 
-      console.log(`✅ [${endTime.toLocaleString()}] EcoManager sync completed in ${duration}ms`);
-      console.log(`   📊 Stores synced: ${successfulStores}/${Object.keys(results).length}`);
-      console.log(`   📦 New orders synced: ${totalSynced}`);
+      // Analyze errors and provide insights
+      const errorAnalysis = this.analyzeStoreErrors(results);
+      if (Object.keys(errorAnalysis.errorCategories).length > 0) {
+        console.log(`\n🚨 [Error Analysis] Sync Issues Detected (Severity: ${errorAnalysis.severity})`);
+        console.log(`─────────────────────────────────────────────────────────────`);
+        
+        Object.entries(errorAnalysis.errorCategories).forEach(([category, stores]) => {
+          console.log(`❌ ${category}: ${stores.join(', ')}`);
+        });
+        
+        if (errorAnalysis.suggestions.length > 0) {
+          console.log(`\n💡 Recommended Actions:`);
+          errorAnalysis.suggestions.forEach((suggestion, index) => {
+            console.log(`   ${index + 1}. ${suggestion}`);
+          });
+        }
+        
+        console.log(`\n📞 Support Resources:`);
+        console.log(`   - EcoManager Dashboard: https://dashboard.ecomanager.com`);
+        console.log(`   - LibertaPhonix Admin: https://app.libertadz.shop/admin/stores`);
+        console.log(`   - API Documentation: Check store-specific API docs`);
+      }
+
+      // Display next sync information
+      const nextSyncTime = this.calculateNextSyncTime();
+      console.log(`\n⏰ Next Sync Information:`);
+      console.log(`   - Next Scheduled Sync: ${nextSyncTime}`);
+      console.log(`   - Sync Frequency: Every hour (8AM-8PM)`);
+      console.log(`   - Manual Sync Available: /api/v1/scheduler/trigger/ecomanager`);
 
       // Notify via global io if available
       if ((global as any).io) {
@@ -236,13 +446,14 @@ export class SchedulerService {
           type: 'ecomanager',
           results,
           duration,
-          timestamp: endTime.toISOString()
+          timestamp: endTime.toISOString(),
+          errorAnalysis
         });
       }
 
     } catch (error) {
       const endTime = new Date();
-      console.error(`❌ [${endTime.toLocaleString()}] EcoManager sync failed:`, error);
+      console.error(`❌ [${endTime.toLocaleString()} ${timezone}] EcoManager sync failed:`, error);
       
       await this.redis.set('scheduler:last_ecomanager_sync_error', JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',
