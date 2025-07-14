@@ -141,6 +141,11 @@ export class EcoManagerService {
       if (hourCount > this.RATE_LIMITS.perHour) {
         const waitTime = 3600000 - (now % 3600000) + 5000; // Wait until next hour + 5s buffer
         console.log(`⚠️ Per-hour rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
+        
+        // Store rate limit wait time for scheduler to check
+        const waitUntil = now + waitTime;
+        await this.redis.set(`ecomanager:rate_limit_wait:${storeId}`, waitUntil.toString(), 'EX', Math.ceil(waitTime / 1000));
+        
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
       

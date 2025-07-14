@@ -46,7 +46,7 @@ export class SchedulerService {
     this.isRunning = true;
     console.log('🚀 Starting Production Background Job Scheduler...');
 
-    // Schedule EcoManager sync: Every hour from 8 AM to 8 PM
+    // Schedule EcoManager sync: Every 6 hours at 08:00, 14:00, 20:00
     this.scheduleEcoManagerSync();
 
     // Schedule Shipping Status sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00
@@ -61,7 +61,7 @@ export class SchedulerService {
 
     console.log('✅ All background jobs scheduled successfully!');
     console.log('📋 Schedule Summary:');
-    console.log('   🔄 EcoManager Sync: Every hour from 8 AM to 8 PM (12 times/day)');
+    console.log('   🔄 EcoManager Sync: Every 6 hours at 08:00, 14:00, 20:00 (3 times/day)');
     console.log('   🚚 Shipping Status Sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00');
     console.log('   🧹 Daily Cleanup: Every day at 2 AM');
   }
@@ -89,30 +89,21 @@ export class SchedulerService {
   }
 
   /**
-   * Schedule EcoManager sync every hour from 8 AM to 8 PM
+   * Schedule EcoManager sync every 6 hours at 08:00, 14:00, 20:00
    */
   private scheduleEcoManagerSync(): void {
+    const syncHours = [8, 14, 20]; // 08:00, 14:00, 20:00
+
     const scheduleNextEcoSync = () => {
       const now = new Date();
       const currentHour = now.getHours();
       
-      // Calculate next sync time
-      let nextSyncHour: number;
+      // Find next sync hour
+      let nextSyncHour = syncHours.find(hour => hour > currentHour);
       let nextSyncDate = new Date(now);
       
-      if (currentHour < 8) {
-        // Before 8 AM - schedule for 8 AM today
-        nextSyncHour = 8;
-      } else if (currentHour >= 8 && currentHour < 20) {
-        // Between 8 AM and 8 PM - schedule for next hour
-        nextSyncHour = currentHour + 1;
-        if (nextSyncHour > 20) {
-          // If next hour would be after 8 PM, schedule for 8 AM tomorrow
-          nextSyncHour = 8;
-          nextSyncDate.setDate(nextSyncDate.getDate() + 1);
-        }
-      } else {
-        // After 8 PM - schedule for 8 AM tomorrow
+      if (!nextSyncHour) {
+        // No more sync hours today, schedule for 08:00 tomorrow
         nextSyncHour = 8;
         nextSyncDate.setDate(nextSyncDate.getDate() + 1);
       }
@@ -201,6 +192,51 @@ export class SchedulerService {
   }
 
   /**
+   * Check global rate limit status across all stores
+   */
+  private async checkGlobalRateLimitStatus(): Promise<{
+    isRateLimited: boolean;
+    affectedStores: string[];
+    maxWaitTime: number;
+  }> {
+    try {
+      const storeConfigs = await prisma.apiConfiguration.findMany({
+        where: { isActive: true },
+        select: { storeIdentifier: true, storeName: true }
+      });
+
+      const affectedStores: string[] = [];
+      let maxWaitTime = 0;
+
+      for (const config of storeConfigs) {
+        // Check if store has active rate limit wait
+        const rateLimitKey = `ecomanager:rate_limit_wait:${config.storeIdentifier}`;
+        const waitTimeStr = await this.redis.get(rateLimitKey);
+        
+        if (waitTimeStr) {
+          const waitTime = parseInt(waitTimeStr);
+          if (waitTime > Date.now()) {
+            affectedStores.push(config.storeIdentifier);
+            const remainingWait = waitTime - Date.now();
+            if (remainingWait > maxWaitTime) {
+              maxWaitTime = remainingWait;
+            }
+          }
+        }
+      }
+
+      return {
+        isRateLimited: affectedStores.length > 0,
+        affectedStores,
+        maxWaitTime
+      };
+    } catch (error) {
+      console.error('Error checking global rate limit status:', error);
+      return { isRateLimited: false, affectedStores: [], maxWaitTime: 0 };
+    }
+  }
+
+  /**
    * Get count of active stores for logging
    */
   private async getActiveStoreCount(): Promise<number> {
@@ -216,24 +252,18 @@ export class SchedulerService {
   }
 
   /**
-   * Calculate next sync time for display
+   * Calculate next sync time for display (6-hour intervals)
    */
   private calculateNextSyncTime(): string {
     const now = new Date();
     const currentHour = now.getHours();
+    const syncHours = [8, 14, 20]; // 08:00, 14:00, 20:00
     
-    let nextSyncHour: number;
+    let nextSyncHour = syncHours.find(hour => hour > currentHour);
     let nextSyncDate = new Date(now);
     
-    if (currentHour < 8) {
-      nextSyncHour = 8;
-    } else if (currentHour >= 8 && currentHour < 20) {
-      nextSyncHour = currentHour + 1;
-      if (nextSyncHour > 20) {
-        nextSyncHour = 8;
-        nextSyncDate.setDate(nextSyncDate.getDate() + 1);
-      }
-    } else {
+    if (!nextSyncHour) {
+      // No more sync hours today, schedule for 08:00 tomorrow
       nextSyncHour = 8;
       nextSyncDate.setDate(nextSyncDate.getDate() + 1);
     }
@@ -365,17 +395,35 @@ export class SchedulerService {
   }
 
   /**
-   * Execute EcoManager sync with comprehensive logging
+   * Execute EcoManager sync with comprehensive logging and rate limit protection
    */
   private async runEcoManagerSync(): Promise<void> {
     const startTime = new Date();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     console.log(`🚀 [${startTime.toLocaleString()} ${timezone}] SCHEDULED EcoManager Sync Started`);
-    console.log(`📅 Sync Type: Hourly Scheduled Sync`);
+    console.log(`📅 Sync Type: 6-Hour Scheduled Sync`);
     console.log(`⏰ Started At: ${startTime.toISOString()}`);
 
     try {
+      // Check if any store is currently rate limited
+      const rateLimitCheck = await this.checkGlobalRateLimitStatus();
+      if (rateLimitCheck.isRateLimited) {
+        console.log(`⚠️ SYNC SKIPPED: Rate limit protection active`);
+        console.log(`   - Affected stores: ${rateLimitCheck.affectedStores.join(', ')}`);
+        console.log(`   - Estimated wait time: ${rateLimitCheck.maxWaitTime}ms`);
+        console.log(`   - Next sync will proceed as scheduled in 6 hours`);
+        
+        // Store skip reason in Redis
+        await this.redis.set('scheduler:last_ecomanager_sync_skipped', JSON.stringify({
+          timestamp: startTime.toISOString(),
+          reason: 'RATE_LIMITED',
+          affectedStores: rateLimitCheck.affectedStores,
+          waitTime: rateLimitCheck.maxWaitTime
+        }));
+        
+        return;
+      }
       // Log sync start
       await this.redis.set('scheduler:last_ecomanager_sync_start', startTime.toISOString());
 
