@@ -326,6 +326,7 @@ export class OrdersController {
           // Enrich orders with customer and agent data
           orders = orders.map(order => ({
             ...order,
+            orderDate: order.createdAt, // Add orderDate field for frontend compatibility
             customer: customerMap.get(order.customerId) || null,
             assignedAgent: order.assignedAgentId ? agentMap.get(order.assignedAgentId) || null : null,
             _count: { items: 0, tickets: 0 } // Simplified for speed
@@ -353,6 +354,7 @@ export class OrdersController {
         // Add minimal structure
         orders = orders.map(order => ({
           ...order,
+          orderDate: order.createdAt, // Add orderDate field for frontend compatibility
           customer: null,
           assignedAgent: null,
           _count: { items: 0, tickets: 0 }
