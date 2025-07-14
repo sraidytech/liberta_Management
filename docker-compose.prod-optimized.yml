@@ -71,7 +71,7 @@ services:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
     restart: always
-    command: ["npm", "run", "start"]
+    command: ["npm", "run", "dev"]
     deploy:
       resources:
         limits:
