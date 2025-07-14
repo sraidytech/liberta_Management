@@ -408,63 +408,118 @@ export class AnalyticsController {
   }
 
   /**
-   * Get agent performance metrics
+   * Get agent performance metrics - OPTIMIZED VERSION
    */
   async getAgentPerformance(req: Request, res: Response) {
     try {
       const { period = '30d' } = req.query;
       
+      // Check cache first
+      const cacheKey = `agent_performance:${period}`;
+      const cached = await redis.get(cacheKey);
+      
+      if (cached) {
+        return res.json({
+          success: true,
+          data: JSON.parse(cached),
+          cached: true
+        });
+      }
+
       let days = 30;
       if (period === '7d') days = 7;
       if (period === '90d') days = 90;
       
-      const startDate = new Date();
+      // Use timezone-aware date calculation
+      const now = getCurrentDate();
+      const startDate = new Date(now);
       startDate.setDate(startDate.getDate() - days);
+      const startDateUTC = getStartOfDay(startDate);
 
-      const agentStats = await prisma.user.findMany({
-        where: {
-          role: { in: [UserRole.AGENT_SUIVI, UserRole.AGENT_CALL_CENTER] },
-          isActive: true
-        },
-        select: {
-          id: true,
-          name: true,
-          agentCode: true,
-          availability: true,
-          currentOrders: true,
-          maxOrders: true,
-          _count: {
-            select: {
-              assignedOrders: {
-                where: {
-                  createdAt: { gte: startDate }
-                }
-              },
-              agentActivities: {
-                where: {
-                  createdAt: { gte: startDate }
-                }
-              }
-            }
-          },
-          assignedOrders: {
-            where: {
-              createdAt: { gte: startDate },
-              status: { in: [OrderStatus.CONFIRMED, OrderStatus.DELIVERED] }
-            },
-            select: {
-              total: true,
-              status: true
-            }
-          }
-        }
-      });
+      // OPTIMIZED: Single query with all necessary data using raw SQL for better performance
+      interface AgentPerformanceRaw {
+        id: string;
+        name: string;
+        agentCode: string;
+        availability: string;
+        currentOrders: number;
+        maxOrders: number;
+        total_orders: bigint;
+        completed_orders: bigint;
+        confirmed_orders: bigint;
+        cancelled_orders: bigint;
+        total_revenue: number;
+        total_activities: bigint;
+      }
 
-      const performance = agentStats.map(agent => {
-        const completedOrders = agent.assignedOrders.filter(o => o.status === OrderStatus.DELIVERED).length;
-        const totalRevenue = agent.assignedOrders.reduce((sum, order) => sum + order.total, 0);
-        const successRate = agent._count.assignedOrders > 0 
-          ? ((completedOrders / agent._count.assignedOrders) * 100).toFixed(1)
+      const agentPerformanceData = await prisma.$queryRaw<AgentPerformanceRaw[]>`
+        SELECT 
+          u.id,
+          u.name,
+          u."agentCode",
+          u.availability,
+          u."currentOrders",
+          u."maxOrders",
+          
+          -- Total orders count
+          COUNT(DISTINCT o.id) as total_orders,
+          
+          -- Completed orders count
+          COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
+          
+          -- Confirmed orders count
+          COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
+          
+          -- Cancelled orders count
+          COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
+          
+          -- Total revenue (only delivered orders)
+          COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
+          
+          -- Activities count
+          COUNT(DISTINCT aa.id) as total_activities
+          
+        FROM "User" u
+        LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+          AND o."createdAt" >= ${startDateUTC}
+        LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+          AND aa."createdAt" >= ${startDateUTC}
+        WHERE 
+          u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
+          AND u."isActive" = true
+        GROUP BY 
+          u.id, u.name, u."agentCode", u.availability, 
+          u."currentOrders", u."maxOrders"
+        ORDER BY total_orders DESC
+      `;
+
+      // Process results
+      const performance = agentPerformanceData.map((agent) => {
+        const totalOrders = Number(agent.total_orders) || 0;
+        const completedOrders = Number(agent.completed_orders) || 0;
+        const confirmedOrders = Number(agent.confirmed_orders) || 0;
+        const cancelledOrders = Number(agent.cancelled_orders) || 0;
+        const totalRevenue = Number(agent.total_revenue) || 0;
+        const totalActivities = Number(agent.total_activities) || 0;
+        
+        const successRate = totalOrders > 0 
+          ? ((completedOrders / totalOrders) * 100).toFixed(1)
+          : '0';
+          
+        const confirmationRate = totalOrders > 0 
+          ? ((confirmedOrders / totalOrders) * 100).toFixed(1)
+          : '0';
+          
+        const cancellationRate = totalOrders > 0 
+          ? ((cancelledOrders / totalOrders) * 100).toFixed(1)
+          : '0';
+
+        const utilization = agent.maxOrders > 0 
+          ? ((agent.currentOrders / agent.maxOrders) * 100).toFixed(1) 
+          : '0';
+
+        const averageOrderValue = completedOrders > 0 
+          ? (totalRevenue / completedOrders).toFixed(2)
           : '0';
 
         return {
@@ -474,14 +529,28 @@ export class AnalyticsController {
           availability: agent.availability,
           currentOrders: agent.currentOrders,
           maxOrders: agent.maxOrders,
-          totalOrders: agent._count.assignedOrders,
+          totalOrders,
           completedOrders,
+          confirmedOrders,
+          cancelledOrders,
           totalRevenue,
+          averageOrderValue: parseFloat(averageOrderValue),
           successRate: `${successRate}%`,
-          activities: agent._count.agentActivities,
-          utilization: agent.maxOrders > 0 ? ((agent.currentOrders / agent.maxOrders) * 100).toFixed(1) : '0'
+          confirmationRate: `${confirmationRate}%`,
+          cancellationRate: `${cancellationRate}%`,
+          activities: totalActivities,
+          utilization: `${utilization}%`,
+          performanceScore: this.calculatePerformanceScore({
+            successRate: parseFloat(successRate),
+            utilization: parseFloat(utilization),
+            totalOrders,
+            activities: totalActivities
+          })
         };
       });
+
+      // Cache for 5 minutes
+      await redis.setex(cacheKey, 300, JSON.stringify(performance));
 
       res.json({
         success: true,
@@ -498,6 +567,37 @@ export class AnalyticsController {
         }
       });
     }
+  }
+
+  /**
+   * Calculate performance score for agents
+   */
+  private calculatePerformanceScore(metrics: {
+    successRate: number;
+    utilization: number;
+    totalOrders: number;
+    activities: number;
+  }): number {
+    const { successRate, utilization, totalOrders, activities } = metrics;
+    
+    // Weighted scoring system
+    const successWeight = 0.4; // 40% weight for success rate
+    const utilizationWeight = 0.3; // 30% weight for utilization
+    const volumeWeight = 0.2; // 20% weight for order volume
+    const activityWeight = 0.1; // 10% weight for activities
+    
+    // Normalize values to 0-100 scale
+    const normalizedVolume = Math.min(totalOrders / 50 * 100, 100); // Assume 50 orders is max
+    const normalizedActivity = Math.min(activities / 100 * 100, 100); // Assume 100 activities is max
+    
+    const score = (
+      successRate * successWeight +
+      utilization * utilizationWeight +
+      normalizedVolume * volumeWeight +
+      normalizedActivity * activityWeight
+    );
+    
+    return Math.round(score * 10) / 10; // Round to 1 decimal place
   }
 
   /**
@@ -1298,8 +1398,11 @@ export class AnalyticsController {
       if (period === '7d') days = 7;
       if (period === '90d') days = 90;
       
-      const startDate = new Date();
+      // Use timezone-aware date calculation
+      const now = getCurrentDate();
+      const startDate = new Date(now);
       startDate.setDate(startDate.getDate() - days);
+      const startDateUTC = getStartOfDay(startDate);
 
       // Build where clause for agent filter
       const agentWhereClause: any = {
@@ -1324,7 +1427,7 @@ export class AnalyticsController {
           agentActivities: {
             where: {
               activityType: 'NOTES_ADDED',
-              createdAt: { gte: startDate },
+              createdAt: { gte: startDateUTC },
               // Exclude EcoManager/system generated notes
               NOT: {
                 OR: [
@@ -1355,7 +1458,7 @@ export class AnalyticsController {
           },
           assignedOrders: {
             where: {
-              createdAt: { gte: startDate }
+              createdAt: { gte: startDateUTC }
             },
             select: {
               id: true,

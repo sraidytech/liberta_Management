@@ -1,22 +1,36 @@
 /**
  * Timezone utilities for proper date handling in production
  * Addresses timezone discrepancies between localhost and server
+ * 
+ * Africa/Casablanca is UTC+1 (no DST changes in recent years)
  */
+
+const APP_TIMEZONE = 'Africa/Casablanca';
+const TIMEZONE_OFFSET_HOURS = 1; // UTC+1 for Casablanca
 
 /**
  * Get the current date in the application timezone (Africa/Casablanca)
  */
 export function getCurrentDate(): Date {
-  const timezone = process.env.TZ || 'Africa/Casablanca';
-  return new Date(new Date().toLocaleString('en-US', { timeZone: timezone }));
+  const now = new Date();
+  // Convert UTC to Casablanca time (UTC+1)
+  return new Date(now.getTime() + (TIMEZONE_OFFSET_HOURS * 60 * 60 * 1000));
 }
 
 /**
- * Convert a date to the application timezone
+ * Convert a UTC date to the application timezone
  */
 export function toAppTimezone(date: Date): Date {
-  const timezone = process.env.TZ || 'Africa/Casablanca';
-  return new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+  // Convert UTC to Casablanca time (UTC+1)
+  return new Date(date.getTime() + (TIMEZONE_OFFSET_HOURS * 60 * 60 * 1000));
+}
+
+/**
+ * Convert a date from application timezone to UTC
+ */
+export function toUTC(date: Date): Date {
+  // Convert Casablanca time to UTC
+  return new Date(date.getTime() - (TIMEZONE_OFFSET_HOURS * 60 * 60 * 1000));
 }
 
 /**
@@ -24,15 +38,13 @@ export function toAppTimezone(date: Date): Date {
  */
 export function getStartOfDay(date?: Date): Date {
   const targetDate = date || getCurrentDate();
-  const timezone = process.env.TZ || 'Africa/Casablanca';
+  const localDate = toAppTimezone(targetDate);
   
-  // Get the date in the target timezone
-  const localDate = new Date(targetDate.toLocaleString('en-US', { timeZone: timezone }));
-  
-  // Set to start of day
+  // Set to start of day in local timezone
   localDate.setHours(0, 0, 0, 0);
   
-  return localDate;
+  // Convert back to UTC for database storage
+  return toUTC(localDate);
 }
 
 /**
@@ -40,32 +52,31 @@ export function getStartOfDay(date?: Date): Date {
  */
 export function getEndOfDay(date?: Date): Date {
   const targetDate = date || getCurrentDate();
-  const timezone = process.env.TZ || 'Africa/Casablanca';
+  const localDate = toAppTimezone(targetDate);
   
-  // Get the date in the target timezone
-  const localDate = new Date(targetDate.toLocaleString('en-US', { timeZone: timezone }));
-  
-  // Set to end of day
+  // Set to end of day in local timezone
   localDate.setHours(23, 59, 59, 999);
   
-  return localDate;
+  // Convert back to UTC for database storage
+  return toUTC(localDate);
 }
 
 /**
- * Get start of week in application timezone
+ * Get start of week in application timezone (Sunday = 0)
  */
 export function getStartOfWeek(date?: Date): Date {
   const targetDate = date || getCurrentDate();
-  const timezone = process.env.TZ || 'Africa/Casablanca';
+  const localDate = toAppTimezone(targetDate);
   
-  const localDate = new Date(targetDate.toLocaleString('en-US', { timeZone: timezone }));
   const day = localDate.getDay();
   const diff = localDate.getDate() - day;
   
-  const startOfWeek = new Date(localDate.setDate(diff));
+  const startOfWeek = new Date(localDate);
+  startOfWeek.setDate(diff);
   startOfWeek.setHours(0, 0, 0, 0);
   
-  return startOfWeek;
+  // Convert back to UTC for database storage
+  return toUTC(startOfWeek);
 }
 
 /**
@@ -73,13 +84,13 @@ export function getStartOfWeek(date?: Date): Date {
  */
 export function getStartOfMonth(date?: Date): Date {
   const targetDate = date || getCurrentDate();
-  const timezone = process.env.TZ || 'Africa/Casablanca';
+  const localDate = toAppTimezone(targetDate);
   
-  const localDate = new Date(targetDate.toLocaleString('en-US', { timeZone: timezone }));
   const startOfMonth = new Date(localDate.getFullYear(), localDate.getMonth(), 1);
   startOfMonth.setHours(0, 0, 0, 0);
   
-  return startOfMonth;
+  // Convert back to UTC for database storage
+  return toUTC(startOfMonth);
 }
 
 /**
@@ -87,13 +98,13 @@ export function getStartOfMonth(date?: Date): Date {
  */
 export function getEndOfMonth(date?: Date): Date {
   const targetDate = date || getCurrentDate();
-  const timezone = process.env.TZ || 'Africa/Casablanca';
+  const localDate = toAppTimezone(targetDate);
   
-  const localDate = new Date(targetDate.toLocaleString('en-US', { timeZone: timezone }));
   const endOfMonth = new Date(localDate.getFullYear(), localDate.getMonth() + 1, 0);
   endOfMonth.setHours(23, 59, 59, 999);
   
-  return endOfMonth;
+  // Convert back to UTC for database storage
+  return toUTC(endOfMonth);
 }
 
 /**
@@ -208,8 +219,7 @@ export function isToday(date: Date): boolean {
  * Get hour of day in application timezone (0-23)
  */
 export function getHourOfDay(date: Date): number {
-  const timezone = process.env.TZ || 'Africa/Casablanca';
-  const localDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }));
+  const localDate = toAppTimezone(date);
   return localDate.getHours();
 }
 
