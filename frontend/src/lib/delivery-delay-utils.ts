@@ -37,7 +37,18 @@ export function calculateOrderDelay(
   shippingStatus?: string,
   wilayaSettings: WilayaDeliverySettings[] = []
 ): OrderDelayInfo {
-  const orderDateObj = typeof orderDate === 'string' ? new Date(orderDate) : orderDate;
+  // Handle null/undefined orderDate
+  let orderDateObj: Date;
+  if (!orderDate) {
+    orderDateObj = new Date(); // Use current date as fallback
+  } else {
+    orderDateObj = typeof orderDate === 'string' ? new Date(orderDate) : orderDate;
+    // Check if date is invalid
+    if (isNaN(orderDateObj.getTime())) {
+      orderDateObj = new Date(); // Use current date as fallback
+    }
+  }
+  
   const wilayaSetting = wilayaSettings.find(setting => setting.wilayaName === wilaya);
   const maxDeliveryDays = wilayaSetting?.maxDeliveryDays || 2; // Default 2 days
 
