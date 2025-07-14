@@ -2,6 +2,19 @@ import { Request, Response } from 'express';
 import { PrismaClient, UserRole, AgentAvailability, OrderStatus } from '@prisma/client';
 import redis from '@/config/redis';
 import { prisma } from '@/config/database';
+import {
+  getCurrentDate,
+  getStartOfDay,
+  getStartOfWeek,
+  getStartOfMonth,
+  getEndOfDay,
+  getEndOfMonth,
+  getDateRangeForPeriod,
+  parseDateFromQuery,
+  getHourOfDay,
+  getHoursDifference,
+  getDaysDifference
+} from '@/utils/timezone';
 
 export class AnalyticsController {
   /**
@@ -20,14 +33,13 @@ export class AnalyticsController {
         });
       }
 
-      // Get current date ranges
-      const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const startOfWeek = new Date(startOfDay);
-      startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+      // Get current date ranges using timezone utilities
+      const now = getCurrentDate();
+      const startOfDayTZ = getStartOfDay(now);
+      const startOfWeekTZ = getStartOfWeek(now);
+      const startOfMonthTZ = getStartOfMonth(now);
+      const startOfLastMonth = getStartOfMonth(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+      const endOfLastMonth = getEndOfMonth(new Date(now.getFullYear(), now.getMonth() - 1, 1));
 
       // Parallel queries for better performance
       const [
@@ -64,21 +76,21 @@ export class AnalyticsController {
         // Today's orders
         prisma.order.count({
           where: {
-            createdAt: { gte: startOfDay }
+            createdAt: { gte: startOfDayTZ }
           }
         }),
         
         // This week's orders
         prisma.order.count({
           where: {
-            createdAt: { gte: startOfWeek }
+            createdAt: { gte: startOfWeekTZ }
           }
         }),
         
         // This month's orders
         prisma.order.count({
           where: {
-            createdAt: { gte: startOfMonth }
+            createdAt: { gte: startOfMonthTZ }
           }
         }),
         
@@ -94,7 +106,7 @@ export class AnalyticsController {
         prisma.order.aggregate({
           _sum: { total: true },
           where: {
-            createdAt: { gte: startOfMonth },
+            createdAt: { gte: startOfMonthTZ },
             status: OrderStatus.DELIVERED
           }
         }),
@@ -209,7 +221,7 @@ export class AnalyticsController {
               select: {
                 assignedOrders: {
                   where: {
-                    createdAt: { gte: startOfMonth }
+                    createdAt: { gte: startOfMonthTZ }
                   }
                 }
               }
