@@ -265,11 +265,33 @@ export class OrdersController {
             status: true,
             shippingStatus: true,
             total: true,
-            orderDate: true, // Include the actual orderDate field
+            orderDate: true,
             createdAt: true,
             storeIdentifier: true,
             customerId: true,
-            assignedAgentId: true
+            assignedAgentId: true,
+            // Maystro fields
+            trackingNumber: true,
+            maystroOrderId: true,
+            // Order items with full details
+            items: {
+              select: {
+                id: true,
+                productId: true,
+                sku: true,
+                title: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true
+              }
+            },
+            // Counts
+            _count: {
+              select: {
+                items: true,
+                tickets: true
+              }
+            }
           },
           where: {
             // Only use simple filters
@@ -328,8 +350,7 @@ export class OrdersController {
           orders = orders.map(order => ({
             ...order,
             customer: customerMap.get(order.customerId) || null,
-            assignedAgent: order.assignedAgentId ? agentMap.get(order.assignedAgentId) || null : null,
-            _count: { items: 0, tickets: 0 } // Simplified for speed
+            assignedAgent: order.assignedAgentId ? agentMap.get(order.assignedAgentId) || null : null
           }));
         }
 
@@ -343,8 +364,27 @@ export class OrdersController {
             reference: true,
             status: true,
             total: true,
-            orderDate: true, // Include the actual orderDate field
-            createdAt: true
+            orderDate: true,
+            createdAt: true,
+            trackingNumber: true,
+            maystroOrderId: true,
+            items: {
+              select: {
+                id: true,
+                productId: true,
+                sku: true,
+                title: true,
+                quantity: true,
+                unitPrice: true,
+                totalPrice: true
+              }
+            },
+            _count: {
+              select: {
+                items: true,
+                tickets: true
+              }
+            }
           },
           orderBy: { createdAt: 'desc' },
           take: 25
@@ -356,8 +396,7 @@ export class OrdersController {
         orders = orders.map(order => ({
           ...order,
           customer: null,
-          assignedAgent: null,
-          _count: { items: 0, tickets: 0 }
+          assignedAgent: null
         }));
       }
 
