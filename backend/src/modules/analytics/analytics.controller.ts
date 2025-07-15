@@ -843,53 +843,198 @@ export class AnalyticsController {
           total_duration: bigint;
         }
 
-        const detailedAgentData = await prisma.$queryRaw<DetailedAgentReportRaw[]>`
-          SELECT 
-            u.id,
-            u.name,
-            u."agentCode",
-            u.availability,
-            u."currentOrders",
-            u."maxOrders",
-            
-            -- Total orders count in date range
-            COUNT(DISTINCT o.id) as total_orders,
-            
-            -- Completed orders count
-            COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
-            
-            -- Cancelled orders count
-            COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
-            
-            -- Confirmed orders count
-            COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
-            
-            -- Total revenue (only delivered orders)
-            COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
-            
-            -- Activities count
-            COUNT(DISTINCT aa.id) as total_activities,
-            
-            -- Total duration
-            COALESCE(SUM(aa.duration), 0) as total_duration
-            
-          FROM "User" u
-          LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
-            AND o."orderDate" >= ${startDateParsed}
-            AND o."orderDate" <= ${endDateParsed}
-            ${storeId ? `AND o."storeIdentifier" = ${storeId}` : ''}
-          LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
-            AND aa."createdAt" >= ${startDateParsed}
-            AND aa."createdAt" <= ${endDateParsed}
-          WHERE 
-            u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
-            AND u."isActive" = true
-            ${agentId ? `AND u.id = ${agentId}` : ''}
-          GROUP BY 
-            u.id, u.name, u."agentCode", u.availability, 
-            u."currentOrders", u."maxOrders"
-          ORDER BY total_orders DESC
-        `;
+        // Use a simpler approach with proper parameter handling
+        let detailedAgentData: DetailedAgentReportRaw[];
+
+        if (storeId && agentId) {
+          detailedAgentData = await prisma.$queryRaw<DetailedAgentReportRaw[]>`
+            SELECT 
+              u.id,
+              u.name,
+              u."agentCode",
+              u.availability,
+              u."currentOrders",
+              u."maxOrders",
+              
+              -- Total orders count in date range
+              COUNT(DISTINCT o.id) as total_orders,
+              
+              -- Completed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
+              
+              -- Cancelled orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
+              
+              -- Confirmed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
+              
+              -- Total revenue (only delivered orders)
+              COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
+              
+              -- Activities count
+              COUNT(DISTINCT aa.id) as total_activities,
+              
+              -- Total duration
+              COALESCE(SUM(aa.duration), 0) as total_duration
+              
+            FROM "User" u
+            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+              AND o."orderDate" >= ${startDateParsed}
+              AND o."orderDate" <= ${endDateParsed}
+              AND o."storeIdentifier" = ${storeId}
+            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+              AND aa."createdAt" >= ${startDateParsed}
+              AND aa."createdAt" <= ${endDateParsed}
+            WHERE 
+              u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
+              AND u."isActive" = true
+              AND u.id = ${agentId}
+            GROUP BY 
+              u.id, u.name, u."agentCode", u.availability, 
+              u."currentOrders", u."maxOrders"
+            ORDER BY total_orders DESC
+          `;
+        } else if (storeId) {
+          detailedAgentData = await prisma.$queryRaw<DetailedAgentReportRaw[]>`
+            SELECT 
+              u.id,
+              u.name,
+              u."agentCode",
+              u.availability,
+              u."currentOrders",
+              u."maxOrders",
+              
+              -- Total orders count in date range
+              COUNT(DISTINCT o.id) as total_orders,
+              
+              -- Completed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
+              
+              -- Cancelled orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
+              
+              -- Confirmed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
+              
+              -- Total revenue (only delivered orders)
+              COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
+              
+              -- Activities count
+              COUNT(DISTINCT aa.id) as total_activities,
+              
+              -- Total duration
+              COALESCE(SUM(aa.duration), 0) as total_duration
+              
+            FROM "User" u
+            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+              AND o."orderDate" >= ${startDateParsed}
+              AND o."orderDate" <= ${endDateParsed}
+              AND o."storeIdentifier" = ${storeId}
+            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+              AND aa."createdAt" >= ${startDateParsed}
+              AND aa."createdAt" <= ${endDateParsed}
+            WHERE 
+              u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
+              AND u."isActive" = true
+            GROUP BY 
+              u.id, u.name, u."agentCode", u.availability, 
+              u."currentOrders", u."maxOrders"
+            ORDER BY total_orders DESC
+          `;
+        } else if (agentId) {
+          detailedAgentData = await prisma.$queryRaw<DetailedAgentReportRaw[]>`
+            SELECT 
+              u.id,
+              u.name,
+              u."agentCode",
+              u.availability,
+              u."currentOrders",
+              u."maxOrders",
+              
+              -- Total orders count in date range
+              COUNT(DISTINCT o.id) as total_orders,
+              
+              -- Completed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
+              
+              -- Cancelled orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
+              
+              -- Confirmed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
+              
+              -- Total revenue (only delivered orders)
+              COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
+              
+              -- Activities count
+              COUNT(DISTINCT aa.id) as total_activities,
+              
+              -- Total duration
+              COALESCE(SUM(aa.duration), 0) as total_duration
+              
+            FROM "User" u
+            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+              AND o."orderDate" >= ${startDateParsed}
+              AND o."orderDate" <= ${endDateParsed}
+            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+              AND aa."createdAt" >= ${startDateParsed}
+              AND aa."createdAt" <= ${endDateParsed}
+            WHERE 
+              u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
+              AND u."isActive" = true
+              AND u.id = ${agentId}
+            GROUP BY 
+              u.id, u.name, u."agentCode", u.availability, 
+              u."currentOrders", u."maxOrders"
+            ORDER BY total_orders DESC
+          `;
+        } else {
+          detailedAgentData = await prisma.$queryRaw<DetailedAgentReportRaw[]>`
+            SELECT 
+              u.id,
+              u.name,
+              u."agentCode",
+              u.availability,
+              u."currentOrders",
+              u."maxOrders",
+              
+              -- Total orders count in date range
+              COUNT(DISTINCT o.id) as total_orders,
+              
+              -- Completed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
+              
+              -- Cancelled orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
+              
+              -- Confirmed orders count
+              COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
+              
+              -- Total revenue (only delivered orders)
+              COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
+              
+              -- Activities count
+              COUNT(DISTINCT aa.id) as total_activities,
+              
+              -- Total duration
+              COALESCE(SUM(aa.duration), 0) as total_duration
+              
+            FROM "User" u
+            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+              AND o."orderDate" >= ${startDateParsed}
+              AND o."orderDate" <= ${endDateParsed}
+            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+              AND aa."createdAt" >= ${startDateParsed}
+              AND aa."createdAt" <= ${endDateParsed}
+            WHERE 
+              u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
+              AND u."isActive" = true
+            GROUP BY 
+              u.id, u.name, u."agentCode", u.availability, 
+              u."currentOrders", u."maxOrders"
+            ORDER BY total_orders DESC
+          `;
+        }
 
         // Get workload distribution with a separate optimized query
         const workloadData = await prisma.$queryRaw<{
