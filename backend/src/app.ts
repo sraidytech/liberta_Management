@@ -236,16 +236,9 @@ class App {
   private initializeSyncService(): void {
     this.syncService = new SyncService(redis);
     
-    // Start auto sync in production or when explicitly enabled
-    if (config.nodeEnv === 'production' || process.env.ENABLE_AUTO_SYNC === 'true') {
-      // Start auto sync with 15-minute intervals
-      this.syncService.startAutoSync(15).catch(error => {
-        console.error('❌ Failed to start auto sync:', error);
-      });
-      console.log('🔄 Auto sync service started');
-    } else {
-      console.log('🔄 Auto sync service initialized (manual mode)');
-    }
+    // SyncService is only used for manual triggers and API calls
+    // Automatic syncing is handled by SchedulerService
+    console.log('🔄 Sync service initialized (manual triggers only - automatic syncing handled by SchedulerService)');
 
     // Make sync service available globally for manual triggers
     (global as any).syncService = this.syncService;
