@@ -479,10 +479,10 @@ export class AnalyticsController {
           -- Activities count
           COUNT(DISTINCT aa.id) as total_activities
           
-        FROM "User" u
-        LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+        FROM users u
+        LEFT JOIN orders o ON u.id = o."assignedAgentId" 
           AND o."createdAt" >= ${startDateUTC}
-        LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+        LEFT JOIN agent_activities aa ON u.id = aa."agentId" 
           AND aa."createdAt" >= ${startDateUTC}
         WHERE 
           u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
@@ -877,12 +877,12 @@ export class AnalyticsController {
               -- Total duration
               COALESCE(SUM(aa.duration), 0) as total_duration
               
-            FROM "User" u
-            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+            FROM users u
+            LEFT JOIN orders o ON u.id = o."assignedAgentId" 
               AND o."orderDate" >= ${startDateParsed}
               AND o."orderDate" <= ${endDateParsed}
               AND o."storeIdentifier" = ${storeId}
-            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+            LEFT JOIN agent_activities aa ON u.id = aa."agentId" 
               AND aa."createdAt" >= ${startDateParsed}
               AND aa."createdAt" <= ${endDateParsed}
             WHERE 
@@ -925,12 +925,12 @@ export class AnalyticsController {
               -- Total duration
               COALESCE(SUM(aa.duration), 0) as total_duration
               
-            FROM "User" u
-            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+            FROM users u
+            LEFT JOIN orders o ON u.id = o."assignedAgentId" 
               AND o."orderDate" >= ${startDateParsed}
               AND o."orderDate" <= ${endDateParsed}
               AND o."storeIdentifier" = ${storeId}
-            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+            LEFT JOIN agent_activities aa ON u.id = aa."agentId" 
               AND aa."createdAt" >= ${startDateParsed}
               AND aa."createdAt" <= ${endDateParsed}
             WHERE 
@@ -972,11 +972,11 @@ export class AnalyticsController {
               -- Total duration
               COALESCE(SUM(aa.duration), 0) as total_duration
               
-            FROM "User" u
-            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+            FROM users u
+            LEFT JOIN orders o ON u.id = o."assignedAgentId" 
               AND o."orderDate" >= ${startDateParsed}
               AND o."orderDate" <= ${endDateParsed}
-            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+            LEFT JOIN agent_activities aa ON u.id = aa."agentId" 
               AND aa."createdAt" >= ${startDateParsed}
               AND aa."createdAt" <= ${endDateParsed}
             WHERE 
@@ -1019,11 +1019,11 @@ export class AnalyticsController {
               -- Total duration
               COALESCE(SUM(aa.duration), 0) as total_duration
               
-            FROM "User" u
-            LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+            FROM users u
+            LEFT JOIN orders o ON u.id = o."assignedAgentId" 
               AND o."orderDate" >= ${startDateParsed}
               AND o."orderDate" <= ${endDateParsed}
-            LEFT JOIN "AgentActivity" aa ON u.id = aa."agentId" 
+            LEFT JOIN agent_activities aa ON u.id = aa."agentId" 
               AND aa."createdAt" >= ${startDateParsed}
               AND aa."createdAt" <= ${endDateParsed}
             WHERE 
@@ -1050,8 +1050,8 @@ export class AnalyticsController {
             u."currentOrders",
             u."maxOrders",
             COUNT(DISTINCT o.id) as active_orders
-          FROM "User" u
-          LEFT JOIN "Order" o ON u.id = o."assignedAgentId" 
+          FROM users u
+          LEFT JOIN orders o ON u.id = o."assignedAgentId" 
             AND o.status IN ('ASSIGNED', 'IN_PROGRESS')
           WHERE 
             u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
