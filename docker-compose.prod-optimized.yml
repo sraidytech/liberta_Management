@@ -1,5 +1,5 @@
-# FIXED Optimized Production Docker Compose Override for 2-CPU VPS
-# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod-optimized-fixed.yml up -d
+# OPTIMIZED Production Docker Compose for 6-Core Intel Xeon Server
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml up -d
 
 services:
   postgres:
@@ -17,17 +17,20 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M  # Reduced for 2-CPU server
-          cpus: '0.5'
+          memory: 2G      # Increased for 6-core server with 12GB RAM
+          cpus: '1.5'     # Increased from 0.5 to 1.5 cores
     command: >
       postgres
-      -c shared_buffers=128MB
-      -c max_connections=200
-      -c effective_cache_size=256MB
-      -c maintenance_work_mem=64MB
+      -c shared_buffers=512MB          # Increased from 128MB
+      -c max_connections=300           # Increased from 200
+      -c effective_cache_size=1536MB   # Increased from 256MB
+      -c maintenance_work_mem=256MB    # Increased from 64MB
       -c checkpoint_completion_target=0.9
-      -c wal_buffers=16MB
+      -c wal_buffers=64MB              # Increased from 16MB
       -c default_statistics_target=100
+      -c work_mem=16MB                 # Added for better query performance
+      -c random_page_cost=1.1          # Optimized for SSD
+      -c effective_io_concurrency=200  # Optimized for SSD
       -c idle_in_transaction_session_timeout=300000
       -c statement_timeout=300000
       -c lock_timeout=30000
@@ -42,15 +45,17 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
-          cpus: '0.25'
+          memory: 512M    # Increased from 256M for 6-core server
+          cpus: '0.5'     # Increased from 0.25
     command: >
       redis-server
-      --maxmemory 200mb
+      --maxmemory 400mb               # Increased from 200mb
       --maxmemory-policy allkeys-lru
       --save 900 1
       --save 300 10
       --save 60 10000
+      --tcp-keepalive 300
+      --timeout 0
 
   backend:
     environment:
@@ -72,6 +77,9 @@ services:
       - MAYSTRO_API_KEY_2=${MAYSTRO_API_KEY_2}
       - MAYSTRO_API_KEY_3=${MAYSTRO_API_KEY_3}
       - MAYSTRO_BASE_URL=${MAYSTRO_BASE_URL}
+      # Performance optimizations for 6-core server
+      - UV_THREADPOOL_SIZE=16          # Increased thread pool
+      - NODE_OPTIONS=--max-old-space-size=1536  # Increased heap size
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
@@ -82,8 +90,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M  # Reduced for 2-CPU server
-          cpus: '0.75'
+          memory: 2G      # Increased from 768M to 2G for 6-core server
+          cpus: '2.0'     # Increased from 0.75 to 2.0 cores
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
@@ -99,22 +107,21 @@ services:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXTAUTH_URL=${NEXTAUTH_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      # Force Next.js to rebuild on container restart
+      # Performance optimizations for 6-core server
       - NEXT_TELEMETRY_DISABLED=1
-      - NEXT_CACHE_DISABLED=1
+      - NODE_OPTIONS=--max-old-space-size=1024  # Increased heap size
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-      # REMOVED: frontend_next volume to prevent caching issues
     restart: always
     command: ["npm", "run", "start"]
     deploy:
       resources:
         limits:
-          memory: 512M
-          cpus: '0.5'
+          memory: 1G      # Increased from 512M to 1G for 6-core server
+          cpus: '1.0'     # Increased from 0.5 to 1.0 core
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]
       interval: 30s
