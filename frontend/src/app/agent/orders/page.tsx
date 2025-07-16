@@ -104,7 +104,6 @@ export default function AgentOrdersPage() {
   const [orderTicketCounts, setOrderTicketCounts] = useState<Record<string, number>>({});
   const [totalAssignedOrders, setTotalAssignedOrders] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>(['ALL']);
   const [selectedShippingStatuses, setSelectedShippingStatuses] = useState<string[]>([]);
   const [availableShippingStatuses, setAvailableShippingStatuses] = useState<string[]>([]);
@@ -1232,7 +1231,7 @@ export default function AgentOrdersPage() {
                 <Package className="h-10 w-10 mx-auto mb-3 text-gray-300" />
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">No orders found</h3>
                 <p className="text-gray-600">
-                  {searchTerm || (statusFilter.length > 0 && !statusFilter.includes('ALL'))
+                  {search || (statusFilter.length > 0 && !statusFilter.includes('ALL'))
                     ? t('tryAdjustingSearchOrFilters')
                     : t('ordersWillAppearWhenAssigned')
                   }

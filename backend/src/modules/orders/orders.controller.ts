@@ -252,16 +252,17 @@ export class OrdersController {
         }
       }
 
-      // 🚀 ULTRA-FAST QUERY: No timeout, minimal data
+      // 🚀 FIXED QUERY: Use the complete where clause including search
       let orders: any[] = [];
       let totalCount = 0;
 
       try {
-        // Step 1: Get basic order data first (fastest query)
+        // Use the complete where clause that includes search functionality
         orders = await prisma.order.findMany({
           select: {
             id: true,
             reference: true,
+            ecoManagerId: true,
             status: true,
             shippingStatus: true,
             total: true,
@@ -270,6 +271,8 @@ export class OrdersController {
             storeIdentifier: true,
             customerId: true,
             assignedAgentId: true,
+            notes: true,
+            internalNotes: true,
             // Maystro fields
             trackingNumber: true,
             maystroOrderId: true,
@@ -293,12 +296,7 @@ export class OrdersController {
               }
             }
           },
-          where: {
-            // Only use simple filters
-            ...(where.status && { status: where.status }),
-            ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
-            ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
-          },
+          where: where, // 🔥 USE THE COMPLETE WHERE CLAUSE INCLUDING SEARCH
           orderBy: {
             [sortBy as string]: sortOrder as 'asc' | 'desc'
           },
@@ -306,13 +304,9 @@ export class OrdersController {
           take: Math.min(limitNum, 50)
         });
 
-        // Step 2: Get count separately (faster)
+        // Get count with the same complete where clause
         totalCount = await prisma.order.count({
-          where: {
-            ...(where.status && { status: where.status }),
-            ...(where.storeIdentifier && { storeIdentifier: where.storeIdentifier }),
-            ...(where.assignedAgentId && { assignedAgentId: where.assignedAgentId })
-          }
+          where: where // 🔥 USE THE COMPLETE WHERE CLAUSE INCLUDING SEARCH
         });
 
         // Step 3: Enrich with customer data only if we have orders

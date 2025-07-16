@@ -131,6 +131,48 @@ export class OptimizedOrdersController {
         };
       }
 
+      // Handle note types filter (improved multi-select)
+      if (noteTypes) {
+        const noteTypeArray = (noteTypes as string).split(',').filter(nt => nt.trim());
+        if (noteTypeArray.length > 0) {
+          where.AND = [
+            ...(where.AND || []),
+            {
+              OR: noteTypeArray.map(noteType => ({
+                OR: [
+                  { notes: { contains: noteType.trim() } },
+                  { internalNotes: { contains: noteType.trim() } }
+                ]
+              }))
+            }
+          ];
+        }
+      }
+
+      // Handle hasAgentNotes filter (show only orders with agent-entered notes)
+      if (hasAgentNotes === 'true') {
+        where.AND = [
+          ...(where.AND || []),
+          {
+            OR: [
+              {
+                AND: [
+                  { notes: { not: null } },
+                  { notes: { not: '' } },
+                  { notes: { not: { contains: 'Last confirmation: Confirmation échouée 1' } } }
+                ]
+              },
+              {
+                AND: [
+                  { internalNotes: { not: null } },
+                  { internalNotes: { not: '' } }
+                ]
+              }
+            ]
+          }
+        ];
+      }
+
       // Apply product-based filtering for non-admin users
       const user = req.user;
       if (user && user.role !== 'ADMIN') {
@@ -169,7 +211,27 @@ export class OptimizedOrdersController {
           { reference: { contains: search as string, mode: 'insensitive' } },
           { ecoManagerId: { contains: search as string, mode: 'insensitive' } },
           { trackingNumber: { contains: search as string, mode: 'insensitive' } },
-          { maystroOrderId: { contains: search as string, mode: 'insensitive' } }
+          { maystroOrderId: { contains: search as string, mode: 'insensitive' } },
+          { customer: {
+              OR: [
+                { fullName: { contains: search as string, mode: 'insensitive' } },
+                { telephone: { contains: search as string, mode: 'insensitive' } },
+                { email: { contains: search as string, mode: 'insensitive' } },
+                { wilaya: { contains: search as string, mode: 'insensitive' } },
+                { commune: { contains: search as string, mode: 'insensitive' } }
+              ]
+            }
+          },
+          { items: {
+              some: {
+                OR: [
+                  { title: { contains: search as string, mode: 'insensitive' } },
+                  { sku: { contains: search as string, mode: 'insensitive' } },
+                  { productId: { contains: search as string, mode: 'insensitive' } }
+                ]
+              }
+            }
+          }
         ];
       }
 
