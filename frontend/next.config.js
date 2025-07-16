@@ -19,7 +19,6 @@ const nextConfig = {
     
     // Bundle optimization
     experimental: {
-      optimizeCss: true,
       optimizePackageImports: ['lucide-react', '@radix-ui/react-label', '@radix-ui/react-slot'],
     },
     
