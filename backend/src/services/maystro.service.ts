@@ -123,7 +123,10 @@ export class MaystroService {
       // Use nextUrl if provided, otherwise construct URL with page parameter
       const url = nextUrl || `/api/stores/orders/?page=${page}`;
       
-      console.log(`🔄 Fetching Maystro orders from: ${url}`);
+      // Reduced logging for production performance
+      if (process.env.NODE_ENV !== 'production') {
+        console.log(`🔄 Fetching Maystro orders from: ${url}`);
+      }
       
       const response = await this.axiosInstance.get(url);
       const data = response.data;
@@ -211,62 +214,6 @@ export class MaystroService {
     }
   }
 
-  /**
-   * Debug method to inspect raw API response
-   */
-  async debugApiResponse(limit: number = 10): Promise<any> {
-    try {
-      console.log('🔍 DEBUG: Fetching raw API response...');
-      
-      const response = await this.axiosInstance.get(`/api/stores/orders/?limit=${limit}`);
-      const data = response.data;
-      
-      console.log('📋 DEBUG: Full API Response Structure:');
-      console.log(JSON.stringify(data, null, 2));
-      
-      if (data.list && data.list.results && data.list.results.length > 0) {
-        console.log('📋 DEBUG: First Order Sample:');
-        console.log(JSON.stringify(data.list.results[0], null, 2));
-        
-        console.log('📋 DEBUG: Status Analysis:');
-        data.list.results.forEach((order: any, index: number) => {
-          console.log(`Order ${index + 1}:`);
-          console.log(`  - external_order_id: ${order.external_order_id}`);
-          console.log(`  - status: ${order.status} (${this.mapStatus(order.status)})`);
-          console.log(`  - id: ${order.id}`);
-          console.log(`  - instance_uuid: ${order.instance_uuid}`);
-          console.log(`  - display_id: ${order.display_id}`);
-          console.log(`  - tracking_number: ${order.tracking_number}`);
-          console.log(`  - alerted_at: ${order.alerted_at}`);
-          console.log(`  - alert_reason: ${order.alert_reason}`);
-          console.log(`  - abort_reason: ${order.abort_reason}`);
-          console.log(`  - created_at: ${order.created_at}`);
-          console.log(`  - last_update: ${order.last_update}`);
-          console.log(`  - customer_name: ${order.customer_name}`);
-          console.log('  ---');
-        });
-        
-        // Check for duplicate values
-        const displayIds = data.list.results.map((order: any) => order.display_id);
-        const trackingNumbers = data.list.results.map((order: any) => order.tracking_number);
-        const ids = data.list.results.map((order: any) => order.id);
-        
-        console.log('📋 DEBUG: Duplicate Analysis:');
-        console.log(`  - Unique display_ids: ${new Set(displayIds).size} out of ${displayIds.length}`);
-        console.log(`  - Unique tracking_numbers: ${new Set(trackingNumbers).size} out of ${trackingNumbers.length}`);
-        console.log(`  - Unique ids: ${new Set(ids).size} out of ${ids.length}`);
-      }
-      
-      return data;
-    } catch (error: any) {
-      console.error('❌ DEBUG: Error fetching API response:', error.message);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-      throw error;
-    }
-  }
 
   /**
    * Get order by external order ID (reference)
@@ -324,7 +271,7 @@ export class MaystroService {
     try {
       // Step 1: Fetch all orders from Maystro API first
       console.log('🔄 Fetching orders from Maystro API for all stores...');
-      const maystroOrders = await this.fetchAllOrders(7000); // Fetch 7000 orders from Maystro
+      const maystroOrders = await this.fetchAllOrders(10000); // Fetch 10000 orders from Maystro
       
       // Step 2: Create a Map for fast lookup
       const orderMap = new Map(maystroOrders.map(order => [order.external_order_id, order]));
