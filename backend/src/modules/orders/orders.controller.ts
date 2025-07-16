@@ -1641,12 +1641,12 @@ export class OrdersController {
   async debugMaystroApi(req: Request, res: Response) {
     try {
       const maystroService = getMaystroService(redis);
-      const result = await maystroService.debugApiResponse(10);
+      const result = await maystroService.testConnection();
 
       res.json({
         success: true,
         data: result,
-        message: 'Debug data fetched successfully'
+        message: 'Maystro API connection test completed'
       });
     } catch (error) {
       console.error('Debug Maystro API error:', error);
