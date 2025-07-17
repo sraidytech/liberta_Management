@@ -172,7 +172,7 @@ export default function OrdersPage() {
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: 'asc' | 'desc';
-  }>({ key: 'createdAt', direction: 'desc' });
+  }>({ key: 'orderDate', direction: 'desc' });
   
   // Pagination and filtering
   const [currentPage, setCurrentPage] = useState(1);
@@ -689,7 +689,7 @@ export default function OrdersPage() {
         setShippingStatusFilter(filters.shippingStatusFilter || '');
         setTotalRange(filters.totalRange || { min: '', max: '' });
         setStatusFilter(filters.statusFilter || '');
-        setSortConfig(filters.sortConfig || { key: 'createdAt', direction: 'desc' });
+        setSortConfig(filters.sortConfig || { key: 'orderDate', direction: 'desc' });
       } catch (e) {
         console.error('Error loading saved filters:', e);
       }
@@ -906,8 +906,8 @@ export default function OrdersPage() {
     setTotalRange({ min: '', max: '' });
     setStatusFilter('');
     setSearch('');
-    setSortConfig({ key: 'createdAt', direction: 'desc' });
-    setSortBy('createdAt');
+    setSortConfig({ key: 'orderDate', direction: 'desc' });
+    setSortBy('orderDate');
     setSortOrder('desc');
   };
 
