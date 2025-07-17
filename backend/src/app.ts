@@ -311,15 +311,26 @@ class App {
   private initializeSchedulerService(): void {
     this.schedulerService = new SchedulerService(redis);
     
+    // 🚨 DEBUG: Log environment details
+    console.log('🔍 [SCHEDULER DEBUG] Environment check:');
+    console.log(`   - NODE_ENV: ${config.nodeEnv}`);
+    console.log(`   - ENABLE_SCHEDULER: ${process.env.ENABLE_SCHEDULER}`);
+    console.log(`   - Is Production: ${config.nodeEnv === 'production'}`);
+    console.log(`   - Should Start: ${config.nodeEnv === 'production' || process.env.ENABLE_SCHEDULER === 'true'}`);
+    
     // Start scheduler in production or when explicitly enabled
     if (config.nodeEnv === 'production' || process.env.ENABLE_SCHEDULER === 'true') {
       // Start the production scheduler
-      this.schedulerService.startScheduler().catch(error => {
-        console.error('❌ Failed to start scheduler:', error);
+      console.log('🚀 [SCHEDULER DEBUG] Starting scheduler...');
+      this.schedulerService.startScheduler().then(() => {
+        console.log('✅ [SCHEDULER DEBUG] Scheduler started successfully');
+      }).catch(error => {
+        console.error('❌ [SCHEDULER DEBUG] Failed to start scheduler:', error);
       });
-      console.log('📅 Production scheduler started');
+      console.log('📅 Production scheduler initiated');
     } else {
       console.log('📅 Scheduler service initialized (manual mode)');
+      console.log('💡 [SCHEDULER DEBUG] To enable automatic scheduling, set NODE_ENV=production or ENABLE_SCHEDULER=true');
     }
 
     // Make scheduler service available globally for manual triggers

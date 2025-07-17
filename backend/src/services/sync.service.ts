@@ -476,6 +476,13 @@ export class SyncService {
 
             // Log order creation with details
             console.log(`   ✅ Created order ${newOrder.reference} (ID: ${ecoOrder.id})`);
+
+            // 🚨 FIX: Attempt to assign the new order immediately (same as manual sync)
+            try {
+              await this.assignmentService.assignOrder(newOrder.id);
+            } catch (assignmentError) {
+              // Silent assignment - only log actual errors, not routine assignment info
+            }
           } else {
             console.log(`   ⏭️ Skipped existing order ${ecoOrder.id}`);
           }
