@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, RefreshCw, Database, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Trash2, RefreshCw, Database, AlertTriangle, CheckCircle, RotateCcw, Truck } from 'lucide-react';
 
 interface ApiResponse {
   success: boolean;
@@ -17,7 +17,9 @@ export function DatabaseManagementSettings() {
   const [results, setResults] = useState<{ [key: string]: ApiResponse | null }>({
     deleteOrders: null,
     syncStores: null,
-    cleanupAssignments: null
+    cleanupAssignments: null,
+    fullSync: null,
+    syncShipping: null
   });
 
   const handleDeleteAllOrders = async () => {
@@ -99,6 +101,68 @@ export function DatabaseManagementSettings() {
       setResults(prev => ({ 
         ...prev, 
         cleanupAssignments: { 
+          success: false, 
+          message: error instanceof Error ? error.message : 'Unknown error' 
+        }
+      }));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleFullSync = async () => {
+    if (!confirm('Are you sure you want to perform a full sync? This will fetch ALL orders from all active stores and may take a long time.')) return;
+    
+    setLoading('fullSync');
+    setResults(prev => ({ ...prev, fullSync: null }));
+    
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/orders/sync-all-stores`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ fullSync: true })
+      });
+      
+      const result = await response.json();
+      setResults(prev => ({ ...prev, fullSync: result }));
+    } catch (error) {
+      setResults(prev => ({ 
+        ...prev, 
+        fullSync: { 
+          success: false, 
+          message: error instanceof Error ? error.message : 'Unknown error' 
+        }
+      }));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSyncShippingStatus = async () => {
+    setLoading('syncShipping');
+    setResults(prev => ({ ...prev, syncShipping: null }));
+    
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/orders/sync-shipping`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({})
+      });
+      
+      const result = await response.json();
+      setResults(prev => ({ ...prev, syncShipping: result }));
+    } catch (error) {
+      setResults(prev => ({ 
+        ...prev, 
+        syncShipping: { 
           success: false, 
           message: error instanceof Error ? error.message : 'Unknown error' 
         }
@@ -220,6 +284,61 @@ export function DatabaseManagementSettings() {
           )}
         </Button>
         {renderResult('cleanupAssignments', results.cleanupAssignments)}
+      </Card>
+
+      {/* Full Sync Orders */}
+      <Card className="p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <RotateCcw className="h-5 w-5 text-gray-600" />
+          Full Order Synchronization
+        </h3>
+        <p className="text-gray-600 mb-4">Perform a complete synchronization of ALL orders from all active EcoManager stores. This may take a long time and should be used sparingly.</p>
+        <Button
+          onClick={handleFullSync}
+          disabled={loading === 'fullSync'}
+          variant="outline"
+          className="w-full sm:w-auto bg-gray-50 hover:bg-gray-100"
+        >
+          {loading === 'fullSync' ? (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              Full Syncing...
+            </>
+          ) : (
+            <>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Full Sync All Orders
+            </>
+          )}
+        </Button>
+        {renderResult('fullSync', results.fullSync)}
+      </Card>
+
+      {/* Sync Shipping Status */}
+      <Card className="p-6">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <Truck className="h-5 w-5 text-purple-600" />
+          Shipping Status Synchronization
+        </h3>
+        <p className="text-gray-600 mb-4">Synchronize shipping status updates from Maystro delivery service for all orders with tracking numbers.</p>
+        <Button
+          onClick={handleSyncShippingStatus}
+          disabled={loading === 'syncShipping'}
+          className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700"
+        >
+          {loading === 'syncShipping' ? (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+              Syncing Shipping...
+            </>
+          ) : (
+            <>
+              <Truck className="mr-2 h-4 w-4" />
+              Sync Shipping Status
+            </>
+          )}
+        </Button>
+        {renderResult('syncShipping', results.syncShipping)}
       </Card>
 
       {/* Warning Notice */}

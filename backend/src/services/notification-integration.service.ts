@@ -36,25 +36,17 @@ export class NotificationIntegrationService {
       });
 
       if (!order || !agent) {
+        // Only log errors, not routine assignment info
         console.error('Order or agent not found for notification');
         return;
       }
 
-      // ORDER_ASSIGNMENT notifications are disabled per user request
-      console.log(`📋 Order assignment notification disabled for order ${order.reference} assigned to ${agent.name || agent.email}`);
+      // 🚨 REMOVED EXCESSIVE LOGGING: Only log manual assignments by admin
+      if (assignedBy) {
+        console.log(`📋 Manual assignment: Order ${order.reference} assigned to ${agent.name || agent.email} by admin`);
+      }
+      // Automatic assignments are now silent to reduce log clutter
 
-      // 🚨 DISABLED: Manager notifications for automatic assignments to prevent notification spam
-      // if (!assignedBy) {
-      //   await this.notifyManagers({
-      //     type: 'SYSTEM_ALERT',
-      //     title: 'Automatic Order Assignment',
-      //     message: `Order ${order.reference} was automatically assigned to ${agent.name || agent.email}`,
-      //     orderId,
-      //   });
-      // }
-      console.log(`📋 Manager notification for automatic assignment disabled for order ${order.reference}`);
-
-      console.log(`✅ Order assignment notification sent for order ${order.reference}`);
     } catch (error) {
       console.error('Error handling order assignment notification:', error);
     }

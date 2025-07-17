@@ -162,6 +162,14 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
         agentName: availableAgents[0].name,
         percentage: Math.max(0, remainingPercentage)
       }]);
+    } else {
+      // If no agents available, add empty entry that user can select from
+      const remainingPercentage = 100 - targetAgents.reduce((sum, ta) => sum + ta.percentage, 0);
+      setTargetAgents([...targetAgents, {
+        agentId: '',
+        agentName: '',
+        percentage: Math.max(0, remainingPercentage)
+      }]);
     }
   };
 
@@ -563,11 +571,22 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
                     value={targetAgent.agentId}
                     onChange={(e) => {
                       const selectedAgent = agents.find(a => a.id === e.target.value);
-                      updateTargetAgent(index, 'agentId', e.target.value);
-                      updateTargetAgent(index, 'agentName', selectedAgent?.name || '');
+                      const updated = [...targetAgents];
+                      updated[index] = {
+                        ...updated[index],
+                        agentId: e.target.value,
+                        agentName: selectedAgent?.name || ''
+                      };
+                      setTargetAgents(updated);
                     }}
                     className="border rounded px-3 py-1 flex-1"
                   >
+                    {/* Show placeholder option if no agent is selected */}
+                    {!targetAgent.agentId && (
+                      <option value="" disabled>
+                        {t('selectAgent')}
+                      </option>
+                    )}
                     {agents
                       .filter(agent => 
                         agent.id === targetAgent.agentId || 
@@ -579,6 +598,15 @@ export function BulkReassignmentModal({ isOpen, onClose, onSuccess }: BulkReassi
                         </option>
                       ))
                     }
+                    {/* Show message if no agents available */}
+                    {agents.filter(agent => 
+                        agent.id === targetAgent.agentId || 
+                        !targetAgents.some(ta => ta.agentId === agent.id)
+                      ).length === 0 && (
+                      <option value="" disabled>
+                        {t('noAgentsAvailable')}
+                      </option>
+                    )}
                   </select>
                   
                   <div className="flex items-center space-x-1">

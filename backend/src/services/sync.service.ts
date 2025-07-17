@@ -637,14 +637,11 @@ export class SyncService {
             });
             syncedCount++;
 
-            // Attempt to assign the new order immediately
+            // Attempt to assign the new order immediately (silent assignment)
             try {
-              const assignmentResult = await this.assignmentService.assignOrder(newOrder.id);
-              if (assignmentResult.success) {
-                console.log(`✅ Order ${newOrder.reference} assigned to ${assignmentResult.assignedAgentName}`);
-              }
+              await this.assignmentService.assignOrder(newOrder.id);
             } catch (assignmentError) {
-              console.log(`⚠️ Could not assign order ${newOrder.reference} immediately`);
+              // Silent assignment - only log actual errors, not routine assignment info
             }
           } catch (orderError) {
             console.error(`Error processing order ${ecoOrder.id}:`, orderError);

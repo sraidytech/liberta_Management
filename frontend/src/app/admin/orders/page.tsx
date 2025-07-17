@@ -938,23 +938,6 @@ export default function OrdersPage() {
               {syncing ? t('syncing') : t('syncNewOrders')}
             </button>
 
-            <button
-              onClick={() => syncOrders(true)}
-              disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              {t('fullSync')}
-            </button>
-
-            <button
-              onClick={syncShippingStatus}
-              disabled={syncing}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white rounded-lg transition-colors"
-            >
-              <Truck className="w-4 h-4" />
-              {syncing ? t('syncing') : t('syncShippingStatus')}
-            </button>
 
             {/* Bulk Actions */}
             {selectedOrders.size > 0 && (

@@ -134,8 +134,15 @@ export class StoresController {
         });
       }
 
-      // Set default baseUrl if not provided
-      const finalBaseUrl = baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2';
+      // Set default baseUrl if not provided and ensure it has the API path
+      let finalBaseUrl = baseUrl || 'https://natureldz.ecomanager.dz';
+      
+      // Automatically append /api/shop/v2 if not already present
+      if (!finalBaseUrl.endsWith('/api/shop/v2')) {
+        // Remove trailing slash if present
+        finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
+        finalBaseUrl += '/api/shop/v2';
+      }
 
       // Check if storeIdentifier already exists
       const existingStore = await prisma.apiConfiguration.findUnique({
@@ -406,7 +413,15 @@ export class StoresController {
         });
       }
 
-      const finalBaseUrl = baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2';
+      // Set default baseUrl if not provided and ensure it has the API path
+      let finalBaseUrl = baseUrl || 'https://natureldz.ecomanager.dz';
+      
+      // Automatically append /api/shop/v2 if not already present
+      if (!finalBaseUrl.endsWith('/api/shop/v2')) {
+        // Remove trailing slash if present
+        finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
+        finalBaseUrl += '/api/shop/v2';
+      }
 
       const ecoService = new EcoManagerService({
         storeName,

@@ -92,7 +92,7 @@ export class AgentAssignmentService {
       // Perform the assignment
       await this.performAssignment(orderId, selectedAgent.id);
 
-      // Send notification after successful assignment
+      // Send notification after successful assignment (silent for automatic assignments)
       await notificationIntegrationService.handleOrderAssignment(orderId, selectedAgent.id);
 
       return {

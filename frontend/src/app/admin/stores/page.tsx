@@ -46,7 +46,7 @@ export default function StoresPage() {
     storeName: '',
     storeIdentifier: '',
     apiToken: '',
-    baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+    baseUrl: 'https://natureldz.ecomanager.dz'
   });
   const [formLoading, setFormLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -215,7 +215,7 @@ export default function StoresPage() {
       storeName: '',
       storeIdentifier: '',
       apiToken: '',
-      baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+      baseUrl: 'https://natureldz.ecomanager.dz'
     });
     setEditingStore(null);
     setShowForm(false);

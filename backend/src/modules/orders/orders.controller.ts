@@ -934,12 +934,21 @@ export class OrdersController {
         });
       }
 
-      // Initialize EcoManager service
+      // Initialize EcoManager service with proper URL handling
+      let finalBaseUrl = apiConfig.baseUrl || 'https://natureldz.ecomanager.dz';
+      
+      // Automatically append /api/shop/v2 if not already present
+      if (!finalBaseUrl.endsWith('/api/shop/v2')) {
+        // Remove trailing slash if present
+        finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
+        finalBaseUrl += '/api/shop/v2';
+      }
+
       const ecoService = new EcoManagerService({
         storeName: apiConfig.storeName,
         storeIdentifier: apiConfig.storeIdentifier,
         apiToken: apiConfig.apiToken,
-        baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: finalBaseUrl
       }, redis);
 
       // Test connection first
