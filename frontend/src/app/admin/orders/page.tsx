@@ -285,6 +285,13 @@ export default function OrdersPage() {
 
       if (search) params.append('search', search);
       if (statusFilter) params.append('status', statusFilter);
+      
+      // 🚀 FIXED: Connect date range filter to backend API (filters by orderDate)
+      if (dateRange.start) params.append('startDate', dateRange.start);
+      if (dateRange.end) params.append('endDate', dateRange.end);
+      
+      // Additional advanced filters
+      if (shippingStatusFilter) params.append('shippingStatus', shippingStatusFilter);
 
       const response = await fetch(`${apiUrl}/api/v1/orders?${params}`, {
         headers: {
@@ -1090,7 +1097,7 @@ export default function OrdersPage() {
                 {/* Advanced Filters Toggle */}
                 <button
                   onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                  className={`px-4 py-4 rounded-2xl border transition-all duration-200 font-medium flex items-center gap-2 ${
+                  className={`px-4 py-4 rounded-2xl border transition-all duration-200 font-medium flex items-center gap-2 relative ${
                     showAdvancedFilters
                       ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-600/25'
                       : 'bg-gray-50/50 border-gray-200/50 text-gray-700 hover:bg-white hover:border-blue-500/50 hover:text-blue-600'
@@ -1098,7 +1105,32 @@ export default function OrdersPage() {
                 >
                   <Filter className="w-4 h-4" />
                   <span>Filters</span>
+                  {/* Active Filter Indicator */}
+                  {(dateRange.start || dateRange.end || customerFilter || wilayaFilter || agentFilter || shippingStatusFilter) && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                  )}
                 </button>
+
+                {/* Quick Date Filter Status */}
+                {(dateRange.start || dateRange.end) && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-2xl text-sm text-blue-700">
+                    <Calendar className="w-4 h-4" />
+                    <span className="font-medium">
+                      {dateRange.start && dateRange.end
+                        ? `${dateRange.start} - ${dateRange.end}`
+                        : dateRange.start
+                          ? `From ${dateRange.start}`
+                          : `Until ${dateRange.end}`
+                      }
+                    </span>
+                    <button
+                      onClick={() => setDateRange({ start: '', end: '' })}
+                      className="ml-1 p-1 hover:bg-blue-100 rounded-full transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1106,26 +1138,101 @@ export default function OrdersPage() {
             {showAdvancedFilters && (
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Date Range */}
-                  <div className="space-y-2">
+                  {/* Enhanced Date Range Filter */}
+                  <div className="space-y-3">
                     <label className="block text-sm font-semibold text-gray-700 flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      Date Range
+                      Order Date Range
                     </label>
+                    
+                    {/* Date Range Presets */}
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        onClick={() => {
+                          const today = new Date().toISOString().split('T')[0];
+                          setDateRange({ start: today, end: today });
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+                      >
+                        Today
+                      </button>
+                      <button
+                        onClick={() => {
+                          const yesterday = new Date();
+                          yesterday.setDate(yesterday.getDate() - 1);
+                          const dateStr = yesterday.toISOString().split('T')[0];
+                          setDateRange({ start: dateStr, end: dateStr });
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+                      >
+                        Yesterday
+                      </button>
+                      <button
+                        onClick={() => {
+                          const today = new Date();
+                          const lastWeek = new Date();
+                          lastWeek.setDate(today.getDate() - 7);
+                          setDateRange({
+                            start: lastWeek.toISOString().split('T')[0],
+                            end: today.toISOString().split('T')[0]
+                          });
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+                      >
+                        Last 7 days
+                      </button>
+                      <button
+                        onClick={() => {
+                          const today = new Date();
+                          const lastMonth = new Date();
+                          lastMonth.setDate(today.getDate() - 30);
+                          setDateRange({
+                            start: lastMonth.toISOString().split('T')[0],
+                            end: today.toISOString().split('T')[0]
+                          });
+                        }}
+                        className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg transition-colors"
+                      >
+                        Last 30 days
+                      </button>
+                      <button
+                        onClick={() => setDateRange({ start: '', end: '' })}
+                        className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    
+                    {/* Date Inputs */}
                     <div className="space-y-2">
                       <input
                         type="date"
+                        placeholder="Start Date"
                         value={dateRange.start}
                         onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
                         className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200"
                       />
                       <input
                         type="date"
+                        placeholder="End Date"
                         value={dateRange.end}
                         onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
                         className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200"
                       />
                     </div>
+                    
+                    {/* Active Filter Indicator */}
+                    {(dateRange.start || dateRange.end) && (
+                      <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                        <Calendar className="w-3 h-3 inline mr-1" />
+                        {dateRange.start && dateRange.end
+                          ? `${dateRange.start} to ${dateRange.end}`
+                          : dateRange.start
+                            ? `From ${dateRange.start}`
+                            : `Until ${dateRange.end}`
+                        }
+                      </div>
+                    )}
                   </div>
 
                   {/* Customer Filter */}

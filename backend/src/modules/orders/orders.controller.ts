@@ -243,12 +243,12 @@ export class OrdersController {
       }
 
       if (startDate || endDate) {
-        where.createdAt = {};
+        where.orderDate = {};
         if (startDate) {
-          where.createdAt.gte = new Date(startDate as string);
+          where.orderDate.gte = new Date(startDate as string);
         }
         if (endDate) {
-          where.createdAt.lte = new Date(endDate as string);
+          where.orderDate.lte = new Date(endDate as string);
         }
       }
 
