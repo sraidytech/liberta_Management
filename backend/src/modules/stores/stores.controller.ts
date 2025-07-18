@@ -134,14 +134,30 @@ export class StoresController {
         });
       }
 
-      // Set default baseUrl if not provided and ensure it has the API path
-      let finalBaseUrl = baseUrl || 'https://natureldz.ecomanager.dz';
+      // Validate baseUrl is provided
+      if (!baseUrl || baseUrl.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Base URL is required. Please provide the EcoManager store URL (e.g., https://alphalab.ecomanager.dz)'
+        });
+      }
+
+      // Ensure the URL has the API path
+      let finalBaseUrl = baseUrl.trim();
       
       // Automatically append /api/shop/v2 if not already present
       if (!finalBaseUrl.endsWith('/api/shop/v2')) {
         // Remove trailing slash if present
         finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
         finalBaseUrl += '/api/shop/v2';
+      }
+
+      // Validate it's an EcoManager URL
+      if (!finalBaseUrl.includes('ecomanager.dz')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Base URL must be a valid EcoManager domain (*.ecomanager.dz)'
+        });
       }
 
       // Check if storeIdentifier already exists
@@ -413,14 +429,30 @@ export class StoresController {
         });
       }
 
-      // Set default baseUrl if not provided and ensure it has the API path
-      let finalBaseUrl = baseUrl || 'https://natureldz.ecomanager.dz';
+      // Validate baseUrl is provided
+      if (!baseUrl || baseUrl.trim() === '') {
+        return res.status(400).json({
+          success: false,
+          message: 'Base URL is required for connection testing'
+        });
+      }
+
+      // Ensure the URL has the API path
+      let finalBaseUrl = baseUrl.trim();
       
       // Automatically append /api/shop/v2 if not already present
       if (!finalBaseUrl.endsWith('/api/shop/v2')) {
         // Remove trailing slash if present
         finalBaseUrl = finalBaseUrl.replace(/\/$/, '');
         finalBaseUrl += '/api/shop/v2';
+      }
+
+      // Validate it's an EcoManager URL
+      if (!finalBaseUrl.includes('ecomanager.dz')) {
+        return res.status(400).json({
+          success: false,
+          message: 'Base URL must be a valid EcoManager domain (*.ecomanager.dz)'
+        });
       }
 
       const ecoService = new EcoManagerService({
@@ -471,11 +503,15 @@ export class StoresController {
       const rateLimitStatuses = await Promise.all(
         stores.map(async (store) => {
           try {
+            if (!store.baseUrl) {
+              throw new Error('Base URL is missing for this store');
+            }
+
             const ecoService = new EcoManagerService({
               storeName: store.storeName,
               storeIdentifier: store.storeIdentifier,
               apiToken: 'dummy', // We only need rate limit status, not actual API calls
-              baseUrl: store.baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
+              baseUrl: store.baseUrl
             }, redis);
 
             const rateLimitStatus = await ecoService.getRateLimitStatus();

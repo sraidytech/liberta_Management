@@ -46,7 +46,7 @@ export default function StoresPage() {
     storeName: '',
     storeIdentifier: '',
     apiToken: '',
-    baseUrl: 'https://natureldz.ecomanager.dz'
+    baseUrl: ''
   });
   const [formLoading, setFormLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
@@ -215,7 +215,7 @@ export default function StoresPage() {
       storeName: '',
       storeIdentifier: '',
       apiToken: '',
-      baseUrl: 'https://natureldz.ecomanager.dz'
+      baseUrl: ''
     });
     setEditingStore(null);
     setShowForm(false);
@@ -287,9 +287,12 @@ export default function StoresPage() {
                   id="baseUrl"
                   value={formData.baseUrl}
                   onChange={(e) => setFormData({ ...formData, baseUrl: e.target.value })}
-                  placeholder="https://natureldz.ecomanager.dz/api/shop/v2"
+                  placeholder="e.g., https://alphalab.ecomanager.dz (without /api/shop/v2)"
                   required
                 />
+                <p className="text-sm text-gray-500 mt-1">
+                  Enter your store's EcoManager domain. The API path will be added automatically.
+                </p>
               </div>
 
               <div>
@@ -309,7 +312,7 @@ export default function StoresPage() {
                   type="button"
                   variant="outline"
                   onClick={handleTestConnection}
-                  disabled={testingConnection || !formData.storeName || !formData.apiToken}
+                  disabled={testingConnection || !formData.storeName || !formData.apiToken || !formData.baseUrl}
                   className="flex items-center gap-2"
                 >
                   <TestTube className="h-4 w-4" />

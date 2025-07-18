@@ -79,11 +79,18 @@ export class SyncService {
     }
 
     // Check base URL
-    const baseUrl = (config as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2';
-    try {
-      new URL(baseUrl);
-    } catch {
-      issues.push('Invalid base URL format');
+    if (!config.baseUrl || config.baseUrl.trim() === '') {
+      issues.push('Base URL is missing or empty');
+    } else {
+      try {
+        new URL(config.baseUrl);
+        // Validate that it's an EcoManager API URL
+        if (!config.baseUrl.includes('ecomanager.dz') || !config.baseUrl.includes('/api/shop/v2')) {
+          warnings.push('Base URL should be an EcoManager API endpoint ending with /api/shop/v2');
+        }
+      } catch {
+        issues.push('Invalid base URL format');
+      }
     }
 
     // Check last usage
@@ -106,14 +113,14 @@ export class SyncService {
    */
   private async logStoreProcessingStart(config: any, storeIndex: number, totalStores: number): Promise<void> {
     const validation = await this.validateStoreConfiguration(config);
-    const baseUrl = (config as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2';
+    const baseUrl = config.baseUrl;
     const tokenPreview = config.apiToken ? `...${config.apiToken.slice(-4)}` : 'MISSING';
 
     console.log(`\n🔄 [Store ${storeIndex}/${totalStores}] Processing ${config.storeName}`);
     console.log(`   - Store ID: ${config.storeIdentifier}`);
-    console.log(`   - API Endpoint: ${baseUrl}`);
+    console.log(`   - API Endpoint: ${baseUrl || 'MISSING'}`);
     console.log(`   - Token Status: ${config.apiToken ? '✅' : '❌'} ${config.apiToken ? `Present (${tokenPreview})` : 'Missing'}`);
-    console.log(`   - Base URL: ${baseUrl}`);
+    console.log(`   - Base URL: ${baseUrl || 'MISSING'}`);
     console.log(`   - Last Used: ${config.lastUsed ? new Date(config.lastUsed).toLocaleString() : 'Never'}`);
     console.log(`   - Request Count: ${config.requestCount || 0}`);
 
@@ -364,10 +371,14 @@ export class SyncService {
     console.log(`   - Last Used: ${apiConfig.lastUsed ? new Date(apiConfig.lastUsed).toLocaleString() : 'Never'}`);
     console.log(`   - Request Count: ${apiConfig.requestCount || 0}`);
 
+    // Validate required configuration
+    if (!apiConfig.baseUrl) {
+      throw new Error(`Base URL is missing for store ${apiConfig.storeName} (${apiConfig.storeIdentifier})`);
+    }
+
     // Initialize EcoManager service
-    const baseUrl = (apiConfig as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2';
     console.log(`🔧 [Service Init] Initializing EcoManager service:`);
-    console.log(`   - Base URL: ${baseUrl}`);
+    console.log(`   - Base URL: ${apiConfig.baseUrl}`);
     console.log(`   - Timeout: 30 seconds`);
     console.log(`   - Rate Limit: 4 req/sec`);
 
@@ -375,7 +386,7 @@ export class SyncService {
       storeName: apiConfig.storeName,
       storeIdentifier: apiConfig.storeIdentifier,
       apiToken: apiConfig.apiToken,
-      baseUrl: baseUrl
+      baseUrl: apiConfig.baseUrl
     }, this.redis);
 
     // Test connection with detailed logging
