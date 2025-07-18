@@ -175,26 +175,24 @@ export class AdminController {
   }
 
   /**
-   * Clean up ALL order assignments - Complete cleanup for testing new assignment system
+   * Clean up all order assignments
    */
   async cleanupAssignments(req: Request, res: Response) {
     try {
-      console.log('🧹 Starting COMPLETE assignment cleanup for ALL orders...');
+      console.log('🧹 Starting assignment cleanup...');
 
       const result = await prisma.$transaction(async (tx) => {
-        // Reset ALL order assignments (not limited to recent orders)
+        // Reset all order assignments
         const updatedOrders = await tx.order.updateMany({
           where: {
             assignedAgentId: { not: null }
           },
           data: {
-            assignedAgentId: null,
-            assignedAt: null, // Also reset assignedAt timestamp
-            status: 'PENDING' // Reset status to PENDING for reassignment
+            assignedAgentId: null
           }
         });
 
-        // Reset ALL agent current order counts
+        // Reset all agent current order counts
         const updatedAgents = await tx.user.updateMany({
           where: {
             role: 'AGENT_SUIVI'
@@ -204,12 +202,8 @@ export class AdminController {
           }
         });
 
-        // Delete all agent activities related to assignments
-        const deletedActivities = await tx.agentActivity.deleteMany({
-          where: {
-            activityType: 'ORDER_ASSIGNED'
-          }
-        });
+        // Delete all agent activities
+        const deletedActivities = await tx.agentActivity.deleteMany({});
 
         // Delete assignment-related notifications
         const deletedNotifications = await tx.notification.deleteMany({
@@ -218,27 +212,20 @@ export class AdminController {
           }
         });
 
-        // Get total order count for reporting
-        const totalOrders = await tx.order.count();
-
         return {
-          totalOrders,
           unassignedOrders: updatedOrders.count,
           resetAgents: updatedAgents.count,
           deletedActivities: deletedActivities.count,
           deletedNotifications: deletedNotifications.count
         };
-      }, {
-        timeout: 120000 // 2 minute timeout for large operations
       });
 
-      console.log('✅ COMPLETE assignment cleanup completed');
-      console.log(`📊 Cleanup results:`, result);
+      console.log('✅ Assignment cleanup completed');
 
       res.json({
         success: true,
-        message: `Complete assignment cleanup completed successfully. Unassigned ${result.unassignedOrders} orders from ${result.totalOrders} total orders, reset ${result.resetAgents} agents.`,
-        data: result,
+        message: 'Assignment cleanup completed successfully',
+        result,
         timestamp: new Date().toISOString()
       });
 
