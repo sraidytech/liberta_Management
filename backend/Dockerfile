@@ -11,7 +11,8 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client
+# Generate Prisma client with checksum ignore for network issues
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 RUN npx prisma generate
 
 # Build the application
