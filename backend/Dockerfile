@@ -11,8 +11,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
+# Generate Prisma client with proper type generation
+ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # Build the application
 RUN npm run build

@@ -159,7 +159,7 @@ export class AgentAssignmentService {
   }
 
   /**
-   * Auto-assign all unassigned orders
+   * Auto-assign all unassigned orders (limited to last 15,000 orders for performance)
    */
   async autoAssignUnassignedOrders(): Promise<{
     totalProcessed: number;
@@ -167,9 +167,19 @@ export class AgentAssignmentService {
     failedAssignments: number;
     results: AssignmentResult[];
   }> {
-    // Get unassigned orders - reduced limit to prevent connection exhaustion
+    // 🚀 PERFORMANCE: Get only the last 15,000 orders for assignment consideration
+    const recentOrderIds = await prisma.order.findMany({
+      select: { id: true },
+      orderBy: { orderDate: 'desc' }, // Use orderDate instead of createdAt
+      take: 15000 // Limit to last 15,000 orders only
+    });
+
+    const recentOrderIdList = recentOrderIds.map(order => order.id);
+
+    // Get unassigned orders from the last 15,000 orders only
     const unassignedOrders = await prisma.order.findMany({
       where: {
+        id: { in: recentOrderIdList }, // Only consider last 15,000 orders
         assignedAgentId: null,
         // Include orders with any shipping status except delivered/cancelled
         OR: [
@@ -178,8 +188,8 @@ export class AgentAssignmentService {
         ]
       },
       select: { id: true },
-      orderBy: { createdAt: 'desc' }, // Get most recent orders first
-      take: 1000 // Reduced from 10,000 to 1,000 orders per run to prevent connection exhaustion
+      orderBy: { orderDate: 'desc' }, // Use orderDate instead of createdAt
+      take: 1000 // Process max 1,000 orders per run to prevent connection exhaustion
     });
 
     const orderIds = unassignedOrders.map(order => order.id);
@@ -199,10 +209,10 @@ export class AgentAssignmentService {
   }
 
   /**
-   * Get available AGENT_SUIVI agents based on capacity (not requiring online status)
+   * Get available AGENT_SUIVI agents based on capacity only (online status removed)
    */
   private async getAvailableAgents(): Promise<AgentStatus[]> {
-    // Get all active AGENT_SUIVI users
+    // 🚀 PERFORMANCE: Get all active AGENT_SUIVI users in single query
     const agents = await prisma.user.findMany({
       where: {
         isActive: true,
@@ -217,37 +227,46 @@ export class AgentAssignmentService {
       }
     });
 
+    // 🚀 PERFORMANCE: Get today's assignment counts for all agents in single query
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const agentAssignmentCounts = await prisma.order.groupBy({
+      by: ['assignedAgentId'],
+      where: {
+        assignedAgentId: { in: agents.map(a => a.id) },
+        assignedAt: {
+          gte: today,
+          lt: tomorrow
+        }
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Create lookup map for assignment counts
+    const assignmentCountMap = new Map();
+    agentAssignmentCounts.forEach(count => {
+      if (count.assignedAgentId) {
+        assignmentCountMap.set(count.assignedAgentId, count._count.id);
+      }
+    });
+
     const availableAgents: AgentStatus[] = [];
 
     for (const agent of agents) {
-      // Check if agent has capacity based on TODAY's assignments only
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const todaysAssignedOrdersCount = await prisma.order.count({
-        where: {
-          assignedAgentId: agent.id,
-          assignedAt: {
-            gte: today,
-            lt: tomorrow
-          }
-        }
-      });
-
+      const todaysAssignedOrdersCount = assignmentCountMap.get(agent.id) || 0;
       const hasCapacity = todaysAssignedOrdersCount < agent.maxOrders;
-
-      // For mandatory assignment, include all agents even if they exceed daily limit
-      // But prioritize those with capacity
-      const isOnline = await this.isAgentOnline(agent.id);
       
       availableAgents.push({
         id: agent.id,
         name: agent.name || '',
         agentCode: agent.agentCode || '',
         isActive: true,
-        isOnline: isOnline,
+        isOnline: true, // Always consider as online - removed online status dependency
         currentOrders: todaysAssignedOrdersCount,
         maxOrders: agent.maxOrders,
         hasCapacity: hasCapacity
@@ -321,71 +340,92 @@ export class AgentAssignmentService {
   }
 
   /**
-   * Get available agents for specific products
+   * Get available agents for specific products (optimized, online status removed)
    */
   private async getAvailableAgentsForProducts(productNames: string[]): Promise<AgentStatus[]> {
     if (productNames.length === 0) {
       return this.getAvailableAgents(); // Fallback to all agents if no products
     }
 
-    // Get all users assigned to any of these products
-    const assignedUsers = await Promise.all(
-      productNames.map(productName =>
-        productAssignmentService.getUsersAssignedToProduct(productName)
+    // 🚀 PERFORMANCE: Get all users assigned to products in single query
+    const productAssignments = await prisma.userProductAssignment.findMany({
+      where: {
+        productName: { in: productNames },
+        isActive: true
+      },
+      select: {
+        userId: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            agentCode: true,
+            maxOrders: true,
+            currentOrders: true,
+            isActive: true,
+            role: true
+          }
+        }
+      }
+    });
+
+    // Filter for active AGENT_SUIVI users only
+    const agents = productAssignments
+      .filter(assignment =>
+        assignment.user.isActive &&
+        assignment.user.role === 'AGENT_SUIVI'
       )
+      .map(assignment => assignment.user);
+
+    // Remove duplicates
+    const uniqueAgents = agents.filter((agent, index, self) =>
+      index === self.findIndex(a => a.id === agent.id)
     );
 
-    // Flatten and deduplicate user IDs
-    const userIds = [...new Set(assignedUsers.flat().map(user => user.id))];
-
-    if (userIds.length === 0) {
+    if (uniqueAgents.length === 0) {
       return this.getAvailableAgents(); // Fallback to all agents if no assignments
     }
 
-    // Get all active AGENT_SUIVI users assigned to these products
-    const agents = await prisma.user.findMany({
+    // 🚀 PERFORMANCE: Get today's assignment counts for all agents in single query
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const agentAssignmentCounts = await prisma.order.groupBy({
+      by: ['assignedAgentId'],
       where: {
-        id: { in: userIds },
-        isActive: true,
-        role: 'AGENT_SUIVI'
+        assignedAgentId: { in: uniqueAgents.map(a => a.id) },
+        assignedAt: {
+          gte: today,
+          lt: tomorrow
+        }
       },
-      select: {
-        id: true,
-        name: true,
-        agentCode: true,
-        maxOrders: true,
-        currentOrders: true
+      _count: {
+        id: true
+      }
+    });
+
+    // Create lookup map for assignment counts
+    const assignmentCountMap = new Map();
+    agentAssignmentCounts.forEach(count => {
+      if (count.assignedAgentId) {
+        assignmentCountMap.set(count.assignedAgentId, count._count.id);
       }
     });
 
     const availableAgents: AgentStatus[] = [];
 
-    for (const agent of agents) {
-      // Check if agent has capacity based on TODAY's assignments only
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const todaysAssignedOrdersCount = await prisma.order.count({
-        where: {
-          assignedAgentId: agent.id,
-          assignedAt: {
-            gte: today,
-            lt: tomorrow
-          }
-        }
-      });
-
+    for (const agent of uniqueAgents) {
+      const todaysAssignedOrdersCount = assignmentCountMap.get(agent.id) || 0;
       const hasCapacity = todaysAssignedOrdersCount < agent.maxOrders;
-      const isOnline = await this.isAgentOnline(agent.id);
       
       availableAgents.push({
         id: agent.id,
         name: agent.name || '',
         agentCode: agent.agentCode || '',
         isActive: true,
-        isOnline: isOnline,
+        isOnline: true, // Always consider as online - removed online status dependency
         currentOrders: todaysAssignedOrdersCount,
         maxOrders: agent.maxOrders,
         hasCapacity: hasCapacity
@@ -708,7 +748,7 @@ export class AgentAssignmentService {
   }
 
   /**
-   * Test assignment system - assign a batch of unassigned orders
+   * Test assignment system - assign a batch of unassigned orders (limited to last 15,000 orders)
    */
   async testAssignmentSystem(maxOrders: number = 10): Promise<{
     totalProcessed: number;
@@ -718,9 +758,19 @@ export class AgentAssignmentService {
   }> {
     console.log(`🧪 Testing assignment system with max ${maxOrders} orders...`);
     
-    // Get some unassigned orders for testing
+    // 🚀 PERFORMANCE: Get only the last 15,000 orders for testing
+    const recentOrderIds = await prisma.order.findMany({
+      select: { id: true },
+      orderBy: { orderDate: 'desc' }, // Use orderDate instead of createdAt
+      take: 15000 // Limit to last 15,000 orders only
+    });
+
+    const recentOrderIdList = recentOrderIds.map(order => order.id);
+
+    // Get some unassigned orders for testing from last 15,000 orders only
     const testOrders = await prisma.order.findMany({
       where: {
+        id: { in: recentOrderIdList }, // Only consider last 15,000 orders
         assignedAgentId: null,
         // Include orders with any shipping status except delivered/cancelled
         OR: [
@@ -729,12 +779,12 @@ export class AgentAssignmentService {
         ]
       },
       select: { id: true, reference: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { orderDate: 'desc' }, // Use orderDate instead of createdAt
       take: maxOrders
     });
 
     if (testOrders.length === 0) {
-      console.log('❌ No unassigned orders found for testing');
+      console.log('❌ No unassigned orders found for testing in last 15,000 orders');
       return {
         totalProcessed: 0,
         successfulAssignments: 0,
@@ -743,7 +793,7 @@ export class AgentAssignmentService {
       };
     }
 
-    console.log(`📋 Found ${testOrders.length} orders to test assignment`);
+    console.log(`📋 Found ${testOrders.length} orders to test assignment from last 15,000 orders`);
     
     const orderIds = testOrders.map(order => order.id);
     const results = await this.assignOrdersBatch(orderIds);
@@ -876,7 +926,7 @@ export class AgentAssignmentService {
   }
 
   /**
-   * Get assignment statistics for dashboard
+   * Get assignment statistics for dashboard (limited to last 15,000 orders, online status removed)
    */
   async getAssignmentStats(): Promise<{
     totalAgents: number;
@@ -894,7 +944,7 @@ export class AgentAssignmentService {
       utilizationRate: number;
     }>;
   }> {
-    // Get all AGENT_SUIVI users
+    // 🚀 PERFORMANCE: Get all AGENT_SUIVI users
     const agents = await prisma.user.findMany({
       where: {
         isActive: true,
@@ -908,9 +958,19 @@ export class AgentAssignmentService {
       }
     });
 
-    // Get unassigned orders count - only last 10,000 orders with delivery status not 'livre' or 'retour'
+    // 🚀 PERFORMANCE: Get only the last 15,000 orders for statistics
+    const recentOrderIds = await prisma.order.findMany({
+      select: { id: true },
+      orderBy: { orderDate: 'desc' }, // Use orderDate instead of createdAt
+      take: 15000 // Limit to last 15,000 orders only
+    });
+
+    const recentOrderIdList = recentOrderIds.map(order => order.id);
+
+    // Get unassigned orders count from last 15,000 orders only
     const unassignedOrders = await prisma.order.count({
       where: {
+        id: { in: recentOrderIdList }, // Only consider last 15,000 orders
         assignedAgentId: null,
         AND: [
           {
@@ -921,27 +981,35 @@ export class AgentAssignmentService {
             ]
           }
         ]
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 10000
+      }
     });
 
-    let onlineAgents = 0;
+    // 🚀 PERFORMANCE: Get assigned orders count for all agents in single query
+    const assignedOrderCounts = await prisma.order.groupBy({
+      by: ['assignedAgentId'],
+      where: {
+        id: { in: recentOrderIdList }, // Only consider last 15,000 orders
+        assignedAgentId: { in: agents.map(a => a.id) },
+        status: 'ASSIGNED'
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    // Create lookup map for assigned order counts
+    const assignedCountMap = new Map();
+    assignedOrderCounts.forEach(count => {
+      if (count.assignedAgentId) {
+        assignedCountMap.set(count.assignedAgentId, count._count.id);
+      }
+    });
+
     let totalAssignedOrders = 0;
     const agentWorkloads = [];
 
     for (const agent of agents) {
-      const isOnline = await this.isAgentOnline(agent.id);
-      if (isOnline) onlineAgents++;
-
-      // Count only ASSIGNED orders
-      const assignedOrders = await prisma.order.count({
-        where: {
-          assignedAgentId: agent.id,
-          status: 'ASSIGNED'
-        }
-      });
-
+      const assignedOrders = assignedCountMap.get(agent.id) || 0;
       totalAssignedOrders += assignedOrders;
 
       const utilizationRate = agent.maxOrders > 0 ? (assignedOrders / agent.maxOrders) * 100 : 0;
@@ -950,7 +1018,7 @@ export class AgentAssignmentService {
         agentId: agent.id,
         agentName: agent.name || 'Unknown',
         agentCode: agent.agentCode || '',
-        isOnline,
+        isOnline: true, // Always consider as online - removed online status dependency
         assignedOrders,
         maxOrders: agent.maxOrders,
         utilizationRate: Math.round(utilizationRate * 100) / 100
@@ -959,8 +1027,8 @@ export class AgentAssignmentService {
 
     return {
       totalAgents: agents.length,
-      onlineAgents,
-      offlineAgents: agents.length - onlineAgents,
+      onlineAgents: agents.length, // All agents considered online
+      offlineAgents: 0, // No offline agents since we removed online status
       unassignedOrders,
       totalAssignedOrders,
       agentWorkloads
