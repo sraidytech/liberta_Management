@@ -31,14 +31,21 @@ export interface MaystroOrder {
 }
 
 export interface MaystroConfig {
+  id: string;
+  name: string;
   apiKey: string;
   baseUrl: string;
+  isPrimary?: boolean;
+}
+
+export interface ApiInstance {
+  config: MaystroConfig;
+  axiosInstance: any;
 }
 
 export class MaystroService {
-  private axiosInstance: any;
+  private apiInstances: ApiInstance[] = [];
   private redis: Redis;
-  private config: MaystroConfig;
   private readonly RATE_LIMIT_DELAY = 50; // 50ms between requests for faster processing
   private readonly MAX_RETRIES = 3;
   private readonly BATCH_SIZE = 20; // Use default page size as per API docs (20 orders per page)
@@ -65,70 +72,165 @@ export class MaystroService {
     53: "NON REÇU"
   };
 
-  constructor(config: MaystroConfig, redis: Redis) {
-    this.config = config;
+  constructor(configs: MaystroConfig[] | MaystroConfig, redis: Redis) {
     this.redis = redis;
-    this.axiosInstance = axios.create({
-      baseURL: config.baseUrl,
-      headers: {
-        'Authorization': `Token ${config.apiKey}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      timeout: 120000 // 2 minutes timeout for large fetches
+    
+    // Handle both single config (backward compatibility) and multiple configs
+    const configArray = Array.isArray(configs) ? configs : [configs];
+    
+    // Ensure single config has required properties
+    if (!Array.isArray(configs)) {
+      const singleConfig = configs as MaystroConfig;
+      if (!singleConfig.id) {
+        (singleConfig as any).id = 'primary';
+        (singleConfig as any).name = 'Primary Maystro API';
+      }
+    }
+    
+    // Create API instances for each configuration
+    this.apiInstances = configArray.map((config, index) => {
+      const axiosInstance = axios.create({
+        baseURL: config.baseUrl,
+        headers: {
+          'Authorization': `Token ${config.apiKey}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        timeout: 120000 // 2 minutes timeout for large fetches
+      });
+
+      // Add request interceptor for rate limiting (per API instance)
+      axiosInstance.interceptors.request.use(async (axiosConfig: any) => {
+        const lastRequestKey = `maystro:last_request:${config.id}`;
+        const lastRequest = await this.redis.get(lastRequestKey);
+        
+        if (lastRequest) {
+          const timeSinceLastRequest = Date.now() - parseInt(lastRequest);
+          if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
+            await new Promise(resolve =>
+              setTimeout(resolve, this.RATE_LIMIT_DELAY - timeSinceLastRequest)
+            );
+          }
+        }
+        
+        await this.redis.set(lastRequestKey, Date.now().toString(), 'EX', 60);
+        return axiosConfig;
+      });
+
+      // Add response interceptor for error handling
+      axiosInstance.interceptors.response.use(
+        (response: any) => response,
+        async (error: any) => {
+          if (error.response?.status === 429) {
+            // Rate limit exceeded, wait longer
+            await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY * 2));
+            return axiosInstance.request(error.config);
+          }
+          throw error;
+        }
+      );
+
+      return {
+        config,
+        axiosInstance
+      };
     });
 
-    // Add request interceptor for rate limiting
-    this.axiosInstance.interceptors.request.use(async (config: any) => {
-      const lastRequestKey = `maystro:last_request`;
-      const lastRequest = await this.redis.get(lastRequestKey);
-      
-      if (lastRequest) {
-        const timeSinceLastRequest = Date.now() - parseInt(lastRequest);
-        if (timeSinceLastRequest < this.RATE_LIMIT_DELAY) {
-          await new Promise(resolve => 
-            setTimeout(resolve, this.RATE_LIMIT_DELAY - timeSinceLastRequest)
-          );
-        }
-      }
-      
-      await this.redis.set(lastRequestKey, Date.now().toString(), 'EX', 60);
-      return config;
+    console.log(`🔑 Initialized MaystroService with ${this.apiInstances.length} API instance(s)`);
+    this.apiInstances.forEach((instance, index) => {
+      console.log(`   - ${instance.config.name} (${instance.config.isPrimary ? 'Primary' : 'Secondary'})`);
     });
+  }
 
-    // Add response interceptor for error handling
-    this.axiosInstance.interceptors.response.use(
-      (response: any) => response,
-      async (error: any) => {
-        if (error.response?.status === 429) {
-          // Rate limit exceeded, wait longer
-          await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY * 2));
-          return this.axiosInstance.request(error.config);
-        }
-        throw error;
+  /**
+   * Get primary API instance (first one marked as primary, or first one if none marked)
+   */
+  private getPrimaryApiInstance(): ApiInstance {
+    const primary = this.apiInstances.find(instance => instance.config.isPrimary);
+    return primary || this.apiInstances[0];
+  }
+
+  /**
+   * Get all API instances
+   */
+  private getAllApiInstances(): ApiInstance[] {
+    return this.apiInstances;
+  }
+
+  /**
+   * Execute a request on a specific API instance with error handling
+   */
+  private async executeOnApiInstance<T>(
+    apiInstance: ApiInstance,
+    operation: (axiosInstance: any) => Promise<T>,
+    operationName: string
+  ): Promise<{ success: boolean; data?: T; error?: string; apiName: string }> {
+    try {
+      const data = await operation(apiInstance.axiosInstance);
+      return {
+        success: true,
+        data,
+        apiName: apiInstance.config.name
+      };
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Unknown error';
+      console.error(`❌ ${operationName} failed on ${apiInstance.config.name}:`, errorMessage);
+      return {
+        success: false,
+        error: errorMessage,
+        apiName: apiInstance.config.name
+      };
+    }
+  }
+
+  /**
+   * Execute operation on all APIs and return first successful result
+   */
+  private async executeWithFallback<T>(
+    operation: (axiosInstance: any) => Promise<T>,
+    operationName: string
+  ): Promise<T | null> {
+    for (const apiInstance of this.apiInstances) {
+      const result = await this.executeOnApiInstance(apiInstance, operation, operationName);
+      if (result.success && result.data) {
+        console.log(`✅ ${operationName} successful on ${result.apiName}`);
+        return result.data;
       }
-    );
+    }
+    
+    console.log(`❌ ${operationName} failed on all ${this.apiInstances.length} API(s)`);
+    return null;
   }
 
   /**
    * Fetch orders from Maystro API with pagination - OPTIMIZED for API docs format
    */
-  async fetchOrders(page: number = 1, nextUrl?: string): Promise<{
+  async fetchOrders(page: number = 1, nextUrl?: string, apiInstanceIndex?: number): Promise<{
     orders: MaystroOrder[];
     nextUrl?: string;
     totalCount: number;
     currentPage: number;
+    apiName?: string;
   }> {
+    // Use specific API instance or primary by default
+    const apiInstance = apiInstanceIndex !== undefined
+      ? this.apiInstances[apiInstanceIndex]
+      : this.getPrimaryApiInstance();
+
+    if (!apiInstance) {
+      throw new Error('No API instance available');
+    }
+
     try {
       // Use nextUrl if provided, otherwise construct URL with page parameter
       const url = nextUrl || `/api/stores/orders/?page=${page}`;
       
       // Reduced logging for production performance
       if (process.env.NODE_ENV !== 'production') {
-        console.log(`🔄 Fetching Maystro orders from: ${url}`);
+        console.log(`🔄 Fetching Maystro orders from ${apiInstance.config.name}: ${url}`);
       }
       
-      const response = await this.axiosInstance.get(url);
+      const response = await apiInstance.axiosInstance.get(url);
       const data = response.data;
 
       if (!data.list || !Array.isArray(data.list.results)) {
@@ -139,10 +241,11 @@ export class MaystroService {
         orders: data.list.results,
         nextUrl: data.list.next,
         totalCount: data.list.count || 0,
-        currentPage: page
+        currentPage: page,
+        apiName: apiInstance.config.name
       };
     } catch (error: any) {
-      console.error('❌ Error fetching Maystro orders:', error.message);
+      console.error(`❌ Error fetching Maystro orders from ${apiInstance.config.name}:`, error.message);
       if (error.response) {
         console.error('Response status:', error.response.status);
         console.error('Response data:', error.response.data);
@@ -152,60 +255,97 @@ export class MaystroService {
   }
 
   /**
-   * Fetch all orders with CONCURRENT pagination - SUPER FAST
+   * Fetch all orders with CONCURRENT pagination from ALL APIs - SUPER FAST WITH DUAL API SUPPORT
    */
   async fetchAllOrders(maxOrders: number = 3000): Promise<MaystroOrder[]> {
     const maxPages = Math.ceil(maxOrders / 20); // 20 orders per page
     const concurrency = 10; // Fetch 10 pages concurrently
     
-    console.log(`🚀 Starting CONCURRENT fetch of up to ${maxOrders} Maystro orders (${maxPages} pages, ${concurrency} concurrent)...`);
+    console.log(`🚀 Starting CONCURRENT fetch from ${this.apiInstances.length} API(s) of up to ${maxOrders} Maystro orders (${maxPages} pages, ${concurrency} concurrent)...`);
 
     try {
-      const allOrders: MaystroOrder[] = [];
+      const allOrdersFromAllApis: MaystroOrder[] = [];
       
-      // Process pages in batches of 10 concurrent requests
-      for (let batchStart = 1; batchStart <= maxPages; batchStart += concurrency) {
-        const batchEnd = Math.min(batchStart + concurrency - 1, maxPages);
-        const pagePromises: Promise<any>[] = [];
+      // Fetch from each API instance
+      for (let apiIndex = 0; apiIndex < this.apiInstances.length; apiIndex++) {
+        const apiInstance = this.apiInstances[apiIndex];
+        console.log(`📡 Fetching orders from ${apiInstance.config.name}...`);
         
-        // Create concurrent requests for this batch
-        for (let page = batchStart; page <= batchEnd; page++) {
-          pagePromises.push(
-            this.fetchOrders(page).catch(error => {
-              console.log(`⚠️  Page ${page} failed: ${error.message}`);
-              return { orders: [], currentPage: page }; // Return empty on error
-            })
-          );
-        }
+        const apiOrders: MaystroOrder[] = [];
         
-        // Wait for all pages in this batch
-        console.log(`📦 Fetching pages ${batchStart}-${batchEnd} concurrently...`);
-        const batchResults = await Promise.all(pagePromises);
-        
-        // Collect orders from successful pages
-        let batchOrderCount = 0;
-        batchResults.forEach(result => {
-          if (result.orders && result.orders.length > 0) {
-            allOrders.push(...result.orders);
-            batchOrderCount += result.orders.length;
+        // Process pages in batches of 10 concurrent requests for this API
+        for (let batchStart = 1; batchStart <= maxPages; batchStart += concurrency) {
+          const batchEnd = Math.min(batchStart + concurrency - 1, maxPages);
+          const pagePromises: Promise<any>[] = [];
+          
+          // Create concurrent requests for this batch
+          for (let page = batchStart; page <= batchEnd; page++) {
+            pagePromises.push(
+              this.fetchOrders(page, undefined, apiIndex).catch(error => {
+                console.log(`⚠️  ${apiInstance.config.name} Page ${page} failed: ${error.message}`);
+                return { orders: [], currentPage: page, apiName: apiInstance.config.name }; // Return empty on error
+              })
+            );
           }
-        });
-        
-        console.log(`✅ Batch ${Math.ceil(batchStart/concurrency)} complete: ${batchOrderCount} orders (Total: ${allOrders.length})`);
-        
-        // Break if we have enough orders
-        if (allOrders.length >= maxOrders) {
-          break;
+          
+          // Wait for all pages in this batch
+          console.log(`📦 Fetching ${apiInstance.config.name} pages ${batchStart}-${batchEnd} concurrently...`);
+          const batchResults = await Promise.all(pagePromises);
+          
+          // Collect orders from successful pages
+          let batchOrderCount = 0;
+          batchResults.forEach(result => {
+            if (result.orders && result.orders.length > 0) {
+              // Add API source metadata to each order
+              const ordersWithSource = result.orders.map((order: MaystroOrder) => ({
+                ...order,
+                _apiSource: apiInstance.config.name,
+                _apiIndex: apiIndex
+              }));
+              apiOrders.push(...ordersWithSource);
+              batchOrderCount += result.orders.length;
+            }
+          });
+          
+          console.log(`✅ ${apiInstance.config.name} Batch ${Math.ceil(batchStart/concurrency)} complete: ${batchOrderCount} orders (API Total: ${apiOrders.length})`);
+          
+          // Break if we have enough orders from this API
+          if (apiOrders.length >= maxOrders) {
+            break;
+          }
+          
+          // Small delay between batches to be nice to the API
+          if (batchEnd < maxPages) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
         }
         
-        // Small delay between batches to be nice to the API
-        if (batchEnd < maxPages) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        console.log(`🎉 ${apiInstance.config.name} fetch complete: ${apiOrders.length} orders`);
+        allOrdersFromAllApis.push(...apiOrders);
       }
 
-      const finalOrders = allOrders.slice(0, maxOrders);
-      console.log(`🎉 CONCURRENT fetch complete: ${finalOrders.length} orders in ~${Math.ceil(maxPages/concurrency)} batches`);
+      // Remove duplicates based on external_order_id (in case same order exists in multiple APIs)
+      const uniqueOrders = new Map<string, MaystroOrder>();
+      allOrdersFromAllApis.forEach(order => {
+        const key = order.external_order_id;
+        if (!uniqueOrders.has(key)) {
+          uniqueOrders.set(key, order);
+        } else {
+          // If duplicate found, prefer the one from primary API or first API
+          const existing = uniqueOrders.get(key)!;
+          const currentApiIndex = (order as any)._apiIndex || 0;
+          const existingApiIndex = (existing as any)._apiIndex || 0;
+          
+          if (currentApiIndex < existingApiIndex) {
+            uniqueOrders.set(key, order);
+          }
+        }
+      });
+
+      const finalOrders = Array.from(uniqueOrders.values()).slice(0, maxOrders);
+      console.log(`🎉 DUAL API CONCURRENT fetch complete: ${finalOrders.length} unique orders from ${this.apiInstances.length} API(s)`);
+      console.log(`📊 Total fetched: ${allOrdersFromAllApis.length}, Unique: ${finalOrders.length}, Duplicates removed: ${allOrdersFromAllApis.length - finalOrders.length}`);
+      
       return finalOrders;
 
     } catch (error: any) {
@@ -216,35 +356,68 @@ export class MaystroService {
 
 
   /**
-   * Get order by external order ID (reference)
+   * Get order by external order ID (reference) - WITH DUAL API CHECKING
    */
   async getOrderByReference(reference: string): Promise<MaystroOrder | null> {
-    try {
-      const response = await this.axiosInstance.get(`/api/stores/orders/?external_order_id=${reference}`);
-      const data = response.data;
+    console.log(`🔍 Searching for order ${reference} across ${this.apiInstances.length} API(s)...`);
+    
+    // Try each API instance until we find the order
+    for (let i = 0; i < this.apiInstances.length; i++) {
+      const apiInstance = this.apiInstances[i];
+      const apiName = apiInstance.config.name;
+      
+      try {
+        console.log(`🔍 Checking order ${reference} in ${apiName}...`);
+        const response = await apiInstance.axiosInstance.get(`/api/stores/orders/?external_order_id=${reference}`);
+        const data = response.data;
 
-      if (data.list && data.list.results && data.list.results.length > 0) {
-        return data.list.results[0];
+        if (data.list && data.list.results && data.list.results.length > 0) {
+          const order = data.list.results[0];
+          console.log(`✅ Order ${reference} found in ${apiName} (Status: ${this.mapStatus(order.status)})`);
+          
+          // Add metadata about which API provided the data
+          order._apiSource = apiName;
+          order._apiIndex = i;
+          
+          return order;
+        } else {
+          console.log(`⚠️ Order ${reference} not found in ${apiName}`);
+        }
+      } catch (error: any) {
+        console.error(`❌ Error checking order ${reference} in ${apiName}:`, error.message);
+        // Continue to next API instead of failing completely
       }
-
-      return null;
-    } catch (error: any) {
-      console.error(`❌ Error fetching order by reference ${reference}:`, error.message);
-      return null;
     }
+
+    console.log(`❌ Order ${reference} not found in any of the ${this.apiInstances.length} API(s)`);
+    return null;
   }
 
   /**
-   * Get order history/tracking
+   * Get order history/tracking - WITH DUAL API CHECKING
    */
   async getOrderHistory(orderId: string): Promise<any[]> {
-    try {
-      const response = await this.axiosInstance.get(`/api/stores/history_order/${orderId}`);
-      return response.data || [];
-    } catch (error: any) {
-      console.error(`❌ Error fetching order history for ${orderId}:`, error.message);
-      return [];
+    console.log(`🔍 Fetching order history for ${orderId} from ${this.apiInstances.length} API(s)...`);
+    
+    // Try each API instance until we find the order history
+    for (const apiInstance of this.apiInstances) {
+      try {
+        console.log(`🔍 Checking order history ${orderId} in ${apiInstance.config.name}...`);
+        const response = await apiInstance.axiosInstance.get(`/api/stores/history_order/${orderId}`);
+        const history = response.data || [];
+        
+        if (history.length > 0) {
+          console.log(`✅ Order history for ${orderId} found in ${apiInstance.config.name} (${history.length} entries)`);
+          return history;
+        }
+      } catch (error: any) {
+        console.error(`❌ Error fetching order history for ${orderId} from ${apiInstance.config.name}:`, error.message);
+        // Continue to next API instead of failing completely
+      }
     }
+    
+    console.log(`❌ Order history for ${orderId} not found in any API`);
+    return [];
   }
 
   /**
@@ -753,69 +926,74 @@ export class MaystroService {
   }
 
   /**
-   * Get available webhook types from Maystro
+   * Get available webhook types from Maystro - uses primary API
    */
   async getWebhookTypes(): Promise<any[]> {
+    const primaryApi = this.getPrimaryApiInstance();
     try {
-      const response = await this.axiosInstance.get('/api/stores/hooks/types/');
+      const response = await primaryApi.axiosInstance.get('/api/stores/hooks/types/');
       return response.data.results || [];
     } catch (error: any) {
-      console.error('❌ Error fetching webhook types:', error.message);
+      console.error(`❌ Error fetching webhook types from ${primaryApi.config.name}:`, error.message);
       throw error;
     }
   }
 
   /**
-   * Get configured webhooks
+   * Get configured webhooks - uses primary API
    */
   async getWebhooks(): Promise<any[]> {
+    const primaryApi = this.getPrimaryApiInstance();
     try {
-      const response = await this.axiosInstance.get('/api/stores/hooks/costume/');
+      const response = await primaryApi.axiosInstance.get('/api/stores/hooks/costume/');
       return response.data.results || [];
     } catch (error: any) {
-      console.error('❌ Error fetching webhooks:', error.message);
+      console.error(`❌ Error fetching webhooks from ${primaryApi.config.name}:`, error.message);
       throw error;
     }
   }
 
   /**
-   * Create a webhook
+   * Create a webhook - uses primary API
    */
   async createWebhook(endpoint: string, triggerTypeId: string): Promise<any> {
+    const primaryApi = this.getPrimaryApiInstance();
     try {
-      const response = await this.axiosInstance.post('/api/stores/hooks/costume/', {
+      const response = await primaryApi.axiosInstance.post('/api/stores/hooks/costume/', {
         endpoint,
         trigger_type_id: triggerTypeId
       });
       return response.data;
     } catch (error: any) {
-      console.error('❌ Error creating webhook:', error.message);
+      console.error(`❌ Error creating webhook on ${primaryApi.config.name}:`, error.message);
       throw error;
     }
   }
 
   /**
-   * Delete a webhook
+   * Delete a webhook - uses primary API
    */
   async deleteWebhook(webhookId: string): Promise<boolean> {
+    const primaryApi = this.getPrimaryApiInstance();
     try {
-      await this.axiosInstance.delete(`/api/stores/hooks/costume/${webhookId}/`);
+      await primaryApi.axiosInstance.delete(`/api/stores/hooks/costume/${webhookId}/`);
       return true;
     } catch (error: any) {
-      console.error('❌ Error deleting webhook:', error.message);
+      console.error(`❌ Error deleting webhook ${webhookId} from ${primaryApi.config.name}:`, error.message);
       return false;
     }
   }
 
   /**
-   * Send test webhook
+   * Send test webhook - uses primary API
    */
   async sendTestWebhook(): Promise<boolean> {
+    const primaryApi = this.getPrimaryApiInstance();
     try {
-      await this.axiosInstance.post('/api/stores/hooks/test/request/');
+      await primaryApi.axiosInstance.post('/api/stores/hooks/test/request/');
       return true;
     } catch (error: any) {
-      console.error('❌ Error sending test webhook:', error.message);
+      console.error(`❌ Error sending test webhook from ${primaryApi.config.name}:`, error.message);
       return false;
     }
   }
@@ -826,16 +1004,32 @@ let maystroService: MaystroService | null = null;
 
 export const getMaystroService = (redis: Redis): MaystroService => {
   if (!maystroService) {
-    const config: MaystroConfig = {
-      apiKey: process.env.MAYSTRO_API_KEY || '',
-      baseUrl: 'https://backend.maystro-delivery.com'
-    };
+    // Import MaystroConfigService to get all configured APIs
+    const { MaystroConfigService } = require('./maystro-config.service');
+    const configService = new MaystroConfigService(redis);
+    
+    // Get all configured API keys
+    const allApiKeys = configService.getAllApiKeys();
+    
+    if (allApiKeys.length === 0) {
+      // Fallback to single API key for backward compatibility
+      const singleConfig: MaystroConfig = {
+        id: 'primary',
+        name: 'Primary Maystro API',
+        apiKey: process.env.MAYSTRO_API_KEY || '',
+        baseUrl: process.env.MAYSTRO_BASE_URL || 'https://backend.maystro-delivery.com',
+        isPrimary: true
+      };
 
-    if (!config.apiKey) {
-      throw new Error('MAYSTRO_API_KEY environment variable is required');
+      if (!singleConfig.apiKey) {
+        throw new Error('No Maystro API keys configured. Please set MAYSTRO_API_KEY or configure multiple keys.');
+      }
+
+      maystroService = new MaystroService([singleConfig], redis);
+    } else {
+      // Use all configured API keys
+      maystroService = new MaystroService(allApiKeys, redis);
     }
-
-    maystroService = new MaystroService(config, redis);
   }
 
   return maystroService;

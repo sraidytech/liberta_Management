@@ -171,6 +171,35 @@ interface GeographicData {
   }>;
 }
 
+interface CommuneData {
+  wilaya: string;
+  summary: {
+    totalCommunes: number;
+    topCommune: string | null;
+    totalOrders: number;
+    totalRevenue: number;
+    totalDeliveredOrders: number;
+    averageOrderValue: number;
+    totalCustomers: number;
+  };
+  ordersByCommune: Array<{
+    commune: string;
+    wilaya: string;
+    orders: number;
+    revenue: number;
+  }>;
+  revenueByCommune: Array<{
+    commune: string;
+    wilaya: string;
+    revenue: number;
+  }>;
+  customersByCommune: Array<{
+    commune: string;
+    wilaya: string;
+    customers: number;
+  }>;
+}
+
 interface CustomerData {
   summary: {
     totalCustomers: number;
@@ -207,6 +236,7 @@ export const useReports = (filters: ReportFilters) => {
   const [agentData, setAgentData] = useState<AgentData | null>(null);
   const [agentNotesData, setAgentNotesData] = useState<AgentNotesData | null>(null);
   const [geographicData, setGeographicData] = useState<GeographicData | null>(null);
+  const [communeData, setCommuneData] = useState<CommuneData | null>(null);
   const [customerData, setCustomerData] = useState<CustomerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -431,6 +461,49 @@ export const useReports = (filters: ReportFilters) => {
     }
   }, [filters, getDateRange]);
 
+  const fetchCommuneData = useCallback(async (wilaya: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const { startDate, endDate } = getDateRange();
+      const params = new URLSearchParams({
+        wilaya,
+        startDate,
+        endDate,
+        ...(filters.storeId && { storeId: filters.storeId }),
+        ...(filters.agentId && { agentId: filters.agentId }),
+        ...(filters.status && { status: filters.status })
+      });
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/analytics/geographic/commune?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setCommuneData(result.data);
+        return result.data;
+      } else {
+        throw new Error(result.error?.message || 'Failed to fetch commune data');
+      }
+    } catch (err) {
+      console.error('Error fetching commune data:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      return null;
+    }
+  }, [filters, getDateRange]);
+
   const fetchCustomerData = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
@@ -549,10 +622,12 @@ export const useReports = (filters: ReportFilters) => {
     agentData,
     agentNotesData,
     geographicData,
+    communeData,
     customerData,
     loading,
     error,
     refreshData,
-    exportData
+    exportData,
+    fetchCommuneData
   };
 };

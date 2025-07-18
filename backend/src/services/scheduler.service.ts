@@ -19,15 +19,13 @@ export class SchedulerService {
     this.syncService = new SyncService(redis);
     this.maystroConfigService = new MaystroConfigService(redis);
     
-    // Initialize Maystro service with primary API key
-    const primaryApiKey = this.maystroConfigService.getPrimaryApiKey();
-    if (primaryApiKey) {
-      this.maystroService = new MaystroService({
-        apiKey: primaryApiKey.apiKey,
-        baseUrl: primaryApiKey.baseUrl
-      }, redis);
+    // Initialize Maystro service with all configured API keys
+    const allApiKeys = this.maystroConfigService.getAllApiKeys();
+    if (allApiKeys.length > 0) {
+      this.maystroService = new MaystroService(allApiKeys, redis);
+      console.log(`🔑 Initialized MaystroService with ${allApiKeys.length} API key(s) for dual API support`);
     } else {
-      console.warn('⚠️ No Maystro API key configured. Shipping status sync will be disabled.');
+      console.warn('⚠️ No Maystro API keys configured. Shipping status sync will be disabled.');
     }
     
     // Load API key statistics from Redis

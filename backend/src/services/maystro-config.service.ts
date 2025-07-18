@@ -53,10 +53,8 @@ export class MaystroConfigService {
       const apiKey = process.env[`MAYSTRO_API_KEY_${keyIndex}`];
       if (!apiKey) break; // Skip if undefined
       
-      const name = process.env[`MAYSTRO_API_KEY_${keyIndex}_NAME`] || `API Key ${keyIndex}`;
-      const baseUrl = process.env[`MAYSTRO_API_KEY_${keyIndex}_BASE_URL`] ||
-                     process.env.MAYSTRO_BASE_URL ||
-                     'https://backend.maystro-delivery.com';
+      const name = process.env[`MAYSTRO_API_KEY_${keyIndex}_NAME`] || `Maystro API ${keyIndex}`;
+      const baseUrl = process.env.MAYSTRO_BASE_URL || 'https://backend.maystro-delivery.com';
 
       apiKeys.push({
         id: `key_${keyIndex}`,

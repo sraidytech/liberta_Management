@@ -62,7 +62,7 @@ git pull origin main
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml down
 
 # Clear cache safely (preserves database)
-docker system prune -af
+    docker system prune -af
 
 # Rebuild with timezone fixes
 docker-compose -f docker-compose.yml -f docker-compose.prod-optimized.yml build --no-cache

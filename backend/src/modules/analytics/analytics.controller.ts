@@ -1353,6 +1353,182 @@ export class AnalyticsController {
   }
 
   /**
+   * Get commune-level analytics for a specific wilaya
+   */
+  async getCommuneAnalytics(req: Request, res: Response) {
+    try {
+      const {
+        wilaya,
+        startDate,
+        endDate,
+        storeId,
+        status,
+        agentId
+      } = req.query;
+
+      if (!wilaya) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Wilaya parameter is required',
+            code: 'MISSING_WILAYA_PARAMETER',
+            statusCode: 400
+          }
+        });
+      }
+
+      // Build where clause based on filters
+      const whereClause: any = {};
+      
+      if (startDate && endDate) {
+        whereClause.orderDate = {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string)
+        };
+      }
+      
+      if (storeId) whereClause.storeIdentifier = storeId;
+      if (status) whereClause.status = status;
+      if (agentId) whereClause.assignedAgentId = agentId;
+
+      // Build revenue where clause (only delivered orders)
+      const revenueWhereClause: any = {
+        ...whereClause,
+        status: OrderStatus.DELIVERED
+      };
+
+      const [
+        ordersByCommune,
+        revenueByCommune,
+        communeCustomerCounts
+      ] = await Promise.all([
+        // Orders by commune in the specified wilaya
+        prisma.order.groupBy({
+          by: ['customerId'],
+          where: whereClause,
+          _count: { id: true }
+        }).then(async (orderResults) => {
+          // Get revenue data separately (only delivered orders)
+          const revenueResults = await prisma.order.groupBy({
+            by: ['customerId'],
+            where: revenueWhereClause,
+            _sum: { total: true }
+          });
+
+          // Create revenue map
+          const revenueMap = new Map();
+          for (const result of revenueResults) {
+            revenueMap.set(result.customerId, result._sum.total || 0);
+          }
+
+          // Group by commune from customer data
+          const communeMap = new Map();
+          await Promise.all(orderResults.map(async (result) => {
+            const customer = await prisma.customer.findUnique({
+              where: { id: result.customerId },
+              select: { commune: true, wilaya: true }
+            });
+            if (customer && result._count && customer.wilaya === wilaya) {
+              const existing = communeMap.get(customer.commune) || { orders: 0, revenue: 0 };
+              communeMap.set(customer.commune, {
+                orders: existing.orders + (result._count.id || 0),
+                revenue: existing.revenue + (revenueMap.get(result.customerId) || 0)
+              });
+            }
+          }));
+
+          return Array.from(communeMap.entries()).map(([commune, data]) => ({
+            commune,
+            wilaya: wilaya as string,
+            orders: data.orders,
+            revenue: data.revenue
+          })).sort((a, b) => b.orders - a.orders);
+        }),
+
+        // Revenue by commune (delivered orders only)
+        prisma.order.groupBy({
+          by: ['customerId'],
+          where: revenueWhereClause,
+          _sum: { total: true }
+        }).then(async (results) => {
+          const communeRevenueMap = new Map();
+          await Promise.all(results.map(async (result) => {
+            const customer = await prisma.customer.findUnique({
+              where: { id: result.customerId },
+              select: { commune: true, wilaya: true }
+            });
+            if (customer && result._sum && customer.wilaya === wilaya) {
+              const existing = communeRevenueMap.get(customer.commune) || 0;
+              communeRevenueMap.set(customer.commune, existing + (result._sum.total || 0));
+            }
+          }));
+          
+          return Array.from(communeRevenueMap.entries()).map(([commune, revenue]) => ({
+            commune,
+            wilaya: wilaya as string,
+            revenue
+          })).sort((a, b) => b.revenue - a.revenue);
+        }),
+
+        // Customer counts by commune
+        prisma.customer.groupBy({
+          by: ['commune'],
+          where: { wilaya: wilaya as string },
+          _count: { id: true },
+          orderBy: { _count: { id: 'desc' } }
+        })
+      ]);
+
+      // Calculate totals for summary
+      const totalOrders = ordersByCommune.reduce((sum, item) => sum + item.orders, 0);
+      const totalRevenue = ordersByCommune.reduce((sum, item) => sum + item.revenue, 0);
+      const totalDeliveredOrders = await prisma.order.count({
+        where: {
+          ...revenueWhereClause,
+          customer: {
+            wilaya: wilaya as string
+          }
+        }
+      });
+
+      const communeAnalytics = {
+        wilaya: wilaya as string,
+        summary: {
+          totalCommunes: ordersByCommune.length,
+          topCommune: ordersByCommune[0]?.commune || null,
+          totalOrders,
+          totalRevenue,
+          totalDeliveredOrders,
+          averageOrderValue: totalDeliveredOrders > 0 ? totalRevenue / totalDeliveredOrders : 0,
+          totalCustomers: communeCustomerCounts.reduce((sum, item) => sum + item._count.id, 0)
+        },
+        ordersByCommune,
+        revenueByCommune,
+        customersByCommune: communeCustomerCounts.map(item => ({
+          commune: item.commune,
+          wilaya: wilaya as string,
+          customers: item._count.id
+        }))
+      };
+
+      res.json({
+        success: true,
+        data: communeAnalytics
+      });
+    } catch (error) {
+      console.error('Commune analytics error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch commune analytics',
+          code: 'COMMUNE_ANALYTICS_ERROR',
+          statusCode: 500
+        }
+      });
+    }
+  }
+
+  /**
    * Get customer analytics
    */
   async getCustomerReports(req: Request, res: Response) {

@@ -37,6 +37,11 @@ router.get('/geographic', requireAdmin as any, async (req, res) => {
   await analyticsController.getGeographicReports(req, res);
 });
 
+// Commune analytics for a specific wilaya
+router.get('/geographic/commune', requireAdmin as any, async (req, res) => {
+  await analyticsController.getCommuneAnalytics(req, res);
+});
+
 // Customer analytics
 router.get('/customers', requireAdmin as any, async (req, res) => {
   await analyticsController.getCustomerReports(req, res);

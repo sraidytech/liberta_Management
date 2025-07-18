@@ -7,6 +7,7 @@ import ReportsHeader from '@/components/admin/reports/reports-header';
 import ReportsFilters from '@/components/admin/reports/reports-filters';
 import SalesReports from '@/components/admin/reports/sales-reports';
 import AgentReports from '@/components/admin/reports/agent-reports';
+import CommuneAnalytics from '@/components/admin/reports/commune-analytics';
 import { useReports } from '@/hooks/useReports';
 import {
   BarChart3,
@@ -24,6 +25,8 @@ export default function ReportsPage() {
   const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<'sales' | 'agents' | 'geographic' | 'customers'>('sales');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [selectedWilaya, setSelectedWilaya] = useState<string | null>(null);
+  const [communeLoading, setCommuneLoading] = useState(false);
   const [filters, setFilters] = useState({
     dateRange: 'last30days',
     startDate: '',
@@ -41,11 +44,13 @@ export default function ReportsPage() {
     agentData,
     agentNotesData,
     geographicData,
+    communeData,
     customerData,
     loading,
     error,
     refreshData,
-    exportData
+    exportData,
+    fetchCommuneData
   } = useReports(filters);
 
   // Auto-refresh functionality
@@ -63,6 +68,22 @@ export default function ReportsPage() {
 
   const handleFilterChange = (newFilters: typeof filters) => {
     setFilters(newFilters);
+  };
+
+  const handleWilayaClick = async (wilaya: string) => {
+    setSelectedWilaya(wilaya);
+    setCommuneLoading(true);
+    try {
+      await fetchCommuneData(wilaya);
+    } catch (error) {
+      console.error('Failed to fetch commune data:', error);
+    } finally {
+      setCommuneLoading(false);
+    }
+  };
+
+  const handleBackToWilayas = () => {
+    setSelectedWilaya(null);
   };
 
   const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
@@ -217,95 +238,116 @@ export default function ReportsPage() {
             )}
             {activeTab === 'geographic' && (
               <div className="space-y-6">
-                {/* Summary Cards */}
-                {geographicData?.summary && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Chiffre d\'Affaires Total' : 'Total Revenue'}
-                        </h4>
-                        <DollarSign className="w-8 h-8 text-green-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-green-600">
-                        {geographicData.summary.totalRevenue.toLocaleString()} DA
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Commandes livrées uniquement' : 'Delivered orders only'}
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Ventes Totales' : 'Total Sales'}
-                        </h4>
-                        <CheckCircle className="w-8 h-8 text-blue-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-blue-600">
-                        {geographicData.summary.totalDeliveredOrders}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Commandes livrées' : 'Delivered orders'}
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Valeur Moyenne' : 'Average Order Value'}
-                        </h4>
-                        <TrendingUp className="w-8 h-8 text-purple-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-purple-600">
-                        {geographicData.summary.averageOrderValue.toLocaleString()} DA
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Par commande' : 'Per order'}
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Wilayas Actives' : 'Active Wilayas'}
-                        </h4>
-                        <MapPin className="w-8 h-8 text-orange-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-orange-600">
-                        {geographicData.summary.totalWilayas}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Régions couvertes' : 'Regions covered'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="text-center py-12">
-                  <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {language === 'fr' ? 'Analyse Géographique' : 'Geographic Analytics'}
-                  </h3>
-                  <p className="text-gray-600">
-                    {language === 'fr' ? 'Analyse des commandes par wilaya et commune' : 'Order analysis by wilaya and commune'}
-                  </p>
-                  {geographicData && (
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {geographicData.ordersByWilaya?.map((item) => (
-                        <div key={item.wilaya} className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                {selectedWilaya ? (
+                  <CommuneAnalytics
+                    data={communeData}
+                    loading={communeLoading}
+                    onBack={handleBackToWilayas}
+                  />
+                ) : (
+                  <>
+                    {/* Summary Cards */}
+                    {geographicData?.summary && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
                           <div className="flex items-center justify-between mb-4">
-                            <h4 className="font-semibold text-gray-900">{item.wilaya}</h4>
-                            <span className="text-2xl font-bold text-blue-600">{item.orders}</span>
+                            <h4 className="font-semibold text-gray-900">
+                              {language === 'fr' ? 'Chiffre d\'Affaires Total' : 'Total Revenue'}
+                            </h4>
+                            <DollarSign className="w-8 h-8 text-green-600" />
                           </div>
-                          <div className="text-sm text-gray-600">
-                            {language === 'fr' ? 'Commandes' : 'Orders'}
+                          <div className="text-3xl font-bold text-green-600">
+                            {geographicData.summary.totalRevenue.toLocaleString()} DA
                           </div>
-                          <div className="text-sm text-blue-600 font-medium mt-2">
-                            {item.revenue.toLocaleString()} DA
+                          <div className="text-sm text-gray-600 mt-1">
+                            {language === 'fr' ? 'Commandes livrées uniquement' : 'Delivered orders only'}
                           </div>
                         </div>
-                      ))}
+                        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-gray-900">
+                              {language === 'fr' ? 'Ventes Totales' : 'Total Sales'}
+                            </h4>
+                            <CheckCircle className="w-8 h-8 text-blue-600" />
+                          </div>
+                          <div className="text-3xl font-bold text-blue-600">
+                            {geographicData.summary.totalDeliveredOrders}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {language === 'fr' ? 'Commandes livrées' : 'Delivered orders'}
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-gray-900">
+                              {language === 'fr' ? 'Valeur Moyenne' : 'Average Order Value'}
+                            </h4>
+                            <TrendingUp className="w-8 h-8 text-purple-600" />
+                          </div>
+                          <div className="text-3xl font-bold text-purple-600">
+                            {geographicData.summary.averageOrderValue.toLocaleString()} DA
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {language === 'fr' ? 'Par commande' : 'Per order'}
+                          </div>
+                        </div>
+                        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="font-semibold text-gray-900">
+                              {language === 'fr' ? 'Wilayas Actives' : 'Active Wilayas'}
+                            </h4>
+                            <MapPin className="w-8 h-8 text-orange-600" />
+                          </div>
+                          <div className="text-3xl font-bold text-orange-600">
+                            {geographicData.summary.totalWilayas}
+                          </div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {language === 'fr' ? 'Régions couvertes' : 'Regions covered'}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="text-center py-12">
+                      <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                        {language === 'fr' ? 'Analyse Géographique' : 'Geographic Analytics'}
+                      </h3>
+                      <p className="text-gray-600 mb-4">
+                        {language === 'fr' ? 'Cliquez sur une wilaya pour voir les communes' : 'Click on a wilaya to see communes'}
+                      </p>
+                      {geographicData && (
+                        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {geographicData.ordersByWilaya?.map((item) => (
+                            <button
+                              key={item.wilaya}
+                              onClick={() => handleWilayaClick(item.wilaya)}
+                              className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 hover:border-blue-300 hover:shadow-lg transition-all duration-200 cursor-pointer group"
+                            >
+                              <div className="flex items-center justify-between mb-4">
+                                <h4 className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
+                                  {item.wilaya}
+                                </h4>
+                                <span className="text-2xl font-bold text-blue-600 group-hover:text-blue-700 transition-colors">
+                                  {item.orders}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors">
+                                {language === 'fr' ? 'Commandes' : 'Orders'}
+                              </div>
+                              <div className="text-sm text-blue-600 font-medium mt-2 group-hover:text-blue-700 transition-colors">
+                                {item.revenue.toLocaleString()} DA
+                              </div>
+                              <div className="text-xs text-gray-500 mt-2 group-hover:text-blue-600 transition-colors">
+                                {language === 'fr' ? 'Cliquer pour voir les communes' : 'Click to view communes'}
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             )}
             {activeTab === 'customers' && (
