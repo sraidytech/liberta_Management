@@ -57,7 +57,8 @@ export function DatabaseManagementSettings() {
     setResults(prev => ({ ...prev, syncStores: null }));
     
     try {
-      const response = await fetch('/api/v1/admin/sync-stores', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/admin/sync-stores`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,13 +82,15 @@ export function DatabaseManagementSettings() {
   };
 
   const handleCleanupAssignments = async () => {
-    if (!confirm('Are you sure you want to cleanup all order assignments? This will remove all agent assignments.')) return;
+    if (!confirm('Are you sure you want to cleanup ALL order assignments? This will remove ALL agent assignments from ALL orders in the system.')) return;
     
     setLoading('cleanupAssignments');
     setResults(prev => ({ ...prev, cleanupAssignments: null }));
     
     try {
-      const response = await fetch('/api/v1/admin/cleanup-assignments', {
+      // Use the correct API URL - same pattern as other functions in this component
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/admin/cleanup-assignments`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -98,11 +101,11 @@ export function DatabaseManagementSettings() {
       const result = await response.json();
       setResults(prev => ({ ...prev, cleanupAssignments: result }));
     } catch (error) {
-      setResults(prev => ({ 
-        ...prev, 
-        cleanupAssignments: { 
-          success: false, 
-          message: error instanceof Error ? error.message : 'Unknown error' 
+      setResults(prev => ({
+        ...prev,
+        cleanupAssignments: {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error'
         }
       }));
     } finally {
@@ -262,9 +265,9 @@ export function DatabaseManagementSettings() {
       <Card className="p-6">
         <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <Database className="h-5 w-5 text-orange-600" />
-          Assignment Cleanup
+          Assignment Cleanup - OPTIMIZED
         </h3>
-        <p className="text-gray-600 mb-4">Clean up all order assignments and reset agent workloads.</p>
+        <p className="text-gray-600 mb-4">Clean up ALL order assignments from ALL orders in the system and reset agent workloads. Perfect for testing the new optimized assignment system which will then work only with the last 15,000 orders.</p>
         <Button
           onClick={handleCleanupAssignments}
           disabled={loading === 'cleanupAssignments'}
