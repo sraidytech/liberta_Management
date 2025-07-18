@@ -584,11 +584,15 @@ export class StoresController {
         });
       }
 
+      if (!store.baseUrl) {
+        throw new Error(`Base URL is missing for store ${store.storeName}`);
+      }
+
       const ecoService = new EcoManagerService({
         storeName: store.storeName,
         storeIdentifier: store.storeIdentifier,
         apiToken: store.apiToken,
-        baseUrl: store.baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: store.baseUrl
       }, redis);
 
       const rateLimitStatus = await ecoService.getRateLimitStatus();

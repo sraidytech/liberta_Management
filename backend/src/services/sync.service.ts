@@ -576,11 +576,15 @@ export class SyncService {
     });
 
     const statusPromises = apiConfigs.map(async (config) => {
+      if (!(config as any).baseUrl) {
+        throw new Error(`Base URL is missing for store ${config.storeName} (${config.storeIdentifier})`);
+      }
+
       const ecoService = new EcoManagerService({
         storeName: config.storeName,
         storeIdentifier: config.storeIdentifier,
         apiToken: '', // Not needed for status check
-        baseUrl: (config as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: (config as any).baseUrl
       }, this.redis);
 
       const lastSyncStatus = await ecoService.getLastSyncStatus();
@@ -623,11 +627,15 @@ export class SyncService {
       }
 
       // Initialize EcoManager service
+      if (!apiConfig.baseUrl) {
+        throw new Error(`Base URL is missing for store ${apiConfig.storeName} (${apiConfig.storeIdentifier})`);
+      }
+
       const ecoService = new EcoManagerService({
         storeName: apiConfig.storeName,
         storeIdentifier: apiConfig.storeIdentifier,
         apiToken: apiConfig.apiToken,
-        baseUrl: (apiConfig as any).baseUrl || 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: apiConfig.baseUrl
       }, this.redis);
 
       // Delete existing orders for this store

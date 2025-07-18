@@ -934,8 +934,16 @@ export class OrdersController {
         });
       }
 
+      // Validate base URL is present
+      if (!apiConfig.baseUrl) {
+        return res.status(400).json({
+          success: false,
+          message: `Base URL is missing for store ${apiConfig.storeName}`
+        });
+      }
+
       // Initialize EcoManager service with proper URL handling
-      let finalBaseUrl = apiConfig.baseUrl || 'https://natureldz.ecomanager.dz';
+      let finalBaseUrl = apiConfig.baseUrl;
       
       // Automatically append /api/shop/v2 if not already present
       if (!finalBaseUrl.endsWith('/api/shop/v2')) {
@@ -1120,11 +1128,15 @@ export class OrdersController {
           console.log(`\n🏪 Processing store: ${apiConfig.storeName} (${apiConfig.storeIdentifier})`);
 
           // Initialize EcoManager service for this store
+          if (!apiConfig.baseUrl) {
+            throw new Error(`Base URL is missing for store ${apiConfig.storeName}`);
+          }
+
           const ecoService = new EcoManagerService({
             storeName: apiConfig.storeName,
             storeIdentifier: apiConfig.storeIdentifier,
             apiToken: apiConfig.apiToken,
-            baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+            baseUrl: apiConfig.baseUrl
           }, redis);
 
           // Test connection first
@@ -1328,11 +1340,15 @@ export class OrdersController {
       }
 
       // Initialize EcoManager service
+      if (!apiConfig.baseUrl) {
+        throw new Error(`Base URL is missing for store ${apiConfig.storeName}`);
+      }
+
       const ecoService = new EcoManagerService({
         storeName: apiConfig.storeName,
         storeIdentifier: apiConfig.storeIdentifier,
         apiToken: apiConfig.apiToken,
-        baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: apiConfig.baseUrl
       }, redis);
 
       // Test connection first
@@ -1436,11 +1452,15 @@ export class OrdersController {
 
       // Initialize EcoManager service
       console.log('🔧 Initializing EcoManager service...');
+      if (!apiConfig.baseUrl) {
+        throw new Error(`Base URL is missing for store ${apiConfig.storeName}`);
+      }
+
       const ecoService = new EcoManagerService({
         storeName: apiConfig.storeName,
         storeIdentifier: apiConfig.storeIdentifier,
         apiToken: apiConfig.apiToken,
-        baseUrl: 'https://natureldz.ecomanager.dz/api/shop/v2'
+        baseUrl: apiConfig.baseUrl
       }, redis);
       console.log('✅ EcoManager service initialized');
 
