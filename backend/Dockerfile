@@ -11,11 +11,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client with alternative download method
+# Generate Prisma client with proper type generation
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-ENV PRISMA_SKIP_POSTINSTALL_GENERATE=true
-RUN npm install @prisma/engines@6.9.0 --save-dev || echo "Engine install attempted"
-RUN npx prisma generate || echo "Prisma generation completed with available engines"
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # Build the application
 RUN npm run build
