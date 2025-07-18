@@ -11,12 +11,11 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client with relaxed settings
-ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-RUN npx prisma generate --schema=./prisma/schema.prisma
+# Generate Prisma client
+RUN npx prisma generate
 
-# Build with relaxed TypeScript checking (skip strict type errors)
-RUN npx tsc --noEmitOnError false --skipLibCheck true
+# Build the application
+RUN npm run build
 
 # Expose port
 EXPOSE 5000
