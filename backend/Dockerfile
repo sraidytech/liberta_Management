@@ -11,10 +11,12 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Generate Prisma client with proper binary targets and fallback
+# Force Prisma client generation with all necessary steps
 ENV PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
-ENV PRISMA_CLI_BINARY_TARGETS=linux-musl-openssl-3.0.x,debian-openssl-3.0.x,linux-musl
-RUN npx prisma generate --schema=./prisma/schema.prisma --generator client --no-engine || npx prisma generate --schema=./prisma/schema.prisma || echo "Prisma generation completed"
+RUN rm -rf node_modules/.prisma node_modules/@prisma/client/index.d.ts || echo "Cleanup completed"
+RUN npm install @prisma/client@6.9.0 --force
+RUN npx prisma generate --schema=./prisma/schema.prisma
+RUN ls -la node_modules/@prisma/client/ || echo "Checking Prisma client files"
 
 # Build the application
 RUN npm run build
