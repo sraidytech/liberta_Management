@@ -845,10 +845,16 @@ export class OrdersController {
         prisma.order.count({ where: { ...whereClause, status: 'ASSIGNED' } }),
         prisma.order.count({ where: { ...whereClause, status: 'CONFIRMED' } }),
         prisma.order.count({ where: { ...whereClause, status: 'SHIPPED' } }),
-        prisma.order.count({ where: { ...whereClause, status: 'DELIVERED' } }),
+        prisma.order.count({ where: { ...whereClause, shippingStatus: 'LIVRÉ' } }),
         prisma.order.count({ where: { ...whereClause, status: 'CANCELLED' } }),
         prisma.order.aggregate({
-          where: { ...whereClause, status: { in: ['CONFIRMED', 'SHIPPED', 'DELIVERED'] } },
+          where: {
+            ...whereClause,
+            OR: [
+              { status: { in: ['CONFIRMED', 'SHIPPED'] } },
+              { shippingStatus: 'LIVRÉ' }
+            ]
+          },
           _sum: { total: true }
         }),
         prisma.order.findMany({

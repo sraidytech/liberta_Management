@@ -499,8 +499,17 @@ export class MaystroService {
       
       for (const order of ordersToSync) {
         try {
-          // Fast lookup using Map (like orderMap.get(externalId) in your script)
-          const maystroOrder = orderMap.get(order.reference);
+          // Step 1: Fast lookup using Map from bulk fetch
+          let maystroOrder = orderMap.get(order.reference);
+          
+          // Step 2: If not found in bulk fetch, try dual API real-time lookup
+          if (!maystroOrder) {
+            console.log(`🔍 Order ${order.reference} not in bulk fetch, checking dual APIs...`);
+            const dualApiResult = await this.getOrderByReference(order.reference);
+            if (dualApiResult) {
+              maystroOrder = dualApiResult;
+            }
+          }
           
           if (maystroOrder) {
             const shippingStatus = this.mapStatus(maystroOrder.status);
