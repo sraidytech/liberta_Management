@@ -475,13 +475,26 @@ export class AgentAssignmentService {
    */
   private async performAssignment(orderId: string, agentId: string, adminId?: string) {
     return await prisma.$transaction(async (tx) => {
+      // First, get the current order to check shipping status
+      const currentOrder = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { shippingStatus: true }
+      });
+
+      // 🎯 AUTO-UPDATE: If shipping status is "LIVRÉ", set status to "DELIVERED" instead of "ASSIGNED"
+      const orderStatus = currentOrder?.shippingStatus === 'LIVRÉ' ? 'DELIVERED' : 'ASSIGNED';
+      
+      if (currentOrder?.shippingStatus === 'LIVRÉ') {
+        console.log(`🚚 Auto-updating order ${orderId} status to DELIVERED during assignment (shipping status: LIVRÉ)`);
+      }
+
       // Update the order
       const updatedOrder = await tx.order.update({
         where: { id: orderId },
         data: {
           assignedAgentId: agentId,
           assignedAt: new Date(),
-          status: 'ASSIGNED'
+          status: orderStatus
         }
       });
 

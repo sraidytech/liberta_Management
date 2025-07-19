@@ -38,7 +38,7 @@ async function fixDeliveredOrdersStatus() {
 
     // Step 2: Show sample of orders to be fixed
     console.log('\n📋 Sample orders to be fixed:');
-    ordersToFix.slice(0, 10).forEach(order => {
+    ordersToFix.slice(0, 10).forEach((order: any) => {
       console.log(`   - ${order.reference}: ${order.status} → DELIVERED (created: ${order.createdAt.toISOString().split('T')[0]})`);
     });
     
@@ -60,7 +60,7 @@ async function fixDeliveredOrdersStatus() {
         const result = await prisma.order.updateMany({
           where: {
             id: {
-              in: batch.map(order => order.id)
+              in: batch.map((order: any) => order.id)
             }
           },
           data: {
