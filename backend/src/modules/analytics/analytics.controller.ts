@@ -2124,7 +2124,7 @@ export class AnalyticsController {
           where: {
             assignedAgentId: agentId,
             status: 'DELIVERED',
-            shippingStatus: 'DELIVERED', // Must have shipping status delivered
+            shippingStatus: { in: ['DELIVERED', 'LIVRÉ', 'Delivered'] }, // Accept multiple delivery status formats
             createdAt: { gte: startDateUTC },
             activities: {
               some: {
@@ -2324,8 +2324,12 @@ export class AnalyticsController {
           missingRequirements.push('at least 1 note on orders');
         }
         if (completedOrders === 0) {
-          missingRequirements.push('at least 1 delivered order');
+          missingRequirements.push('at least 1 delivered order with shipping status DELIVERED/LIVRÉ');
         }
+
+        // Clear cache to ensure fresh data on next request
+        const cacheKey = `agent_performance_analytics:${agentId}:${period}`;
+        await redis.del(cacheKey);
 
         return res.json({
           success: true,
@@ -2339,7 +2343,7 @@ export class AnalyticsController {
             },
             hasInsufficientActivity: true,
             message: `Agent needs ${missingRequirements.join(' and ')} to view performance analytics`,
-            requiredActivity: 'Please add notes to your assigned orders and ensure at least one order is delivered to track your performance',
+            requiredActivity: 'Please add notes to your assigned orders and ensure at least one order is delivered (shipping status: DELIVERED/LIVRÉ) to track your performance',
             missingRequirements: {
               needsNotes: agentNotesCount === 0,
               needsDeliveredOrders: completedOrders === 0,
