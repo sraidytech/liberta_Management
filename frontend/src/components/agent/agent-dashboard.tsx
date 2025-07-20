@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
 import { createTranslator } from '@/lib/i18n';
+import AgentPerformanceAnalytics from './agent-performance-analytics';
 import {
   Clock,
   Package,
@@ -378,6 +379,9 @@ export default function AgentDashboard() {
           </Card>
         </div>
       )}
+
+      {/* My Performance Section */}
+      <AgentPerformanceAnalytics />
 
       {/* Orders List */}
       <Card className="p-6">

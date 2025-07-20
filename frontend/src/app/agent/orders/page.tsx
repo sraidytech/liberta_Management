@@ -133,6 +133,13 @@ export default function AgentOrdersPage() {
   const [noteType, setNoteType] = useState('');
   const [customNote, setCustomNote] = useState('');
   
+  // Add Note Only modal state
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false);
+  const [addingNoteToOrder, setAddingNoteToOrder] = useState<string | null>(null);
+  const [noteOnlyType, setNoteOnlyType] = useState('');
+  const [noteOnlyCustom, setNoteOnlyCustom] = useState('');
+  const [noteOnlyText, setNoteOnlyText] = useState('');
+  
   // Wilaya delivery settings for delay calculation
   const [wilayaSettings, setWilayaSettings] = useState<WilayaDeliverySettings[]>([]);
   
@@ -633,12 +640,54 @@ export default function AgentOrdersPage() {
         console.log('✅ Status updated successfully:', result);
         fetchOrders();
         setSelectedOrder(null);
+        showToast({ title: 'Success', message: 'Order status updated successfully', type: 'success' });
       } else {
         const errorText = await response.text();
         console.error('❌ Status update failed:', response.status, errorText);
+        showToast({ title: 'Error', message: 'Failed to update order status', type: 'error' });
       }
     } catch (error) {
       console.error('💥 Error updating order status:', error);
+      showToast({ title: 'Error', message: 'Error updating order status', type: 'error' });
+    }
+  };
+
+  const addNoteOnly = async (orderId: string, notes?: string, noteType?: string, customNote?: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      console.log('📝 Adding note only:', { orderId, notes, noteType, customNote });
+      
+      const response = await fetch(`${apiBaseUrl}/api/v1/orders/${orderId}/notes`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          notes,
+          noteType,
+          customNote
+        })
+      });
+      
+      console.log('📊 Add note response:', response.status);
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Note added successfully:', result);
+        fetchOrders();
+        setSelectedOrder(null);
+        showToast({ title: 'Success', message: 'Note added successfully', type: 'success' });
+      } else {
+        const errorText = await response.text();
+        console.error('❌ Add note failed:', response.status, errorText);
+        showToast({ title: 'Error', message: 'Failed to add note', type: 'error' });
+      }
+    } catch (error) {
+      console.error('💥 Error adding note:', error);
+      showToast({ title: 'Error', message: 'Error adding note', type: 'error' });
     }
   };
 
@@ -1226,6 +1275,79 @@ export default function AgentOrdersPage() {
 
           {/* Clean Card-Based Orders List */}
           <div className="space-y-3">
+            {/* Deadline Notification Banner */}
+            {(() => {
+              const urgentOrders = filteredOrders.filter(order => {
+                const delayInfo = order.delayInfo || calculateOrderDelay(
+                  order.id,
+                  order.customer.wilaya,
+                  order.orderDate,
+                  order.shippingStatus,
+                  wilayaSettings
+                );
+                return delayInfo.isDelayed && !delayInfo.isDelivered;
+              });
+              
+              const criticalOrders = urgentOrders.filter(order => {
+                const delayInfo = order.delayInfo || calculateOrderDelay(
+                  order.id,
+                  order.customer.wilaya,
+                  order.orderDate,
+                  order.shippingStatus,
+                  wilayaSettings
+                );
+                return delayInfo.delayLevel === 'critical';
+              });
+              
+              const warningOrders = urgentOrders.filter(order => {
+                const delayInfo = order.delayInfo || calculateOrderDelay(
+                  order.id,
+                  order.customer.wilaya,
+                  order.orderDate,
+                  order.shippingStatus,
+                  wilayaSettings
+                );
+                return delayInfo.delayLevel === 'warning';
+              });
+              
+              if (urgentOrders.length === 0) return null;
+              
+              return (
+                <div className="mb-6 p-4 rounded-lg border-l-4 border-red-500 bg-red-50 animate-pulse">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-red-500 mr-2 animate-bounce" />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-red-800">
+                        🚨 URGENT: {urgentOrders.length} orders need attention
+                      </h3>
+                      <p className="text-sm text-red-700 mt-1">
+                        {criticalOrders.length > 0 && warningOrders.length > 0 && (
+                          `${criticalOrders.length} CRITICAL orders overdue, ${warningOrders.length} WARNING orders approaching deadline.`
+                        )}
+                        {criticalOrders.length > 0 && warningOrders.length === 0 && (
+                          `${criticalOrders.length} orders are overdue and need immediate attention.`
+                        )}
+                        {criticalOrders.length === 0 && warningOrders.length > 0 && (
+                          `${warningOrders.length} orders are approaching their delivery deadline.`
+                        )}
+                        {' '}Most urgent: {urgentOrders.slice(0, 3).map(o => `#${o.reference}`).join(', ')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        // Scroll to first urgent order
+                        const firstUrgentOrder = document.querySelector(`[data-order-id="${urgentOrders[0].id}"]`);
+                        firstUrgentOrder?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }}
+                      className="ml-4 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                    >
+                      View First
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             {filteredOrders.length === 0 ? (
               <div className="bg-white rounded-lg border border-gray-200 p-8 text-center">
                 <Package className="h-10 w-10 mx-auto mb-3 text-gray-300" />
@@ -1260,6 +1382,7 @@ export default function AgentOrdersPage() {
                 return (
                   <div
                     key={order.id}
+                    data-order-id={order.id}
                     className={cardClasses}
                   >
                   {/* Header Row */}
@@ -1405,6 +1528,20 @@ export default function AgentOrdersPage() {
                     >
                       <Edit className="h-4 w-4" />
                       {t('editStatus')}
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setAddingNoteToOrder(order.id);
+                        setShowAddNoteModal(true);
+                        setNoteOnlyType('');
+                        setNoteOnlyCustom('');
+                        setNoteOnlyText('');
+                      }}
+                      className="flex items-center gap-2 px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors text-sm font-medium"
+                    >
+                      <StickyNote className="h-4 w-4" />
+                      {t('addNote')}
                     </button>
                     
                     <button
@@ -1573,6 +1710,124 @@ export default function AgentOrdersPage() {
             </div>
           </div>
         )}
+        {/* Add Note Only Modal */}
+        {showAddNoteModal && addingNoteToOrder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-50 sm:items-center">
+            <div className="bg-white rounded-t-2xl sm:rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">{t('addNote')}</h2>
+                  <p className="text-sm text-gray-500 mt-1">{t('addNoteWithoutStatusChange')}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowAddNoteModal(false);
+                    setAddingNoteToOrder(null);
+                    setNoteOnlyType('');
+                    setNoteOnlyCustom('');
+                    setNoteOnlyText('');
+                  }}
+                  className="rounded-full p-2"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-5">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    {t('noteTypes')}
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={noteOnlyType}
+                      onChange={(e) => {
+                        setNoteOnlyType(e.target.value);
+                        if (e.target.value !== 'CUSTOM') {
+                          setNoteOnlyCustom('');
+                        }
+                      }}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors appearance-none cursor-pointer"
+                    >
+                      <option value="">{t('selectNoteType')}</option>
+                      {noteOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Show custom note field if needed */}
+                {(noteOnlyType && noteOptions.find(opt => opt.value === noteOnlyType)?.hasRemark) && (
+                  <div className="animate-in slide-in-from-top-2 duration-200">
+                    <label className="block text-sm font-semibold text-gray-700 mb-3">
+                      {noteOnlyType === 'CUSTOM' ? t('customNote') : 'Remarque'}
+                    </label>
+                    <textarea
+                      value={noteOnlyCustom}
+                      onChange={(e) => setNoteOnlyCustom(e.target.value)}
+                      placeholder={noteOnlyType === 'CUSTOM' ? 'Entrez votre note personnalisée...' : 'Entrez votre remarque...'}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors resize-none"
+                      rows={3}
+                    />
+                  </div>
+                )}
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-3">
+                    {t('additionalNotes')} ({t('optional')})
+                  </label>
+                  <textarea
+                    value={noteOnlyText}
+                    onChange={(e) => setNoteOnlyText(e.target.value)}
+                    placeholder={t('additionalNotes')}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors resize-none"
+                    rows={2}
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                  <Button
+                    onClick={() => {
+                      setShowAddNoteModal(false);
+                      setAddingNoteToOrder(null);
+                      setNoteOnlyType('');
+                      setNoteOnlyCustom('');
+                      setNoteOnlyText('');
+                    }}
+                    variant="outline"
+                    className="px-6 py-2 rounded-xl"
+                  >
+                    {t('cancel')}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (addingNoteToOrder && (noteOnlyText || noteOnlyType || noteOnlyCustom)) {
+                        addNoteOnly(addingNoteToOrder, noteOnlyText, noteOnlyType, noteOnlyCustom);
+                        setShowAddNoteModal(false);
+                        setAddingNoteToOrder(null);
+                        setNoteOnlyType('');
+                        setNoteOnlyCustom('');
+                        setNoteOnlyText('');
+                      }
+                    }}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+                    disabled={!noteOnlyText && !noteOnlyType && !noteOnlyCustom}
+                  >
+                    <StickyNote className="h-4 w-4 mr-2" />
+                    {t('addNote')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* Comprehensive Order Details Modal */}
         {selectedOrder && showOrderModal && (

@@ -1,6 +1,7 @@
 import { SyncService } from './sync.service';
 import { MaystroService } from './maystro.service';
 import { MaystroConfigService } from './maystro-config.service';
+import { deadlineNotificationService } from './deadline-notification.service';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 
@@ -50,6 +51,9 @@ export class SchedulerService {
     // Schedule Shipping Status sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00
     this.scheduleShippingStatusSync();
 
+    // Schedule deadline notifications: Every 4 hours at 06:00, 10:00, 14:00, 18:00
+    this.scheduleDeadlineNotifications();
+
     // Schedule daily cleanup jobs
     this.scheduleDailyCleanup();
 
@@ -61,6 +65,7 @@ export class SchedulerService {
     console.log('📋 Schedule Summary:');
     console.log('   🔄 EcoManager Sync: Every 6 hours at 08:00, 14:00, 20:00 (3 times/day)');
     console.log('   🚚 Shipping Status Sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00');
+    console.log('   🚨 Deadline Notifications: Every 4 hours at 06:00, 10:00, 14:00, 18:00');
     console.log('   🧹 Daily Cleanup: Every day at 2 AM');
   }
 
@@ -156,6 +161,42 @@ export class SchedulerService {
     };
 
     scheduleNextShippingSync();
+  }
+
+  /**
+   * Schedule deadline notifications every 4 hours at 06:00, 10:00, 14:00, 18:00
+   */
+  private scheduleDeadlineNotifications(): void {
+    const notificationHours = [6, 10, 14, 18]; // 06:00, 10:00, 14:00, 18:00
+
+    const scheduleNextDeadlineCheck = () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      
+      // Find next notification hour
+      let nextNotificationHour = notificationHours.find(hour => hour > currentHour);
+      let nextNotificationDate = new Date(now);
+      
+      if (!nextNotificationHour) {
+        // No more notification hours today, schedule for 06:00 tomorrow
+        nextNotificationHour = 6;
+        nextNotificationDate.setDate(nextNotificationDate.getDate() + 1);
+      }
+
+      nextNotificationDate.setHours(nextNotificationHour, 0, 0, 0);
+      const timeUntilNext = nextNotificationDate.getTime() - now.getTime();
+
+      console.log(`⏰ Next deadline notification check scheduled for: ${nextNotificationDate.toLocaleString()}`);
+
+      const timeout = setTimeout(async () => {
+        await this.runDeadlineNotifications();
+        scheduleNextDeadlineCheck(); // Schedule the next one
+      }, timeUntilNext);
+
+      this.scheduledJobs.set('deadline_notifications', timeout);
+    };
+
+    scheduleNextDeadlineCheck();
   }
 
   /**
@@ -578,6 +619,112 @@ export class SchedulerService {
   }
 
   /**
+   * Execute deadline notification processing
+   */
+  private async runDeadlineNotifications(): Promise<void> {
+    const startTime = Date.now();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    console.log(`🚨 [${new Date().toLocaleString()} ${timezone}] SCHEDULED Deadline Notification Processing Started`);
+    console.log(`📅 Processing Type: 4-Hour Scheduled Check`);
+    console.log(`⏰ Started At: ${new Date().toISOString()}`);
+
+    try {
+      // Log processing start
+      await this.redis.set('scheduler:last_deadline_check_start', new Date().toISOString());
+
+      console.log(`📊 Deadline Check Configuration:`);
+      console.log(`   - Check Frequency: Every 4 hours (6AM, 10AM, 2PM, 6PM)`);
+      console.log(`   - Rate Limit: Max 10 notifications per 15 minutes per agent`);
+      console.log(`   - Notification Strategy: Batched aggregation`);
+      console.log(`   - Processing Strategy: Intelligent filtering and grouping`);
+      console.log(`─────────────────────────────────────────────────────────────`);
+
+      // Run the deadline notification processing
+      const results = await deadlineNotificationService.processAllAgentDeadlines();
+      
+      // Log results
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      await this.redis.set('scheduler:last_deadline_check_end', new Date().toISOString());
+      await this.redis.set('scheduler:last_deadline_check_results', JSON.stringify(results));
+
+      console.log(`─────────────────────────────────────────────────────────────`);
+      console.log(`✅ [${new Date().toLocaleString()} ${timezone}] Deadline Notification Processing Completed`);
+      console.log(`📊 Final Results:`);
+      console.log(`   - Duration: ${(duration / 1000).toFixed(1)}s (${duration}ms)`);
+      console.log(`   - Agents Processed: ${results.processedAgents}`);
+      console.log(`   - Notifications Sent: ${results.notificationsSent}`);
+      console.log(`   - Rate Limited Agents: ${results.rateLimitedAgents}`);
+      console.log(`   - Total Orders Processed: ${results.totalOrdersProcessed}`);
+
+      // Calculate next check time
+      const nextCheckTime = this.calculateNextDeadlineCheckTime();
+      console.log(`\n⏰ Next Deadline Check Information:`);
+      console.log(`   - Next Scheduled Check: ${nextCheckTime}`);
+      console.log(`   - Check Frequency: Every 4 hours`);
+      console.log(`   - Manual Check Available: /api/v1/scheduler/trigger/deadline-notifications`);
+
+      // Notify via global io if available
+      if ((global as any).io) {
+        (global as any).io.emit('deadline_check_completed', {
+          type: 'deadline_notifications',
+          results,
+          duration,
+          timestamp: new Date().toISOString()
+        });
+      }
+
+    } catch (error) {
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      console.error(`❌ [${new Date().toLocaleString()} ${timezone}] Deadline Notification Processing Failed`);
+      console.error(`💥 Error Details:`, error);
+      console.error(`⏱️ Failed after: ${(duration / 1000).toFixed(1)}s`);
+      
+      // Store error information
+      await this.redis.set('scheduler:last_deadline_check_error', JSON.stringify({
+        error: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString(),
+        duration
+      }));
+
+      // Notify via global io if available
+      if ((global as any).io) {
+        (global as any).io.emit('deadline_check_failed', {
+          type: 'deadline_notifications',
+          error: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString(),
+          duration
+        });
+      }
+    }
+  }
+
+  /**
+   * Calculate next deadline check time for display (4-hour intervals)
+   */
+  private calculateNextDeadlineCheckTime(): string {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const checkHours = [6, 10, 14, 18]; // 06:00, 10:00, 14:00, 18:00
+    
+    let nextCheckHour = checkHours.find(hour => hour > currentHour);
+    let nextCheckDate = new Date(now);
+    
+    if (!nextCheckHour) {
+      // No more check hours today, schedule for 06:00 tomorrow
+      nextCheckHour = 6;
+      nextCheckDate.setDate(nextCheckDate.getDate() + 1);
+    }
+
+    nextCheckDate.setHours(nextCheckHour, 0, 0, 0);
+    return nextCheckDate.toLocaleString();
+  }
+
+  /**
    * Execute daily cleanup tasks
    */
   private async runDailyCleanup(): Promise<void> {
@@ -705,5 +852,18 @@ export class SchedulerService {
     
     await this.runShippingStatusSync();
     return { success: true, message: 'Shipping Status sync completed' };
+  }
+
+  /**
+   * Manually trigger deadline notification processing
+   */
+  public async triggerDeadlineNotifications(): Promise<any> {
+    console.log('🚨 Manual deadline notification processing triggered');
+    await this.runDeadlineNotifications();
+    return {
+      success: true,
+      message: 'Deadline notification processing completed',
+      timestamp: new Date().toISOString(),
+    };
   }
 }

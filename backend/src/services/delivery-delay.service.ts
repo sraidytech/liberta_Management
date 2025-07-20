@@ -199,6 +199,148 @@ export class DeliveryDelayService {
   }
 
   /**
+   * Get orders that need deadline notifications for AGENT_SUIVI only
+   */
+  public async getOrdersNeedingDeadlineNotifications(): Promise<Array<{
+    agentId: string;
+    agentName: string;
+    orders: Array<{
+      id: string;
+      reference: string;
+      delayInfo: OrderDelayInfo;
+      customer: { fullName: string; wilaya: string };
+    }>;
+  }>> {
+    try {
+      // Get all active AGENT_SUIVI with assigned orders
+      const agents = await prisma.user.findMany({
+        where: {
+          role: 'AGENT_SUIVI', // Only AGENT_SUIVI
+          isActive: true,
+          assignedOrders: {
+            some: {
+              shippingStatus: {
+                notIn: ['LIVRÉ', 'DELIVERED', 'ANNULÉ'] // Exclude delivered and cancelled orders
+              },
+              status: {
+                in: ['ASSIGNED', 'IN_PROGRESS', 'CONFIRMED']
+              }
+            }
+          }
+        },
+        include: {
+          assignedOrders: {
+            where: {
+              shippingStatus: {
+                notIn: ['LIVRÉ', 'DELIVERED', 'ANNULÉ'] // Exclude delivered and cancelled orders
+              },
+              status: {
+                in: ['ASSIGNED', 'IN_PROGRESS', 'CONFIRMED']
+              }
+            },
+            include: {
+              customer: {
+                select: {
+                  fullName: true,
+                  wilaya: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      const agentNotificationData = [];
+
+      for (const agent of agents) {
+        const ordersWithDelays = [];
+
+        for (const order of agent.assignedOrders) {
+          const delayInfo = await this.calculateOrderDelay(
+            order.id,
+            order.customer.wilaya,
+            order.orderDate,
+            order.shippingStatus || undefined
+          );
+
+          // Only include orders that are delayed or approaching deadline (within 6 hours)
+          if (delayInfo.isDelayed || (delayInfo.daysSinceOrder >= delayInfo.maxDeliveryDays - 0.25)) {
+            ordersWithDelays.push({
+              id: order.id,
+              reference: order.reference,
+              delayInfo,
+              customer: order.customer
+            });
+          }
+        }
+
+        if (ordersWithDelays.length > 0) {
+          agentNotificationData.push({
+            agentId: agent.id,
+            agentName: agent.name || agent.email,
+            orders: ordersWithDelays
+          });
+        }
+      }
+
+      return agentNotificationData;
+    } catch (error) {
+      console.error('Error getting orders needing deadline notifications:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get summary statistics for deadline notifications
+   */
+  public async getDeadlineNotificationSummary(): Promise<{
+    totalAgentsWithDelayedOrders: number;
+    totalDelayedOrders: number;
+    criticalOrders: number;
+    warningOrders: number;
+    averageDelayDays: number;
+  }> {
+    try {
+      const agentData = await this.getOrdersNeedingDeadlineNotifications();
+      
+      let totalDelayedOrders = 0;
+      let criticalOrders = 0;
+      let warningOrders = 0;
+      let totalDelayDays = 0;
+
+      agentData.forEach(agent => {
+        agent.orders.forEach(order => {
+          totalDelayedOrders++;
+          totalDelayDays += order.delayInfo.delayDays;
+          
+          if (order.delayInfo.delayLevel === 'critical') {
+            criticalOrders++;
+          } else if (order.delayInfo.delayLevel === 'warning') {
+            warningOrders++;
+          }
+        });
+      });
+
+      return {
+        totalAgentsWithDelayedOrders: agentData.length,
+        totalDelayedOrders,
+        criticalOrders,
+        warningOrders,
+        averageDelayDays: totalDelayedOrders > 0 ? totalDelayDays / totalDelayedOrders : 0
+      };
+    } catch (error) {
+      console.error('Error getting deadline notification summary:', error);
+      return {
+        totalAgentsWithDelayedOrders: 0,
+        totalDelayedOrders: 0,
+        criticalOrders: 0,
+        warningOrders: 0,
+        averageDelayDays: 0
+      };
+    }
+  }
+
+  /**
    * Clear wilaya settings cache
    */
   public async clearCache(): Promise<void> {

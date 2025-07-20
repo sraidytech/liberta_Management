@@ -89,6 +89,11 @@ router.put('/:id/status', async (req, res) => {
   await ordersController.updateOrderStatus(req, res);
 });
 
+// Add note to order without changing status
+router.put('/:id/notes', async (req, res) => {
+  await ordersController.addNote(req, res);
+});
+
 // Assign agent to order
 router.put('/:id/assign', async (req, res) => {
   await ordersController.assignAgent(req, res);

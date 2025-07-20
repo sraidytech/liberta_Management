@@ -753,6 +753,12 @@ export interface Translations {
   noteTypesManagement: string;
   manageNoteTypesDescription: string;
   addNoteType: string;
+  addNote: string;
+  addNoteOnly: string;
+  addNoteWithoutStatusChange: string;
+  selectNoteType: string;
+  customNote: string;
+  additionalNotes: string;
   totalNoteTypes: string;
   areYouSureDeleteNoteType: string;
   configureMaxDeliveryDays: string;
@@ -1539,6 +1545,12 @@ export const translations: Record<Language, Translations> = {
     noteTypesManagement: 'Note Types Management',
     manageNoteTypesDescription: 'Manage the note types that agents can select when updating orders',
     addNoteType: 'Add Note Type',
+    addNote: 'Add Note',
+    addNoteOnly: 'Add Note Only',
+    addNoteWithoutStatusChange: 'Add note without changing status',
+    selectNoteType: 'Select note type...',
+    customNote: 'Custom Note',
+    additionalNotes: 'Additional Notes',
     totalNoteTypes: 'Total Note Types',
     areYouSureDeleteNoteType: 'Are you sure you want to delete the note type "{name}"? This action cannot be undone.',
     configureMaxDeliveryDays: 'Configure maximum delivery days for each wilaya. Orders exceeding these limits will be highlighted.',
@@ -2323,6 +2335,12 @@ export const translations: Record<Language, Translations> = {
     noteTypesManagement: 'Gestion des Types de Notes',
     manageNoteTypesDescription: 'Gérer les types de notes que les agents peuvent sélectionner lors de la mise à jour des commandes',
     addNoteType: 'Ajouter Type de Note',
+    addNote: 'Ajouter Note',
+    addNoteOnly: 'Ajouter Note Seulement',
+    addNoteWithoutStatusChange: 'Ajouter une note sans changer le statut',
+    selectNoteType: 'Sélectionner un type de note...',
+    customNote: 'Note Personnalisée',
+    additionalNotes: 'Notes Supplémentaires',
     totalNoteTypes: 'Total Types de Notes',
     areYouSureDeleteNoteType: 'Êtes-vous sûr de vouloir supprimer le type de note "{name}" ? Cette action ne peut pas être annulée.',
     configureMaxDeliveryDays: 'Configurer les jours de livraison maximum pour chaque wilaya. Les commandes dépassant ces limites seront mises en évidence.',

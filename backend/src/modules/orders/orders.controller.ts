@@ -678,6 +678,134 @@ export class OrdersController {
       });
     }
   }
+  /**
+   * Add note to order without changing status
+   */
+  async addNote(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { notes, noteType, customNote } = req.body;
+      const userId = (req as any).user?.id;
+
+      if (!notes && !noteType && !customNote) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'At least one note field is required'
+          }
+        });
+      }
+
+      // Check if order exists
+      const existingOrder = await prisma.order.findUnique({
+        where: { id },
+        include: { assignedAgent: true }
+      });
+
+      if (!existingOrder) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            message: 'Order not found'
+          }
+        });
+      }
+
+      // Prepare structured notes
+      let structuredNotes = null;
+      if (notes || noteType || customNote) {
+        // Get existing notes or initialize empty array
+        let existingNotes = [];
+        if (existingOrder.notes) {
+          try {
+            // Try to parse as JSON (new format)
+            existingNotes = JSON.parse(existingOrder.notes);
+            // Ensure it's an array
+            if (!Array.isArray(existingNotes)) {
+              existingNotes = [];
+            }
+          } catch (e) {
+            // If parsing fails, it's legacy text format - start fresh with empty array
+            // Legacy notes will not be migrated to maintain clean agent-only history
+            existingNotes = [];
+          }
+        }
+        
+        // Create new note entry
+        const newNote = {
+          id: Date.now().toString(),
+          timestamp: new Date().toISOString(),
+          agentId: userId,
+          agentName: (req as any).user?.name || 'Unknown Agent',
+          type: noteType || 'CUSTOM',
+          note: notes || customNote || '',
+          statusChange: null // No status change for note-only updates
+        };
+        
+        // Add new note to existing notes
+        existingNotes.push(newNote);
+        structuredNotes = JSON.stringify(existingNotes);
+      }
+
+      // Update order with new note only
+      const updatedOrder = await prisma.order.update({
+        where: { id },
+        data: {
+          ...(structuredNotes && { notes: structuredNotes }),
+          ...(notes && { internalNotes: notes }), // Keep backward compatibility
+          updatedAt: new Date()
+        },
+        include: {
+          customer: true,
+          assignedAgent: true,
+          items: true
+        }
+      });
+
+      // Create activity logs
+      if (userId) {
+        // Create notes activity
+        const noteContent = notes || customNote || '';
+        await prisma.agentActivity.create({
+          data: {
+            agentId: userId,
+            orderId: id,
+            activityType: 'NOTES_ADDED',
+            description: noteContent,
+            duration: null // Can be calculated later if needed
+          }
+        });
+      }
+
+      // Create notification for assigned agent if different from current user
+      if (existingOrder.assignedAgentId && existingOrder.assignedAgentId !== userId) {
+        await prisma.notification.create({
+          data: {
+            userId: existingOrder.assignedAgentId,
+            orderId: id,
+            type: 'ORDER_UPDATE',
+            title: 'Note Added to Order',
+            message: `A note was added to order ${existingOrder.reference}`
+          }
+        });
+      }
+
+      res.json({
+        success: true,
+        data: updatedOrder,
+        message: 'Note added successfully'
+      });
+    } catch (error) {
+      console.error('Add note error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to add note'
+        }
+      });
+    }
+  }
+
 
   /**
    * Assign agent to order
@@ -800,7 +928,13 @@ export class OrdersController {
     try {
       const { storeIdentifier, period = '7d' } = req.query;
 
-      // Calculate date range based on period
+      // Base where clause for store filtering (without date restriction for totals)
+      const baseWhereClause: any = {};
+      if (storeIdentifier) {
+        baseWhereClause.storeIdentifier = storeIdentifier;
+      }
+
+      // Calculate date range for recent orders only
       const now = new Date();
       let startDate: Date;
 
@@ -818,17 +952,15 @@ export class OrdersController {
           startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       }
 
-      const whereClause: any = {
+      // Where clause for recent orders (with date filter)
+      const recentWhereClause: any = {
+        ...baseWhereClause,
         createdAt: {
           gte: startDate
         }
       };
 
-      if (storeIdentifier) {
-        whereClause.storeIdentifier = storeIdentifier;
-      }
-
-      // Get statistics
+      // Get ALL-TIME statistics (no date filter) and recent orders
       const [
         totalOrders,
         pendingOrders,
@@ -840,25 +972,35 @@ export class OrdersController {
         totalRevenue,
         recentOrders
       ] = await Promise.all([
-        prisma.order.count({ where: whereClause }),
-        prisma.order.count({ where: { ...whereClause, status: 'PENDING' } }),
-        prisma.order.count({ where: { ...whereClause, status: 'ASSIGNED' } }),
-        prisma.order.count({ where: { ...whereClause, status: 'CONFIRMED' } }),
-        prisma.order.count({ where: { ...whereClause, status: 'SHIPPED' } }),
-        prisma.order.count({ where: { ...whereClause, shippingStatus: 'LIVRÉ' } }),
-        prisma.order.count({ where: { ...whereClause, status: 'CANCELLED' } }),
+        // ALL-TIME TOTALS (no date filter)
+        prisma.order.count({ where: baseWhereClause }),
+        prisma.order.count({ where: { ...baseWhereClause, status: 'PENDING' } }),
+        prisma.order.count({ where: { ...baseWhereClause, status: 'ASSIGNED' } }),
+        prisma.order.count({ where: { ...baseWhereClause, status: 'CONFIRMED' } }),
+        prisma.order.count({ where: { ...baseWhereClause, status: 'SHIPPED' } }),
+        prisma.order.count({
+          where: {
+            ...baseWhereClause,
+            OR: [
+              { status: 'DELIVERED' },
+              { shippingStatus: 'LIVRÉ' }
+            ]
+          }
+        }),
+        prisma.order.count({ where: { ...baseWhereClause, status: 'CANCELLED' } }),
         prisma.order.aggregate({
           where: {
-            ...whereClause,
+            ...baseWhereClause,
             OR: [
-              { status: { in: ['CONFIRMED', 'SHIPPED'] } },
+              { status: { in: ['CONFIRMED', 'SHIPPED', 'DELIVERED'] } },
               { shippingStatus: 'LIVRÉ' }
             ]
           },
           _sum: { total: true }
         }),
+        // RECENT ORDERS (with date filter for the list)
         prisma.order.findMany({
-          where: whereClause,
+          where: recentWhereClause,
           include: {
             customer: {
               select: {

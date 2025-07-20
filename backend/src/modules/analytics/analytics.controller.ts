@@ -2021,4 +2021,398 @@ export class AnalyticsController {
       });
     }
   }
+
+  /**
+   * Get detailed performance analytics for a specific agent
+   */
+  async getAgentPerformanceAnalytics(req: Request, res: Response) {
+    try {
+      const { agentId } = req.params;
+      const { period = '30d' } = req.query;
+      const userId = (req as any).user?.id;
+      const userRole = (req as any).user?.role;
+
+      if (!agentId) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            message: 'Agent ID is required'
+          }
+        });
+      }
+
+      // Allow agents to view their own performance or managers to view any agent
+      if (userId !== agentId && !['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'].includes(userRole)) {
+        return res.status(403).json({
+          success: false,
+          error: {
+            message: 'Insufficient permissions to view agent performance'
+          }
+        });
+      }
+
+      // Check cache first
+      const cacheKey = `agent_performance_analytics:${agentId}:${period}`;
+      const cached = await redis.get(cacheKey);
+      
+      if (cached) {
+        return res.json({
+          success: true,
+          data: JSON.parse(cached),
+          cached: true
+        });
+      }
+
+      let days = 30;
+      if (period === '7d') days = 7;
+      if (period === '90d') days = 90;
+      
+      // Use timezone-aware date calculation
+      const now = getCurrentDate();
+      const startDate = new Date(now);
+      startDate.setDate(startDate.getDate() - days);
+      const startDateUTC = getStartOfDay(startDate);
+
+      // Get agent information
+      const agent = await prisma.user.findUnique({
+        where: { id: agentId },
+        select: {
+          id: true,
+          name: true,
+          agentCode: true,
+          maxOrders: true,
+          currentOrders: true
+        }
+      });
+
+      if (!agent) {
+        return res.status(404).json({
+          success: false,
+          error: {
+            message: 'Agent not found'
+          }
+        });
+      }
+
+      // Get comprehensive performance data
+      const [
+        totalOrders,
+        completedOrders,
+        cancelledOrders,
+        confirmedOrders,
+        averageProcessingTime,
+        agentNotesCount,
+        dailyOrderCounts,
+        weeklyOrderCounts,
+        monthlyOrderCounts
+      ] = await Promise.all([
+        // Total orders assigned in period - only count orders with activities (notes)
+        prisma.order.count({
+          where: {
+            assignedAgentId: agentId,
+            createdAt: { gte: startDateUTC },
+            activities: {
+              some: {
+                agentId: agentId // Must have at least 1 note/activity
+              }
+            }
+          }
+        }),
+
+        // Completed (delivered) orders - only count orders with notes AND delivered status
+        prisma.order.count({
+          where: {
+            assignedAgentId: agentId,
+            status: 'DELIVERED',
+            shippingStatus: 'DELIVERED', // Must have shipping status delivered
+            createdAt: { gte: startDateUTC },
+            activities: {
+              some: {
+                agentId: agentId // Must have at least 1 note/activity
+              }
+            }
+          }
+        }),
+
+        // Cancelled orders - only count orders with activities (notes)
+        prisma.order.count({
+          where: {
+            assignedAgentId: agentId,
+            status: 'CANCELLED',
+            createdAt: { gte: startDateUTC },
+            activities: {
+              some: {
+                agentId: agentId // Must have at least 1 note/activity
+              }
+            }
+          }
+        }),
+
+        // Confirmed orders - only count orders with activities (notes)
+        prisma.order.count({
+          where: {
+            assignedAgentId: agentId,
+            status: 'CONFIRMED',
+            createdAt: { gte: startDateUTC },
+            activities: {
+              some: {
+                agentId: agentId // Must have at least 1 note/activity
+              }
+            }
+          }
+        }),
+
+        // Average processing time (from assignment to completion)
+        prisma.order.findMany({
+          where: {
+            assignedAgentId: agentId,
+            status: { in: ['DELIVERED', 'CANCELLED'] },
+            assignedAt: { not: null },
+            updatedAt: { gte: startDateUTC }
+          },
+          select: {
+            assignedAt: true,
+            updatedAt: true
+          }
+        }).then(orders => {
+          if (orders.length === 0) return 0;
+          
+          const totalProcessingTime = orders.reduce((sum, order) => {
+            if (order.assignedAt) {
+              const processingTime = new Date(order.updatedAt).getTime() - new Date(order.assignedAt).getTime();
+              return sum + processingTime;
+            }
+            return sum;
+          }, 0);
+          
+          return totalProcessingTime / orders.length / (1000 * 60 * 60); // Convert to hours
+        }),
+
+        // Agent notes/activities count (required for performance calculation)
+        prisma.agentActivity.count({
+          where: {
+            agentId: agentId,
+            createdAt: { gte: startDateUTC }
+          }
+        }),
+
+        // Daily order counts for the period
+        prisma.order.groupBy({
+          by: ['createdAt'],
+          where: {
+            assignedAgentId: agentId,
+            createdAt: { gte: startDateUTC }
+          },
+          _count: { id: true }
+        }).then(results => {
+          const dailyMap = new Map<string, number>();
+          
+          // Initialize all dates with 0
+          for (let i = 0; i < days; i++) {
+            const date = new Date(startDate);
+            date.setDate(startDate.getDate() + i);
+            const dateKey = date.toISOString().split('T')[0];
+            dailyMap.set(dateKey, 0);
+          }
+          
+          // Fill in actual counts
+          results.forEach(result => {
+            const dateKey = result.createdAt.toISOString().split('T')[0];
+            const existing = dailyMap.get(dateKey) || 0;
+            dailyMap.set(dateKey, existing + result._count.id);
+          });
+          
+          return Array.from(dailyMap.entries()).map(([date, count]) => ({
+            date,
+            count
+          }));
+        }),
+
+        // Weekly order counts (last 4 weeks)
+        Promise.resolve().then(async () => {
+          const weeklyData = [];
+          for (let i = 0; i < 4; i++) {
+            const weekStart = new Date(now);
+            weekStart.setDate(weekStart.getDate() - (i * 7) - 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            
+            const count = await prisma.order.count({
+              where: {
+                assignedAgentId: agentId,
+                createdAt: {
+                  gte: getStartOfDay(weekStart),
+                  lte: getEndOfDay(weekEnd)
+                }
+              }
+            });
+            
+            weeklyData.unshift({
+              week: `Week ${4 - i}`,
+              count
+            });
+          }
+          return weeklyData;
+        }),
+
+        // Monthly order counts (last 3 months)
+        Promise.resolve().then(async () => {
+          const monthlyData = [];
+          for (let i = 0; i < 3; i++) {
+            const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const monthEnd = getEndOfMonth(monthStart);
+            
+            const count = await prisma.order.count({
+              where: {
+                assignedAgentId: agentId,
+                createdAt: {
+                  gte: getStartOfMonth(monthStart),
+                  lte: monthEnd
+                }
+              }
+            });
+            
+            monthlyData.unshift({
+              month: monthStart.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+              count
+            });
+          }
+          return monthlyData;
+        })
+      ]);
+
+      // Calculate performance metrics
+      const completionRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
+      const successRate = totalOrders > 0 ? ((completedOrders + confirmedOrders) / totalOrders) * 100 : 0;
+      const cancellationRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
+
+      // Get previous period data for comparison
+      const previousStartDate = new Date(startDate);
+      previousStartDate.setDate(previousStartDate.getDate() - days);
+      const previousEndDate = new Date(startDate);
+
+      const [previousTotalOrders, previousCompletedOrders] = await Promise.all([
+        prisma.order.count({
+          where: {
+            assignedAgentId: agentId,
+            createdAt: {
+              gte: getStartOfDay(previousStartDate),
+              lt: getStartOfDay(startDate)
+            }
+          }
+        }),
+        prisma.order.count({
+          where: {
+            assignedAgentId: agentId,
+            status: 'DELIVERED',
+            createdAt: {
+              gte: getStartOfDay(previousStartDate),
+              lt: getStartOfDay(startDate)
+            }
+          }
+        })
+      ]);
+
+      const previousCompletionRate = previousTotalOrders > 0 ? (previousCompletedOrders / previousTotalOrders) * 100 : 0;
+      const completionTrend = completionRate > previousCompletionRate ? 'up' : 
+                             completionRate < previousCompletionRate ? 'down' : 'stable';
+
+      // Check if agent has sufficient activity (at least 1 note AND at least 1 delivered order) to show performance data
+      if (agentNotesCount === 0 || completedOrders === 0) {
+        const missingRequirements = [];
+        if (agentNotesCount === 0) {
+          missingRequirements.push('at least 1 note on orders');
+        }
+        if (completedOrders === 0) {
+          missingRequirements.push('at least 1 delivered order');
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            agent: {
+              id: agent.id,
+              name: agent.name,
+              agentCode: agent.agentCode,
+              maxOrders: agent.maxOrders,
+              currentOrders: agent.currentOrders
+            },
+            hasInsufficientActivity: true,
+            message: `Agent needs ${missingRequirements.join(' and ')} to view performance analytics`,
+            requiredActivity: 'Please add notes to your assigned orders and ensure at least one order is delivered to track your performance',
+            missingRequirements: {
+              needsNotes: agentNotesCount === 0,
+              needsDeliveredOrders: completedOrders === 0,
+              currentNotes: agentNotesCount,
+              currentDeliveredOrders: completedOrders
+            }
+          }
+        });
+      }
+
+      // Format response
+      const performanceData = {
+        agent: {
+          id: agent.id,
+          name: agent.name,
+          agentCode: agent.agentCode,
+          maxOrders: agent.maxOrders,
+          currentOrders: agent.currentOrders
+        },
+        period: {
+          days,
+          startDate: startDateUTC.toISOString(),
+          endDate: now.toISOString()
+        },
+        completionRate: {
+          current: Math.round(completionRate * 10) / 10,
+          previous: Math.round(previousCompletionRate * 10) / 10,
+          trend: completionTrend
+        },
+        averageProcessingTime: {
+          hours: Math.round(averageProcessingTime * 10) / 10,
+          comparison: averageProcessingTime < 24 ? 'excellent' : 
+                     averageProcessingTime < 48 ? 'good' : 'needs_improvement'
+        },
+        orderCounts: {
+          total: totalOrders,
+          completed: completedOrders,
+          cancelled: cancelledOrders,
+          confirmed: confirmedOrders,
+          daily: dailyOrderCounts,
+          weekly: weeklyOrderCounts,
+          monthly: monthlyOrderCounts
+        },
+        successRate: {
+          delivered: completedOrders,
+          cancelled: cancelledOrders,
+          confirmed: confirmedOrders,
+          percentage: Math.round(successRate * 10) / 10,
+          cancellationRate: Math.round(cancellationRate * 10) / 10
+        },
+        productivity: {
+          ordersPerDay: totalOrders > 0 ? Math.round((totalOrders / days) * 10) / 10 : 0,
+          utilizationRate: agent.maxOrders > 0 ? Math.round((agent.currentOrders / agent.maxOrders) * 100 * 10) / 10 : 0
+        }
+      };
+
+      // Cache for 10 minutes
+      await redis.setex(cacheKey, 600, JSON.stringify(performanceData));
+
+      res.json({
+        success: true,
+        data: performanceData
+      });
+    } catch (error) {
+      console.error('Agent performance analytics error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch agent performance analytics',
+          code: 'AGENT_PERFORMANCE_ERROR',
+          statusCode: 500
+        }
+      });
+    }
+  }
 }

@@ -11,6 +11,14 @@ export interface CreateNotificationData {
   metadata?: any;
 }
 
+export interface BatchedNotificationData {
+  type: NotificationType;
+  title: string;
+  message: string;
+  metadata?: any;
+  priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}
+
 export interface NotificationFilters {
   userId?: string;
   type?: NotificationType;
@@ -728,6 +736,117 @@ export class NotificationService {
     } catch (error) {
       console.error('Error creating bulk notification:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Create optimized batched notification for deadline alerts
+   */
+  async createBatchedDeadlineNotification(
+    userId: string,
+    title: string,
+    message: string,
+    orderIds?: string[]
+  ) {
+    try {
+      const notification = await this.createNotification({
+        userId,
+        orderId: orderIds?.[0], // Use first order as primary reference
+        type: 'SYSTEM_ALERT' as NotificationType,
+        title,
+        message
+      });
+
+      console.log(`📦 Batched deadline notification created: ${title} for user ${userId} (${orderIds?.length || 0} orders)`);
+      return notification;
+    } catch (error) {
+      console.error('Error creating batched deadline notification:', error);
+      throw new Error('Failed to create batched deadline notification');
+    }
+  }
+
+  /**
+   * Get notification statistics for monitoring
+   */
+  async getNotificationStats(timeframe: 'hour' | 'day' | 'week' = 'day'): Promise<{
+    total: number;
+    byType: Record<string, number>;
+  }> {
+    try {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch (timeframe) {
+        case 'hour':
+          startDate.setHours(startDate.getHours() - 1);
+          break;
+        case 'day':
+          startDate.setDate(startDate.getDate() - 1);
+          break;
+        case 'week':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+      }
+
+      const notifications = await prisma.notification.findMany({
+        where: {
+          createdAt: {
+            gte: startDate,
+            lte: now
+          }
+        },
+        select: {
+          type: true
+        }
+      });
+
+      const stats = {
+        total: notifications.length,
+        byType: {} as Record<string, number>
+      };
+
+      notifications.forEach(notification => {
+        // Count by type
+        stats.byType[notification.type] = (stats.byType[notification.type] || 0) + 1;
+      });
+
+      return stats;
+    } catch (error) {
+      console.error('Error getting notification stats:', error);
+      return {
+        total: 0,
+        byType: {}
+      };
+    }
+  }
+
+  /**
+   * Clean up old deadline notifications specifically
+   */
+  async cleanupOldDeadlineNotifications(daysOld: number = 7): Promise<{ count: number }> {
+    try {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+
+      // Clean up old SYSTEM_ALERT notifications that are read
+      const result = await prisma.notification.deleteMany({
+        where: {
+          createdAt: {
+            lt: cutoffDate,
+          },
+          isRead: true,
+          type: 'SYSTEM_ALERT', // Our deadline notifications use SYSTEM_ALERT type
+          title: {
+            contains: 'orders need attention' // Only delete deadline-related notifications
+          }
+        },
+      });
+
+      console.log(`🧹 Cleaned up ${result.count} old deadline notifications (older than ${daysOld} days)`);
+      return result;
+    } catch (error) {
+      console.error('Error cleaning up old deadline notifications:', error);
+      return { count: 0 };
     }
   }
 }

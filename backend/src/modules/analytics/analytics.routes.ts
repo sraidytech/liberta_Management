@@ -52,4 +52,9 @@ router.get('/agents/notes', requireAdmin as any, async (req, res) => {
   await analyticsController.getAgentNotesAnalytics(req, res);
 });
 
+// Agent performance analytics (agents can view their own, managers can view any)
+router.get('/agents/:agentId/performance', async (req, res) => {
+  await analyticsController.getAgentPerformanceAnalytics(req, res);
+});
+
 export default router;
