@@ -444,7 +444,7 @@ export class MaystroService {
     try {
       // Step 1: Fetch all orders from Maystro API first
       console.log('🔄 Fetching orders from Maystro API for all stores...');
-      const maystroOrders = await this.fetchAllOrders(25000); // Fetch 10000 orders from Maystro
+      const maystroOrders = await this.fetchAllOrders(10000); // Fetch 10000 orders from Maystro
       
       // Step 2: Create a Map for fast lookup
       const orderMap = new Map(maystroOrders.map(order => [order.external_order_id, order]));
