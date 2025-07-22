@@ -43,4 +43,9 @@ router.delete('/:id', requireAdmin as any, async (req, res) => {
   await StoresController.deleteStore(req, res);
 });
 
+// Store sync route
+router.post('/:id/sync', requireAdmin as any, async (req, res) => {
+  await StoresController.syncStoreOrders(req, res);
+});
+
 export default router;

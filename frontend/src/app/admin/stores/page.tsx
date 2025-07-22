@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/lib/language-context';
-import { Plus, Edit, Trash2, Power, PowerOff, TestTube } from 'lucide-react';
+import { Plus, Edit, Trash2, Power, PowerOff, TestTube, RefreshCw, Loader2 } from 'lucide-react';
 import AdminLayout from '@/components/admin/admin-layout';
 
 interface Store {
@@ -50,6 +50,7 @@ export default function StoresPage() {
   });
   const [formLoading, setFormLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [syncingStores, setSyncingStores] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchStores();
@@ -207,6 +208,52 @@ export default function StoresPage() {
       alert('Connection test failed');
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const handleSyncStore = async (store: Store, fullSync: boolean = false) => {
+    setSyncingStores(prev => new Set(prev).add(store.id));
+
+    try {
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/v1/stores/${store.id}/sync`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fullSync })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const syncData = result.data;
+        
+        // Show detailed success message
+        const message = `✅ Sync completed for ${store.storeName}!\n\n` +
+          `📊 Results:\n` +
+          `• Orders Synced: ${syncData.syncedCount || 0}\n` +
+          `• Total Fetched: ${syncData.totalFetched || 0}\n` +
+          `• Errors: ${syncData.errorCount || 0}\n` +
+          `• Duration: ${((syncData.duration || 0) / 1000).toFixed(1)}s\n` +
+          `• Sync Type: ${syncData.syncType || 'incremental'}`;
+        
+        alert(message);
+        await fetchStores(); // Refresh store data
+      } else {
+        const error = await response.json();
+        alert(`❌ Sync failed for ${store.storeName}:\n\n${error.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error syncing store:', error);
+      alert(`❌ Sync failed for ${store.storeName}:\n\nNetwork error or server unavailable`);
+    } finally {
+      setSyncingStores(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(store.id);
+        return newSet;
+      });
     }
   };
 
@@ -375,6 +422,27 @@ export default function StoresPage() {
                   </div>
 
                   <div className="flex gap-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSyncStore(store)}
+                      disabled={syncingStores.has(store.id) || !store.isActive}
+                      className="flex items-center gap-1 text-blue-600 hover:text-blue-700 disabled:text-gray-400"
+                      title={!store.isActive ? 'Store must be active to sync' : 'Sync new orders for this store'}
+                    >
+                      {syncingStores.has(store.id) ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          Sync Orders
+                        </>
+                      )}
+                    </Button>
+
                     <Button
                       variant="outline"
                       size="sm"

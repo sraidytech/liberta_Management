@@ -616,4 +616,110 @@ export class StoresController {
       });
     }
   }
+
+  /**
+   * Sync orders for a specific store
+   */
+  static async syncStoreOrders(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { fullSync = false } = req.body;
+
+      // Get store configuration
+      const store = await prisma.apiConfiguration.findUnique({
+        where: { id }
+      });
+
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          message: 'Store configuration not found'
+        });
+      }
+
+      if (!store.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: 'Store is not active. Please activate the store before syncing.'
+        });
+      }
+
+      // Validate required configuration
+      if (!store.baseUrl) {
+        return res.status(400).json({
+          success: false,
+          message: `Base URL is missing for store ${store.storeName}. Please update the store configuration.`
+        });
+      }
+
+      if (!store.apiToken) {
+        return res.status(400).json({
+          success: false,
+          message: `API token is missing for store ${store.storeName}. Please update the store configuration.`
+        });
+      }
+
+      console.log(`🔄 Starting manual sync for store: ${store.storeName} (${store.storeIdentifier})`);
+      console.log(`   - Sync Type: ${fullSync ? 'Full Sync' : 'Incremental Sync'}`);
+      console.log(`   - Requested by: ${(req as any).user?.name || 'Unknown'}`);
+
+      // Import SyncService dynamically to avoid circular dependencies
+      const { SyncService } = await import('../../services/sync.service');
+      const syncService = new SyncService(redis);
+
+      // Perform the sync
+      const syncStartTime = Date.now();
+      const result = await syncService.manualSync(store.storeIdentifier, fullSync);
+      const syncDuration = Date.now() - syncStartTime;
+
+      console.log(`✅ Manual sync completed for ${store.storeName}:`);
+      console.log(`   - Duration: ${(syncDuration / 1000).toFixed(1)}s`);
+      console.log(`   - Orders Synced: ${result.syncedCount || 0}`);
+      console.log(`   - Errors: ${result.errorCount || 0}`);
+
+      // Update last used time
+      await prisma.apiConfiguration.update({
+        where: { id },
+        data: { lastUsed: new Date() }
+      });
+
+      res.json({
+        success: true,
+        message: `Store sync completed successfully for ${store.storeName}`,
+        data: {
+          storeName: store.storeName,
+          storeIdentifier: store.storeIdentifier,
+          syncType: fullSync ? 'full' : 'incremental',
+          syncedCount: result.syncedCount || 0,
+          errorCount: result.errorCount || 0,
+          totalFetched: result.totalFetched || 0,
+          duration: syncDuration,
+          timestamp: new Date().toISOString(),
+          ...result
+        }
+      });
+    } catch (error) {
+      console.error('Error syncing store orders:', error);
+      
+      // Provide specific error messages based on error type
+      let errorMessage = 'Failed to sync store orders';
+      if (error instanceof Error) {
+        if (error.message.includes('403') || error.message.includes('Forbidden')) {
+          errorMessage = 'API access forbidden. Please check your API token.';
+        } else if (error.message.includes('timeout')) {
+          errorMessage = 'Request timeout. Please check your network connection.';
+        } else if (error.message.includes('rate limit')) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+
+      res.status(500).json({
+        success: false,
+        message: errorMessage,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
 }
