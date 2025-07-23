@@ -451,8 +451,9 @@ export class EcoManagerService {
   async fetchNewOrders(lastOrderId: number): Promise<EcoManagerOrder[]> {
     const newOrders: EcoManagerOrder[] = [];
     let consecutiveEmptyPages = 0;
-    const maxEmptyPages = 3;
-    const maxPagesToScan = 50; // 🚨 CRITICAL FIX: Limit maximum pages to prevent infinite loops
+    const maxEmptyPages = 3; // 🎯 Stop if 3 consecutive empty pages found
+    const maxForwardPages = 50; // 🎯 Maximum 50 new pages forward
+    const maxBackwardPages = 25; // 🎯 Maximum 25 old pages backward
 
     console.log(`🔍 Fetching new "En dispatch" orders for ${this.config.storeName}...`);
     console.log(`📊 Last synced EcoManager order ID: ${lastOrderId}`);
@@ -461,41 +462,41 @@ export class EcoManagerService {
     const pageInfo = await this.getPageInfo();
     let currentLastPage = pageInfo?.lastPage || 1;
 
-    // OPTIMIZATION 1: Smart scanning with limits
-    const backwardRange = 10;
-    const startPage = Math.max(1, currentLastPage - backwardRange);
-    const maxForwardPage = currentLastPage + maxPagesToScan;
+    // 🎯 OPTIMIZED SCANNING STRATEGY: 25 backward + 50 forward with early termination
+    const backwardStartPage = Math.max(1, currentLastPage - maxBackwardPages);
+    const forwardEndPage = currentLastPage + maxForwardPages;
     
-    console.log(`📄 Scanning strategy for ${this.config.storeName}:`);
+    console.log(`📄 OPTIMIZED Scanning strategy for ${this.config.storeName}:`);
     console.log(`   - Current last page: ${currentLastPage}`);
-    console.log(`   - Backward range: ${startPage} to ${currentLastPage - 1}`);
-    console.log(`   - Forward range: ${currentLastPage} to ${maxForwardPage} (max ${maxPagesToScan} pages)`);
+    console.log(`   - Backward scan: ${backwardStartPage} to ${currentLastPage - 1} (${Math.max(0, currentLastPage - backwardStartPage)} pages)`);
+    console.log(`   - Forward scan: ${currentLastPage} to ${forwardEndPage} (max ${maxForwardPages} pages)`);
+    console.log(`   - Early termination: Stop if ${maxEmptyPages} consecutive empty pages found`);
 
     let newLastPage = currentLastPage;
-    let foundNewOrders = false;
-    let pagesScanned = 0;
+    let forwardPagesScanned = 0;
 
-    // OPTIMIZATION 2: Limited forward scan with early termination
+    // 🚀 PHASE 1: FORWARD SCAN (50 pages max, stop on 3 empty consecutive)
     let page = currentLastPage;
-    console.log(`🔄 Starting forward scan from page ${page}...`);
+    console.log(`🔄 Starting FORWARD scan from page ${page}...`);
     
-    while (consecutiveEmptyPages < maxEmptyPages && pagesScanned < maxPagesToScan && page <= maxForwardPage) {
+    while (consecutiveEmptyPages < maxEmptyPages && forwardPagesScanned < maxForwardPages && page <= forwardEndPage) {
       try {
-        console.log(`📄 Fetching ${this.config.storeName} page ${page} (${pagesScanned + 1}/${maxPagesToScan})...`);
+        console.log(`📄 [FORWARD] Fetching ${this.config.storeName} page ${page} (${forwardPagesScanned + 1}/${maxForwardPages})...`);
         const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
-        pagesScanned++;
+        forwardPagesScanned++;
 
         if (!orders || orders.length === 0) {
           consecutiveEmptyPages++;
           console.log(`❌ Empty page received (${consecutiveEmptyPages}/${maxEmptyPages})`);
           if (consecutiveEmptyPages >= maxEmptyPages) {
-            console.log(`🛑 Stopping forward scan after ${maxEmptyPages} empty pages`);
+            console.log(`🛑 EARLY TERMINATION: Found ${maxEmptyPages} consecutive empty pages. Stopping forward scan.`);
             break;
           }
           page++;
           continue;
         }
 
+        // Reset empty page counter when we find orders
         consecutiveEmptyPages = 0;
         if (page > newLastPage) {
           newLastPage = page;
@@ -504,28 +505,26 @@ export class EcoManagerService {
         const firstId = orders[0].id;
         const lastId = orders[orders.length - 1].id;
         
-        console.log(`📦 Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
+        console.log(`📦 [FORWARD] Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
 
-        // 🚨 CRITICAL FIX: Check if we're seeing the same orders repeatedly
+        // Check if we're seeing old orders (shouldn't happen in forward scan, but safety check)
         if (lastOrderId > 0 && firstId <= lastOrderId && lastId <= lastOrderId) {
-          console.log(`⚠️ All orders on page ${page} are older than last synced ID ${lastOrderId}. Stopping forward scan.`);
-          break;
+          console.log(`⚠️ All orders on page ${page} are older than last synced ID ${lastOrderId}. This shouldn't happen in forward scan.`);
         }
 
-        // OPTIMIZATION 3: Use database query instead of loading all IDs into memory
+        // Filter for new dispatch orders
         const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
 
         if (newDispatchOrders.length > 0) {
           newOrders.push(...newDispatchOrders);
-          foundNewOrders = true;
-          console.log(`✅ Found ${newDispatchOrders.length} new dispatch orders on page ${page}`);
+          console.log(`✅ [FORWARD] Found ${newDispatchOrders.length} new dispatch orders on page ${page}`);
           
-          // Show details of found orders (limit to first 3 for brevity)
-          newDispatchOrders.slice(0, 3).forEach(order => {
+          // Show details of found orders (limit to first 2 for brevity)
+          newDispatchOrders.slice(0, 2).forEach(order => {
             console.log(`   - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
           });
-          if (newDispatchOrders.length > 3) {
-            console.log(`   - ... and ${newDispatchOrders.length - 3} more orders`);
+          if (newDispatchOrders.length > 2) {
+            console.log(`   - ... and ${newDispatchOrders.length - 2} more orders`);
           }
         }
 
@@ -535,53 +534,57 @@ export class EcoManagerService {
         await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
         page++;
       } catch (error) {
-        console.error(`❌ Error fetching page ${page}:`, error);
+        console.error(`❌ [FORWARD] Error fetching page ${page}:`, error);
         page++;
         continue;
       }
     }
 
     // Log why forward scan stopped
-    if (pagesScanned >= maxPagesToScan) {
-      console.log(`🛑 Forward scan stopped: Reached maximum pages limit (${maxPagesToScan})`);
+    if (consecutiveEmptyPages >= maxEmptyPages) {
+      console.log(`🎯 Forward scan stopped: Found ${maxEmptyPages} consecutive empty pages (EARLY TERMINATION)`);
+    } else if (forwardPagesScanned >= maxForwardPages) {
+      console.log(`🎯 Forward scan stopped: Reached maximum pages limit (${maxForwardPages})`);
     }
 
-    // OPTIMIZATION 4: Limited backward scan
-    console.log(`🔄 Scanning backward from page ${currentLastPage - 1} to ${startPage}...`);
+    // 🚀 PHASE 2: BACKWARD SCAN (25 pages max)
+    console.log(`🔄 Starting BACKWARD scan from page ${currentLastPage - 1} to ${backwardStartPage}...`);
     
-    for (let backPage = currentLastPage - 1; backPage >= startPage; backPage--) {
+    let backwardPagesScanned = 0;
+    for (let backPage = currentLastPage - 1; backPage >= backwardStartPage; backPage--) {
       try {
-        console.log(`📄 Fetching ${this.config.storeName} page ${backPage}...`);
+        backwardPagesScanned++;
+        console.log(`📄 [BACKWARD] Fetching ${this.config.storeName} page ${backPage} (${backwardPagesScanned}/${maxBackwardPages})...`);
         const orders = await this.fetchOrdersPage(backPage, this.BATCH_SIZE);
 
         if (!orders || orders.length === 0) {
+          console.log(`❌ [BACKWARD] Empty page ${backPage}, continuing...`);
           continue;
         }
 
         const firstId = orders[0].id;
         const lastId = orders[orders.length - 1].id;
         
-        console.log(`📦 Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
+        console.log(`📦 [BACKWARD] Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
 
         const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
 
         if (newDispatchOrders.length > 0) {
           newOrders.push(...newDispatchOrders);
-          foundNewOrders = true;
-          console.log(`✅ Found ${newDispatchOrders.length} new dispatch orders on page ${backPage}`);
+          console.log(`✅ [BACKWARD] Found ${newDispatchOrders.length} new dispatch orders on page ${backPage}`);
           
-          // Show details of found orders (limit to first 3 for brevity)
-          newDispatchOrders.slice(0, 3).forEach(order => {
+          // Show details of found orders (limit to first 2 for brevity)
+          newDispatchOrders.slice(0, 2).forEach(order => {
             console.log(`   - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
           });
-          if (newDispatchOrders.length > 3) {
-            console.log(`   - ... and ${newDispatchOrders.length - 3} more orders`);
+          if (newDispatchOrders.length > 2) {
+            console.log(`   - ... and ${newDispatchOrders.length - 2} more orders`);
           }
         }
 
         await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
       } catch (error) {
-        console.error(`❌ Error fetching page ${backPage}:`, error);
+        console.error(`❌ [BACKWARD] Error fetching page ${backPage}:`, error);
         continue;
       }
     }
@@ -596,7 +599,8 @@ export class EcoManagerService {
     }
 
     console.log(`🎯 SYNC COMPLETE for ${this.config.storeName}: Found ${newOrders.length} new "En dispatch" orders`);
-    console.log(`📊 Pages scanned: Forward=${pagesScanned}, Backward=${Math.max(0, currentLastPage - startPage)}`);
+    console.log(`📊 Pages scanned: Forward=${forwardPagesScanned}/${maxForwardPages}, Backward=${backwardPagesScanned}/${maxBackwardPages}`);
+    console.log(`🚀 Early termination: ${consecutiveEmptyPages >= maxEmptyPages ? 'YES' : 'NO'} (${consecutiveEmptyPages}/${maxEmptyPages} empty pages)`);
     return newOrders;
   }
 
