@@ -63,7 +63,7 @@ export class SchedulerService {
 
     console.log('✅ All background jobs scheduled successfully!');
     console.log('📋 Schedule Summary:');
-    console.log('   🔄 EcoManager Sync: Every 6 hours at 03:00, 09:00, 15:00, 21:00 (4 times/day)');
+    console.log('   🔄 EcoManager Sync: Every 6 hours at 08:00, 14:00, 20:00 (3 times/day)');
     console.log('   🚚 Shipping Status Sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00');
     console.log('   🚨 Deadline Notifications: Every 4 hours at 06:00, 10:00, 14:00, 18:00');
     console.log('   🧹 Daily Cleanup: Every day at 2 AM');
@@ -92,10 +92,10 @@ export class SchedulerService {
   }
 
   /**
-   * Schedule EcoManager sync every 6 hours at 03:00, 09:00, 15:00, 21:00
+   * Schedule EcoManager sync every 6 hours at 08:00, 14:00, 20:00
    */
   private scheduleEcoManagerSync(): void {
-    const syncHours = [3, 9, 15, 21]; // 03:00, 09:00, 15:00, 21:00
+    const syncHours = [8, 14, 20]; // 08:00, 14:00, 20:00
 
     const scheduleNextEcoSync = () => {
       const now = new Date();
@@ -106,8 +106,8 @@ export class SchedulerService {
       let nextSyncDate = new Date(now);
       
       if (!nextSyncHour) {
-        // No more sync hours today, schedule for 03:00 tomorrow
-        nextSyncHour = 3;
+        // No more sync hours today, schedule for 08:00 tomorrow
+        nextSyncHour = 8;
         nextSyncDate.setDate(nextSyncDate.getDate() + 1);
       }
 
@@ -296,14 +296,14 @@ export class SchedulerService {
   private calculateNextSyncTime(): string {
     const now = new Date();
     const currentHour = now.getHours();
-    const syncHours = [3, 9, 15, 21]; // 03:00, 09:00, 15:00, 21:00
+    const syncHours = [8, 14, 20]; // 08:00, 14:00, 20:00
     
     let nextSyncHour = syncHours.find(hour => hour > currentHour);
     let nextSyncDate = new Date(now);
     
     if (!nextSyncHour) {
-      // No more sync hours today, schedule for 03:00 tomorrow
-      nextSyncHour = 3;
+      // No more sync hours today, schedule for 08:00 tomorrow
+      nextSyncHour = 8;
       nextSyncDate.setDate(nextSyncDate.getDate() + 1);
     }
 

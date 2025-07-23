@@ -1,8 +1,6 @@
 import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
-import * as fs from 'fs';
-import * as path from 'path';
 
 import { prisma } from '../config/database';
 
@@ -453,52 +451,44 @@ export class EcoManagerService {
   async fetchNewOrders(lastOrderId: number): Promise<EcoManagerOrder[]> {
     const newOrders: EcoManagerOrder[] = [];
     let consecutiveEmptyPages = 0;
-    const maxEmptyPages = 3; // 🎯 Stop if 3 consecutive empty pages found
-    const maxForwardPages = 50; // 🎯 Maximum 50 new pages forward
-    const maxBackwardPages = 25; // 🎯 Maximum 25 old pages backward
+    const maxEmptyPages = 3;
 
-    console.log(`🔍 Fetching new "En dispatch" orders for ${this.config.storeName}...`);
-    console.log(`📊 Last synced EcoManager order ID: ${lastOrderId}`);
+    console.log(`Fetching new "En dispatch" orders for ${this.config.storeName}...`);
+    console.log(`Last synced EcoManager order ID for ${this.config.storeName}: ${lastOrderId}`);
 
     // Get cached page info
     const pageInfo = await this.getPageInfo();
     let currentLastPage = pageInfo?.lastPage || 1;
 
-    // 🎯 OPTIMIZED SCANNING STRATEGY: 25 backward + 50 forward with early termination
-    const backwardStartPage = Math.max(1, currentLastPage - maxBackwardPages);
-    const forwardEndPage = currentLastPage + maxForwardPages;
+    // OPTIMIZATION 1: Scan -10 pages backward and forward until max page found
+    const backwardRange = 10;
+    const startPage = Math.max(1, currentLastPage - backwardRange);
     
-    console.log(`📄 OPTIMIZED Scanning strategy for ${this.config.storeName}:`);
-    console.log(`   - Current last page: ${currentLastPage}`);
-    console.log(`   - Backward scan: ${backwardStartPage} to ${currentLastPage - 1} (${Math.max(0, currentLastPage - backwardStartPage)} pages)`);
-    console.log(`   - Forward scan: ${currentLastPage} to ${forwardEndPage} (max ${maxForwardPages} pages)`);
-    console.log(`   - Early termination: Stop if ${maxEmptyPages} consecutive empty pages found`);
+    console.log(`Scanning ${this.config.storeName} from page ${startPage} backward (-10) and forward until max page...`);
 
     let newLastPage = currentLastPage;
-    let forwardPagesScanned = 0;
+    let foundNewOrders = false;
 
-    // 🚀 PHASE 1: FORWARD SCAN (50 pages max, stop on 3 empty consecutive)
+    // OPTIMIZATION 2: Scan forward from current last page until max page found
     let page = currentLastPage;
-    console.log(`🔄 Starting FORWARD scan from page ${page}...`);
+    console.log(`Starting forward scan from page ${page}...`);
     
-    while (consecutiveEmptyPages < maxEmptyPages && forwardPagesScanned < maxForwardPages && page <= forwardEndPage) {
+    while (consecutiveEmptyPages < maxEmptyPages) {
       try {
-        console.log(`📄 [FORWARD] Fetching ${this.config.storeName} page ${page} (${forwardPagesScanned + 1}/${maxForwardPages})...`);
+        console.log(`Fetching ${this.config.storeName} page ${page}...`);
         const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
-        forwardPagesScanned++;
 
         if (!orders || orders.length === 0) {
           consecutiveEmptyPages++;
-          console.log(`❌ Empty page received (${consecutiveEmptyPages}/${maxEmptyPages})`);
+          console.log(`Empty page received (${consecutiveEmptyPages}/${maxEmptyPages})`);
           if (consecutiveEmptyPages >= maxEmptyPages) {
-            console.log(`🛑 EARLY TERMINATION: Found ${maxEmptyPages} consecutive empty pages. Stopping forward scan.`);
+            console.log(`Stopping forward scan after ${maxEmptyPages} empty pages`);
             break;
           }
           page++;
           continue;
         }
 
-        // Reset empty page counter when we find orders
         consecutiveEmptyPages = 0;
         if (page > newLastPage) {
           newLastPage = page;
@@ -507,27 +497,20 @@ export class EcoManagerService {
         const firstId = orders[0].id;
         const lastId = orders[orders.length - 1].id;
         
-        console.log(`📦 [FORWARD] Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
+        console.log(`Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
 
-        // Check if we're seeing old orders (shouldn't happen in forward scan, but safety check)
-        if (lastOrderId > 0 && firstId <= lastOrderId && lastId <= lastOrderId) {
-          console.log(`⚠️ All orders on page ${page} are older than last synced ID ${lastOrderId}. This shouldn't happen in forward scan.`);
-        }
-
-        // Filter for new dispatch orders
+        // OPTIMIZATION 3: Use database query instead of loading all IDs into memory
         const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
 
         if (newDispatchOrders.length > 0) {
           newOrders.push(...newDispatchOrders);
-          console.log(`✅ [FORWARD] Found ${newDispatchOrders.length} new dispatch orders on page ${page}`);
+          foundNewOrders = true;
+          console.log(`Found ${newDispatchOrders.length} new dispatch orders on page ${page}`);
           
-          // Show details of found orders (limit to first 2 for brevity)
-          newDispatchOrders.slice(0, 2).forEach(order => {
-            console.log(`   - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
+          // Show details of found orders
+          newDispatchOrders.forEach(order => {
+            console.log(`  - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
           });
-          if (newDispatchOrders.length > 2) {
-            console.log(`   - ... and ${newDispatchOrders.length - 2} more orders`);
-          }
         }
 
         // Save page info for next run
@@ -536,73 +519,59 @@ export class EcoManagerService {
         await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
         page++;
       } catch (error) {
-        console.error(`❌ [FORWARD] Error fetching page ${page}:`, error);
+        console.error(`Error fetching page ${page}:`, error);
         page++;
         continue;
       }
     }
 
-    // Log why forward scan stopped
-    if (consecutiveEmptyPages >= maxEmptyPages) {
-      console.log(`🎯 Forward scan stopped: Found ${maxEmptyPages} consecutive empty pages (EARLY TERMINATION)`);
-    } else if (forwardPagesScanned >= maxForwardPages) {
-      console.log(`🎯 Forward scan stopped: Reached maximum pages limit (${maxForwardPages})`);
-    }
-
-    // 🚀 PHASE 2: BACKWARD SCAN (25 pages max)
-    console.log(`🔄 Starting BACKWARD scan from page ${currentLastPage - 1} to ${backwardStartPage}...`);
+    // OPTIMIZATION 4: Always scan backward 10 pages from current last page
+    console.log(`Scanning backward from page ${currentLastPage - 1} to ${startPage}...`);
     
-    let backwardPagesScanned = 0;
-    for (let backPage = currentLastPage - 1; backPage >= backwardStartPage; backPage--) {
+    for (let backPage = currentLastPage - 1; backPage >= startPage; backPage--) {
       try {
-        backwardPagesScanned++;
-        console.log(`📄 [BACKWARD] Fetching ${this.config.storeName} page ${backPage} (${backwardPagesScanned}/${maxBackwardPages})...`);
+        console.log(`Fetching ${this.config.storeName} page ${backPage}...`);
         const orders = await this.fetchOrdersPage(backPage, this.BATCH_SIZE);
 
         if (!orders || orders.length === 0) {
-          console.log(`❌ [BACKWARD] Empty page ${backPage}, continuing...`);
           continue;
         }
 
         const firstId = orders[0].id;
         const lastId = orders[orders.length - 1].id;
         
-        console.log(`📦 [BACKWARD] Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
+        console.log(`Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
 
         const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
 
         if (newDispatchOrders.length > 0) {
           newOrders.push(...newDispatchOrders);
-          console.log(`✅ [BACKWARD] Found ${newDispatchOrders.length} new dispatch orders on page ${backPage}`);
+          foundNewOrders = true;
+          console.log(`Found ${newDispatchOrders.length} new dispatch orders on page ${backPage}`);
           
-          // Show details of found orders (limit to first 2 for brevity)
-          newDispatchOrders.slice(0, 2).forEach(order => {
-            console.log(`   - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
+          // Show details of found orders
+          newDispatchOrders.forEach(order => {
+            console.log(`  - Order ${order.id}: ${order.full_name} - ${order.total} DZD`);
           });
-          if (newDispatchOrders.length > 2) {
-            console.log(`   - ... and ${newDispatchOrders.length - 2} more orders`);
-          }
         }
 
         await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
       } catch (error) {
-        console.error(`❌ [BACKWARD] Error fetching page ${backPage}:`, error);
+        console.error(`Error fetching page ${backPage}:`, error);
         continue;
       }
     }
 
     // Update last page if changed
     if (newLastPage !== currentLastPage) {
-      console.log(`📊 Updating last page for ${this.config.storeName} from ${currentLastPage} to ${newLastPage}`);
+      console.log(`Updating last page for ${this.config.storeName} from ${currentLastPage} to ${newLastPage}`);
       const lastPageOrders = await this.fetchOrdersPage(newLastPage, this.BATCH_SIZE);
       if (lastPageOrders && lastPageOrders.length > 0) {
         await this.savePageInfo(newLastPage, lastPageOrders[lastPageOrders.length - 1].id, lastPageOrders[0].id);
       }
     }
 
-    console.log(`🎯 SYNC COMPLETE for ${this.config.storeName}: Found ${newOrders.length} new "En dispatch" orders`);
-    console.log(`📊 Pages scanned: Forward=${forwardPagesScanned}/${maxForwardPages}, Backward=${backwardPagesScanned}/${maxBackwardPages}`);
-    console.log(`🚀 Early termination: ${consecutiveEmptyPages >= maxEmptyPages ? 'YES' : 'NO'} (${consecutiveEmptyPages}/${maxEmptyPages} empty pages)`);
+    console.log(`Found ${newOrders.length} new "En dispatch" orders for ${this.config.storeName}`);
     return newOrders;
   }
 
@@ -799,116 +768,30 @@ export class EcoManagerService {
   }
 
   /**
-   * Get page info file path
-   */
-  private getPageInfoFilePath(): string {
-    const dataDir = path.join(process.cwd(), 'data', 'page-info');
-    if (!fs.existsSync(dataDir)) {
-      fs.mkdirSync(dataDir, { recursive: true });
-    }
-    return path.join(dataDir, `${this.config.storeIdentifier}.json`);
-  }
-
-  /**
-   * Save page info to both Redis and JSON file for persistence
+   * Save page info to cache (like Google Sheets script)
    */
   async savePageInfo(lastPage: number, firstId: number, lastId: number): Promise<void> {
+    const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
     const pageInfo = {
       lastPage,
       firstId,
       lastId,
       timestamp: new Date().toISOString(),
-      storeName: this.config.storeName,
-      storeIdentifier: this.config.storeIdentifier
+      storeName: this.config.storeName
     };
 
-    // Save to Redis (fast access)
-    const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
     await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7); // 7 days
-
-    // Save to JSON file (persistent storage)
-    try {
-      const filePath = this.getPageInfoFilePath();
-      fs.writeFileSync(filePath, JSON.stringify(pageInfo, null, 2));
-      console.log(`Saved page info for ${this.config.storeName}:`, pageInfo);
-    } catch (error) {
-      console.error(`Error saving page info to file for ${this.config.storeName}:`, error);
-    }
+    console.log(`Saved page info for ${this.config.storeName}:`, pageInfo);
   }
 
   /**
-   * Get cached page info with auto-recovery from JSON file and binary search
+   * Get last page info from cache
    */
   async getPageInfo(): Promise<any> {
-    // Try Redis first (fastest)
     const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
-    const redisData = await this.redis.get(pageInfoKey);
+    const pageData = await this.redis.get(pageInfoKey);
     
-    if (redisData) {
-      return JSON.parse(redisData);
-    }
-
-    console.log(`📁 Redis cache miss for ${this.config.storeName}, checking JSON file...`);
-
-    // Try JSON file (persistent storage)
-    try {
-      const filePath = this.getPageInfoFilePath();
-      if (fs.existsSync(filePath)) {
-        const fileData = fs.readFileSync(filePath, 'utf8');
-        const pageInfo = JSON.parse(fileData);
-        
-        // Restore to Redis for future use
-        await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7);
-        console.log(`✅ Restored page info from file for ${this.config.storeName}:`, pageInfo);
-        return pageInfo;
-      }
-    } catch (error) {
-      console.error(`Error reading page info file for ${this.config.storeName}:`, error);
-    }
-
-    console.log(`🔍 No cached page info found for ${this.config.storeName}, attempting auto-recovery...`);
-
-    // Auto-recovery: Find last page using last synced order ID
-    try {
-      const lastOrder = await prisma.order.findFirst({
-        where: { storeIdentifier: this.config.storeIdentifier },
-        orderBy: { ecoManagerId: 'desc' }
-      });
-
-      if (lastOrder?.ecoManagerId) {
-        const lastOrderId = parseInt(lastOrder.ecoManagerId);
-        console.log(`🔄 Auto-recovering page info using last order ID: ${lastOrderId}`);
-        
-        // Use existing binary search to find the page
-        const recoveredPage = await this.findPageWithOrderId(lastOrderId);
-        
-        // Get the actual orders from that page to build page info
-        const pageOrders = await this.fetchOrdersPage(recoveredPage, this.BATCH_SIZE);
-        
-        if (pageOrders && pageOrders.length > 0) {
-          const recoveredPageInfo = {
-            lastPage: recoveredPage,
-            firstId: pageOrders[0].id,
-            lastId: pageOrders[pageOrders.length - 1].id,
-            timestamp: new Date().toISOString(),
-            storeName: this.config.storeName,
-            storeIdentifier: this.config.storeIdentifier,
-            recovered: true
-          };
-
-          // Save the recovered info
-          await this.savePageInfo(recoveredPage, pageOrders[0].id, pageOrders[pageOrders.length - 1].id);
-          
-          console.log(`✅ Auto-recovered page info for ${this.config.storeName}:`, recoveredPageInfo);
-          return recoveredPageInfo;
-        }
-      }
-    } catch (error) {
-      console.error(`Error during auto-recovery for ${this.config.storeName}:`, error);
-    }
-
-    console.log(`⚠️  Could not recover page info for ${this.config.storeName}, starting from page 1`);
-    return null;
+    return pageData ? JSON.parse(pageData) : null;
   }
 
   /**
