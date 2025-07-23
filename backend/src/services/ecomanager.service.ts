@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
+import * as fs from 'fs';
+import * as path from 'path';
 
 import { prisma } from '../config/database';
 
@@ -797,30 +799,116 @@ export class EcoManagerService {
   }
 
   /**
-   * Save page info to cache (like Google Sheets script)
+   * Get page info file path
+   */
+  private getPageInfoFilePath(): string {
+    const dataDir = path.join(process.cwd(), 'data', 'page-info');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    return path.join(dataDir, `${this.config.storeIdentifier}.json`);
+  }
+
+  /**
+   * Save page info to both Redis and JSON file for persistence
    */
   async savePageInfo(lastPage: number, firstId: number, lastId: number): Promise<void> {
-    const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
     const pageInfo = {
       lastPage,
       firstId,
       lastId,
       timestamp: new Date().toISOString(),
-      storeName: this.config.storeName
+      storeName: this.config.storeName,
+      storeIdentifier: this.config.storeIdentifier
     };
 
+    // Save to Redis (fast access)
+    const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
     await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7); // 7 days
-    console.log(`Saved page info for ${this.config.storeName}:`, pageInfo);
+
+    // Save to JSON file (persistent storage)
+    try {
+      const filePath = this.getPageInfoFilePath();
+      fs.writeFileSync(filePath, JSON.stringify(pageInfo, null, 2));
+      console.log(`Saved page info for ${this.config.storeName}:`, pageInfo);
+    } catch (error) {
+      console.error(`Error saving page info to file for ${this.config.storeName}:`, error);
+    }
   }
 
   /**
-   * Get last page info from cache
+   * Get cached page info with auto-recovery from JSON file and binary search
    */
   async getPageInfo(): Promise<any> {
+    // Try Redis first (fastest)
     const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
-    const pageData = await this.redis.get(pageInfoKey);
+    const redisData = await this.redis.get(pageInfoKey);
     
-    return pageData ? JSON.parse(pageData) : null;
+    if (redisData) {
+      return JSON.parse(redisData);
+    }
+
+    console.log(`📁 Redis cache miss for ${this.config.storeName}, checking JSON file...`);
+
+    // Try JSON file (persistent storage)
+    try {
+      const filePath = this.getPageInfoFilePath();
+      if (fs.existsSync(filePath)) {
+        const fileData = fs.readFileSync(filePath, 'utf8');
+        const pageInfo = JSON.parse(fileData);
+        
+        // Restore to Redis for future use
+        await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7);
+        console.log(`✅ Restored page info from file for ${this.config.storeName}:`, pageInfo);
+        return pageInfo;
+      }
+    } catch (error) {
+      console.error(`Error reading page info file for ${this.config.storeName}:`, error);
+    }
+
+    console.log(`🔍 No cached page info found for ${this.config.storeName}, attempting auto-recovery...`);
+
+    // Auto-recovery: Find last page using last synced order ID
+    try {
+      const lastOrder = await prisma.order.findFirst({
+        where: { storeIdentifier: this.config.storeIdentifier },
+        orderBy: { ecoManagerId: 'desc' }
+      });
+
+      if (lastOrder?.ecoManagerId) {
+        const lastOrderId = parseInt(lastOrder.ecoManagerId);
+        console.log(`🔄 Auto-recovering page info using last order ID: ${lastOrderId}`);
+        
+        // Use existing binary search to find the page
+        const recoveredPage = await this.findPageWithOrderId(lastOrderId);
+        
+        // Get the actual orders from that page to build page info
+        const pageOrders = await this.fetchOrdersPage(recoveredPage, this.BATCH_SIZE);
+        
+        if (pageOrders && pageOrders.length > 0) {
+          const recoveredPageInfo = {
+            lastPage: recoveredPage,
+            firstId: pageOrders[0].id,
+            lastId: pageOrders[pageOrders.length - 1].id,
+            timestamp: new Date().toISOString(),
+            storeName: this.config.storeName,
+            storeIdentifier: this.config.storeIdentifier,
+            recovered: true
+          };
+
+          // Save the recovered info
+          await this.savePageInfo(recoveredPage, pageOrders[0].id, pageOrders[pageOrders.length - 1].id);
+          
+          console.log(`✅ Auto-recovered page info for ${this.config.storeName}:`, recoveredPageInfo);
+          return recoveredPageInfo;
+        }
+      }
+    } catch (error) {
+      console.error(`Error during auto-recovery for ${this.config.storeName}:`, error);
+    }
+
+    console.log(`⚠️  Could not recover page info for ${this.config.storeName}, starting from page 1`);
+    return null;
   }
 
   /**
