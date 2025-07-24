@@ -36,7 +36,13 @@ async function resetSyncPositions() {
       console.log(`🔢 EcoManager ID: ${lastOrder.ecoManagerId}`);
 
       // Extract the numeric ID from the reference
-      const numericId = parseInt(lastOrder.reference.replace(store.storeIdentifier, ''));
+      // Handle cases where reference might have variations (e.g., NATUR vs NATU)
+      let numericId: number;
+      if (store.storeIdentifier === 'NATU' && lastOrder.reference.startsWith('NATUR')) {
+        numericId = parseInt(lastOrder.reference.replace('NATUR', ''));
+      } else {
+        numericId = parseInt(lastOrder.reference.replace(store.storeIdentifier, ''));
+      }
       console.log(`🔢 Extracted numeric ID: ${numericId}`);
 
       // Calculate the correct page (assuming 20 orders per page)
