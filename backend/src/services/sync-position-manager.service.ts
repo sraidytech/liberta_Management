@@ -4,6 +4,16 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { prisma } from '../config/database';
 
+export interface SyncPosition {
+  storeIdentifier: string;
+  lastPage: number;
+  lastOrderId: number;
+  firstId: number;
+  lastId: number;
+  timestamp: string;
+  source: 'redis' | 'json' | 'database' | 'calculated';
+}
+
 export interface StoreSyncPosition {
   storeIdentifier: string;
   storeName: string;
@@ -44,50 +54,6 @@ export class SyncPositionManager {
   }
 
   /**
-   * Get last order ID for a store from database
-   */
-  private async getLastOrderIdFromDatabase(storeIdentifier: string): Promise<number> {
-    try {
-      const lastOrder = await prisma.order.findFirst({
-        where: { 
-          storeIdentifier,
-          ecoManagerId: { not: null }
-        },
-        orderBy: { ecoManagerId: 'desc' },
-        select: { ecoManagerId: true }
-      });
-
-      if (lastOrder?.ecoManagerId) {
-        const orderId = parseInt(lastOrder.ecoManagerId);
-        return isNaN(orderId) ? 0 : orderId;
-      }
-
-      return 0;
-    } catch (error) {
-      console.error(`Error getting last order ID for ${storeIdentifier}:`, error);
-      return 0;
-    }
-  }
-
-  /**
-   * Calculate optimal starting page based on last order ID
-   * This uses the same binary search logic as EcoManagerService
-   */
-  private async calculateOptimalPage(storeIdentifier: string, lastOrderId: number): Promise<number> {
-    if (lastOrderId === 0) {
-      return 1;
-    }
-
-    // For now, use a simple estimation based on order ID
-    // In a real implementation, you might want to use the EcoManagerService's findPageWithOrderId method
-    // This is a conservative estimate: assume ~20 orders per page, start a bit earlier
-    const estimatedPage = Math.max(1, Math.floor(lastOrderId / 20) - 10);
-    
-    console.log(`Calculated optimal starting page for ${storeIdentifier}: ${estimatedPage} (based on last order ID: ${lastOrderId})`);
-    return estimatedPage;
-  }
-
-  /**
    * Get sync position from Redis
    */
   private async getSyncPositionFromRedis(storeIdentifier: string): Promise<StoreSyncPosition | null> {
@@ -95,25 +61,95 @@ export class SyncPositionManager {
       const pageInfoKey = `ecomanager:pageinfo:${storeIdentifier}`;
       const pageData = await this.redis.get(pageInfoKey);
       
-      if (pageData) {
-        const parsed = JSON.parse(pageData);
-        return {
-          storeIdentifier,
-          storeName: parsed.storeName || storeIdentifier,
-          lastPage: parsed.lastPage || 1,
-          lastOrderId: parsed.lastId || 0,
-          firstId: parsed.firstId || 0,
-          lastId: parsed.lastId || 0,
-          timestamp: parsed.timestamp || new Date().toISOString(),
-          source: 'redis'
-        };
+      if (!pageData) {
+        return null;
       }
 
-      return null;
+      const pageInfo = JSON.parse(pageData);
+      
+      // Get store name from database
+      const store = await prisma.apiConfiguration.findUnique({
+        where: { storeIdentifier },
+        select: { storeName: true }
+      });
+
+      return {
+        storeIdentifier,
+        storeName: store?.storeName || storeIdentifier,
+        lastPage: pageInfo.lastPage || 1,
+        lastOrderId: pageInfo.lastId || 0,
+        firstId: pageInfo.firstId || 0,
+        lastId: pageInfo.lastId || 0,
+        timestamp: pageInfo.timestamp || new Date().toISOString(),
+        source: 'redis'
+      };
     } catch (error) {
       console.error(`Error getting sync position from Redis for ${storeIdentifier}:`, error);
       return null;
     }
+  }
+
+  /**
+   * Get last order ID from database
+   */
+  private async getLastOrderIdFromDatabase(storeIdentifier: string): Promise<number> {
+    try {
+      const lastOrder = await prisma.order.findFirst({
+        where: {
+          storeIdentifier: storeIdentifier,
+          source: 'ECOMANAGER',
+          ecoManagerId: { not: null }
+        },
+        orderBy: {
+          ecoManagerId: 'desc'
+        },
+        select: {
+          ecoManagerId: true
+        }
+      });
+
+      if (!lastOrder || !lastOrder.ecoManagerId) {
+        return 0;
+      }
+
+      return parseInt(lastOrder.ecoManagerId);
+    } catch (error) {
+      console.error(`Error getting last order ID for ${storeIdentifier}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Calculate optimal page based on order ID
+   */
+  private async calculateOptimalPage(storeIdentifier: string, lastOrderId: number): Promise<number> {
+    if (lastOrderId === 0) {
+      return 1;
+    }
+
+    // 🚀 IMPROVED: Calculate page based on EcoManager API structure
+    // EcoManager API returns orders in descending order (newest first)
+    // We need to find which page contains our last order ID
+    
+    let estimatedPage: number;
+    
+    if (lastOrderId > 100000) {
+      // For high order IDs (like JWLR: 114001), estimate based on total orders
+      estimatedPage = Math.max(1, Math.floor(lastOrderId / 20));
+    } else if (lastOrderId > 10000) {
+      // For medium order IDs, use a different calculation
+      estimatedPage = Math.max(1, Math.floor(lastOrderId / 15));
+    } else {
+      // For lower order IDs, use standard calculation
+      estimatedPage = Math.max(1, Math.ceil(lastOrderId / 20));
+    }
+    
+    console.log(`📊 [CALCULATION] Calculated position for ${storeIdentifier}:`);
+    console.log(`   - Last Order ID: ${lastOrderId}`);
+    console.log(`   - Estimated Page: ${estimatedPage}`);
+    console.log(`   - Calculation method: ${lastOrderId > 100000 ? 'high-volume' : lastOrderId > 10000 ? 'medium-volume' : 'standard'}`);
+
+    return estimatedPage;
   }
 
   /**
@@ -169,23 +205,39 @@ export class SyncPositionManager {
   /**
    * Get sync position for a specific store (with fallback chain)
    */
-  async getSyncPosition(storeIdentifier: string): Promise<StoreSyncPosition> {
+  async getSyncPosition(storeIdentifier: string): Promise<SyncPosition> {
     // Try Redis first
     let position = await this.getSyncPositionFromRedis(storeIdentifier);
     if (position) {
-      return position;
+      return {
+        storeIdentifier: position.storeIdentifier,
+        lastPage: position.lastPage,
+        lastOrderId: position.lastOrderId,
+        firstId: position.firstId,
+        lastId: position.lastId,
+        timestamp: position.timestamp,
+        source: position.source
+      };
     }
 
     // Try JSON backup
     const backup = await this.loadSyncPositionsFromJson();
     if (backup?.stores[storeIdentifier]) {
-      position = backup.stores[storeIdentifier];
-      position.source = 'json';
+      const backupPosition = backup.stores[storeIdentifier];
       
       // Restore to Redis
-      await this.saveSyncPositionToRedis(position);
+      await this.saveSyncPositionToRedis(backupPosition);
       console.log(`Restored sync position from JSON backup for ${storeIdentifier}`);
-      return position;
+      
+      return {
+        storeIdentifier: backupPosition.storeIdentifier,
+        lastPage: backupPosition.lastPage,
+        lastOrderId: backupPosition.lastOrderId,
+        firstId: backupPosition.firstId,
+        lastId: backupPosition.lastId,
+        timestamp: backupPosition.timestamp,
+        source: 'json'
+      };
     }
 
     // Calculate from database
@@ -198,7 +250,7 @@ export class SyncPositionManager {
       select: { storeName: true }
     });
 
-    position = {
+    const calculatedPosition: StoreSyncPosition = {
       storeIdentifier,
       storeName: store?.storeName || storeIdentifier,
       lastPage: optimalPage,
@@ -210,11 +262,20 @@ export class SyncPositionManager {
     };
 
     // Save to both Redis and JSON
-    await this.saveSyncPositionToRedis(position);
-    await this.backupSyncPosition(position);
+    await this.saveSyncPositionToRedis(calculatedPosition);
+    await this.backupSyncPosition(calculatedPosition);
 
-    console.log(`Calculated new sync position for ${storeIdentifier}:`, position);
-    return position;
+    console.log(`Calculated new sync position for ${storeIdentifier}:`, calculatedPosition);
+    
+    return {
+      storeIdentifier: calculatedPosition.storeIdentifier,
+      lastPage: calculatedPosition.lastPage,
+      lastOrderId: calculatedPosition.lastOrderId,
+      firstId: calculatedPosition.firstId,
+      lastId: calculatedPosition.lastId,
+      timestamp: calculatedPosition.timestamp,
+      source: calculatedPosition.source
+    };
   }
 
   /**
@@ -282,7 +343,17 @@ export class SyncPositionManager {
 
     for (const store of activeStores) {
       const position = await this.getSyncPosition(store.storeIdentifier);
-      positions.push(position);
+      
+      positions.push({
+        storeIdentifier: position.storeIdentifier,
+        storeName: store.storeName,
+        lastPage: position.lastPage,
+        lastOrderId: position.lastOrderId,
+        firstId: position.firstId,
+        lastId: position.lastId,
+        timestamp: position.timestamp,
+        source: position.source
+      });
     }
 
     return positions;
@@ -314,7 +385,7 @@ export class SyncPositionManager {
 
       for (const store of activeStores) {
         try {
-          const position = await this.getSyncPosition(store.storeIdentifier);
+          await this.getSyncPosition(store.storeIdentifier);
           results.restored++;
           results.details.push({
             storeIdentifier: store.storeIdentifier,
