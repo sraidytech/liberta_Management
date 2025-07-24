@@ -1,0 +1,60 @@
+{
+  "metadata": {
+    "createdAt": "2025-07-24T18:38:27.401Z",
+    "method": "SMART_JUMP_SEARCH",
+    "totalStores": 5,
+    "foundExact": 1
+  },
+  "stores": {
+    "PURNA": {
+      "lastPage": 171,
+      "lastOrderId": 174320,
+      "timestamp": "2025-07-24T18:38:27.401Z",
+      "storeName": "PURNA - Purna Store",
+      "found": false,
+      "confidence": "MEDIUM",
+      "totalChecks": 100,
+      "searchMethod": "SMART_ESTIMATION"
+    },
+    "NATU": {
+      "lastPage": 69,
+      "lastOrderId": 174302,
+      "timestamp": "2025-07-24T18:38:27.401Z",
+      "storeName": "NATU - Natural DZ",
+      "found": false,
+      "confidence": "MEDIUM",
+      "totalChecks": 100,
+      "searchMethod": "SMART_ESTIMATION"
+    },
+    "DILST": {
+      "lastPage": 112,
+      "lastOrderId": 174131,
+      "timestamp": "2025-07-24T18:38:27.401Z",
+      "storeName": "DILST - Dilst Store",
+      "found": false,
+      "confidence": "MEDIUM",
+      "totalChecks": 100,
+      "searchMethod": "SMART_ESTIMATION"
+    },
+    "MGSTR": {
+      "lastPage": 1,
+      "lastOrderId": 171380,
+      "timestamp": "2025-07-24T18:38:27.401Z",
+      "storeName": "MGSTR - Magasin Store",
+      "found": true,
+      "confidence": "HIGH",
+      "totalChecks": 52,
+      "searchMethod": "SMART_JUMP_SEARCH"
+    },
+    "JWLR": {
+      "lastPage": 33,
+      "lastOrderId": 177606,
+      "timestamp": "2025-07-24T18:38:27.401Z",
+      "storeName": "JWLR - Jewelry Store",
+      "found": false,
+      "confidence": "MEDIUM",
+      "totalChecks": 100,
+      "searchMethod": "SMART_ESTIMATION"
+    }
+  }
+}
