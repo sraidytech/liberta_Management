@@ -1,5 +1,5 @@
-import { prisma } from '../config/database';
-import redis from '../config/redis';
+import { prisma } from '@/config/database';
+import redis from '@/config/redis';
 import { NotificationType, UserRole } from '@prisma/client';
 
 export interface CreateNotificationData {

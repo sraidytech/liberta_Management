@@ -1,5 +1,5 @@
 import { notificationService } from './notification.service';
-import { prisma } from '../config/database';
+import { prisma } from '@/config/database';
 import { OrderStatus, UserRole } from '@prisma/client';
 
 /**

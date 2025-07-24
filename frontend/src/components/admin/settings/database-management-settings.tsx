@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, RefreshCw, Database, AlertTriangle, CheckCircle, RotateCcw, Truck, Shield, Activity } from 'lucide-react';
+import { Trash2, RefreshCw, Database, AlertTriangle, CheckCircle, RotateCcw, Truck } from 'lucide-react';
 
 interface ApiResponse {
   success: boolean;
@@ -12,62 +12,15 @@ interface ApiResponse {
   data?: any;
 }
 
-interface SyncPositionStatus {
-  totalStores: number;
-  healthyStores: number;
-  problematicStores: number;
-  stores: Array<{
-    storeIdentifier: string;
-    storeName: string;
-    status: 'healthy' | 'missing' | 'reset' | 'calculated';
-    lastPage: number;
-    lastOrderId: number;
-    source: string;
-    timestamp: string;
-  }>;
-  insights: {
-    cacheHealth: number;
-    needsAttention: any[];
-    recommendations: string[];
-  };
-}
-
 export function DatabaseManagementSettings() {
   const [loading, setLoading] = useState<string | null>(null);
-  const [syncPositionStatus, setSyncPositionStatus] = useState<SyncPositionStatus | null>(null);
   const [results, setResults] = useState<{ [key: string]: ApiResponse | null }>({
     deleteOrders: null,
     syncStores: null,
     cleanupAssignments: null,
     fullSync: null,
-    syncShipping: null,
-    restoreSyncPositions: null
+    syncShipping: null
   });
-
-  // Load sync position status on component mount
-  useEffect(() => {
-    loadSyncPositionStatus();
-  }, []);
-
-  const loadSyncPositionStatus = async () => {
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/v1/admin/sync-position-status`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        setSyncPositionStatus(result.data);
-      }
-    } catch (error) {
-      console.error('Failed to load sync position status:', error);
-    }
-  };
 
   const handleDeleteAllOrders = async () => {
     if (!confirm('Are you sure you want to delete ALL orders? This action cannot be undone.')) return;
@@ -222,43 +175,6 @@ export function DatabaseManagementSettings() {
     }
   };
 
-  // 🚀 NEW: Handle restore sync positions
-  const handleRestoreSyncPositions = async () => {
-    if (!confirm('Are you sure you want to restore sync positions? This will fix Redis cache issues and prevent timeout problems during order sync.')) return;
-    
-    setLoading('restoreSyncPositions');
-    setResults(prev => ({ ...prev, restoreSyncPositions: null }));
-    
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/v1/admin/restore-sync-positions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-      });
-      
-      const result = await response.json();
-      setResults(prev => ({ ...prev, restoreSyncPositions: result }));
-      
-      // Reload sync position status after restoration
-      if (result.success) {
-        await loadSyncPositionStatus();
-      }
-    } catch (error) {
-      setResults(prev => ({ 
-        ...prev, 
-        restoreSyncPositions: { 
-          success: false, 
-          message: error instanceof Error ? error.message : 'Unknown error' 
-        }
-      }));
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const renderResult = (key: string, result: ApiResponse | null) => {
     if (!result) return null;
     
@@ -274,11 +190,7 @@ export function DatabaseManagementSettings() {
             {result.message}
             {result.data && (
               <div className="mt-2 text-sm">
-                {typeof result.data === 'object' ? (
-                  <pre className="whitespace-pre-wrap text-xs bg-white p-2 rounded border">
-                    {JSON.stringify(result.data, null, 2)}
-                  </pre>
-                ) : result.data}
+                {typeof result.data === 'object' ? JSON.stringify(result.data, null, 2) : result.data}
               </div>
             )}
           </div>
@@ -287,121 +199,12 @@ export function DatabaseManagementSettings() {
     );
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'healthy':
-        return <Badge className="bg-green-100 text-green-800 border-green-200">Healthy</Badge>;
-      case 'missing':
-        return <Badge className="bg-red-100 text-red-800 border-red-200">Missing</Badge>;
-      case 'reset':
-        return <Badge className="bg-orange-100 text-orange-800 border-orange-200">Reset</Badge>;
-      case 'calculated':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Calculated</Badge>;
-      default:
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-200">Unknown</Badge>;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold">Database Management</h2>
         <p className="text-gray-600 mt-1">Manage database operations and system maintenance</p>
       </div>
-
-      {/* 🚀 NEW: Sync Position Management */}
-      <Card className="p-6 border-blue-200 bg-blue-50">
-        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-          <Shield className="h-5 w-5 text-blue-600" />
-          🚀 Sync Position Management - REDIS CACHE FIX
-        </h3>
-        <p className="text-gray-700 mb-4">
-          <strong>CRITICAL FIX:</strong> Restore sync positions when Redis cache is cleared. 
-          This prevents the timeout issue where all stores reset to page 1 and try to fetch thousands of pages.
-          The system uses JSON backups and database calculations to restore optimal starting pages.
-        </p>
-        
-        {/* Sync Position Status Dashboard */}
-        {syncPositionStatus && (
-          <div className="mb-4 p-4 bg-white rounded-lg border">
-            <h4 className="font-semibold mb-3 flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Current Sync Position Status
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{syncPositionStatus.healthyStores}</div>
-                <div className="text-sm text-gray-600">Healthy Stores</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-orange-600">{syncPositionStatus.problematicStores}</div>
-                <div className="text-sm text-gray-600">Need Attention</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{Math.round(syncPositionStatus.insights.cacheHealth * 100)}%</div>
-                <div className="text-sm text-gray-600">Cache Health</div>
-              </div>
-            </div>
-            
-            {/* Store Details */}
-            <div className="space-y-2">
-              {syncPositionStatus.stores.map((store) => (
-                <div key={store.storeIdentifier} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium">{store.storeName}</span>
-                    {getStatusBadge(store.status)}
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    Page: {store.lastPage} | Last ID: {store.lastOrderId} | Source: {store.source.toUpperCase()}
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Recommendations */}
-            {syncPositionStatus.insights.recommendations.length > 0 && (
-              <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                <h5 className="font-medium text-yellow-800 mb-2">Recommendations:</h5>
-                <ul className="text-sm text-yellow-700 space-y-1">
-                  {syncPositionStatus.insights.recommendations.map((rec, index) => (
-                    <li key={index}>• {rec}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-        
-        <div className="flex gap-3">
-          <Button
-            onClick={handleRestoreSyncPositions}
-            disabled={loading === 'restoreSyncPositions'}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            {loading === 'restoreSyncPositions' ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Restoring Positions...
-              </>
-            ) : (
-              <>
-                <Shield className="mr-2 h-4 w-4" />
-                Restore Sync Positions
-              </>
-            )}
-          </Button>
-          
-          <Button
-            onClick={loadSyncPositionStatus}
-            variant="outline"
-            disabled={loading !== null}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh Status
-          </Button>
-        </div>
-        {renderResult('restoreSyncPositions', results.restoreSyncPositions)}
-      </Card>
 
       {/* Order Management */}
       <Card className="p-6">

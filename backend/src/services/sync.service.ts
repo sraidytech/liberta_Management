@@ -2,7 +2,6 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { EcoManagerService } from './ecomanager.service';
 import { AgentAssignmentService } from './agent-assignment.service';
-import { SyncPositionManager } from './sync-position-manager.service';
 
 import { prisma } from '../config/database';
 
@@ -10,12 +9,10 @@ export class SyncService {
   private redis: Redis;
   private isRunning: boolean = false;
   private assignmentService: AgentAssignmentService;
-  private syncPositionManager: SyncPositionManager;
 
   constructor(redis: Redis) {
     this.redis = redis;
     this.assignmentService = new AgentAssignmentService(redis);
-    this.syncPositionManager = new SyncPositionManager(redis);
   }
 
   /**
@@ -236,24 +233,11 @@ export class SyncService {
   }
 
   /**
-   * Sync orders from all active stores with comprehensive logging and auto-recovery
+   * Sync orders from all active stores with comprehensive logging
    */
   async syncAllStores(): Promise<{ [storeIdentifier: string]: any }> {
     const syncStartTime = Date.now();
     console.log(`📦 [Sync Start] Beginning store synchronization process...`);
-    
-    // 🚀 NEW: Auto-recovery check before starting sync
-    console.log(`🔍 [AUTO-RECOVERY] Checking for Redis cache issues...`);
-    try {
-      const recovered = await this.syncPositionManager.autoRecover();
-      if (recovered) {
-        console.log(`✅ [AUTO-RECOVERY] Successfully recovered sync positions before sync`);
-      } else {
-        console.log(`ℹ️ [AUTO-RECOVERY] No recovery needed - all positions healthy`);
-      }
-    } catch (error) {
-      console.error(`⚠️ [AUTO-RECOVERY] Auto-recovery failed, continuing with sync:`, error);
-    }
     
     // Get all active API configurations
     const apiConfigs = await prisma.apiConfiguration.findMany({
@@ -421,33 +405,16 @@ export class SyncService {
     // Get last synced order ID with database query details
     console.log(`🔍 [Database Query] Finding last synced order...`);
     const dbQueryStart = Date.now();
-    
-    // 🚀 FIXED: Query by orderDate to get the actual last order, not by ecoManagerId
     const lastOrder = await prisma.order.findFirst({
-      where: { 
-        OR: [
-          { storeIdentifier },
-          // Handle NATUR vs NATU case
-          ...(storeIdentifier === 'NATU' ? [{ reference: { startsWith: 'NATUR' } }] : [])
-        ]
-      },
-      orderBy: { orderDate: 'desc' }
+      where: { storeIdentifier },
+      orderBy: { ecoManagerId: 'desc' }
     });
     const dbQueryTime = Date.now() - dbQueryStart;
 
-    // Extract numeric ID from reference for NATU/NATUR case
-    let lastOrderId = 0;
-    if (lastOrder?.reference) {
-      if (storeIdentifier === 'NATU' && lastOrder.reference.startsWith('NATUR')) {
-        lastOrderId = parseInt(lastOrder.reference.replace('NATUR', '')) || 0;
-      } else {
-        lastOrderId = parseInt(lastOrder.reference.replace(storeIdentifier, '')) || 0;
-      }
-    }
-    
+    const lastOrderId = lastOrder?.ecoManagerId ? parseInt(lastOrder.ecoManagerId) : 0;
     console.log(`📊 [Database Result] Query completed in ${dbQueryTime}ms:`);
     console.log(`   - Last Order ID: ${lastOrderId}`);
-    console.log(`   - Last Order Date: ${lastOrder?.orderDate ? new Date(lastOrder.orderDate).toLocaleString() : 'None'}`);
+    console.log(`   - Last Order Date: ${lastOrder?.createdAt ? new Date(lastOrder.createdAt).toLocaleString() : 'None'}`);
     console.log(`   - Last Order Reference: ${lastOrder?.reference || 'None'}`);
 
     // Fetch new orders with API call details
