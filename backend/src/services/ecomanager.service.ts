@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 
 import { prisma } from '../config/database';
+import { SyncPositionManager } from './sync-position-manager.service';
 
 export interface EcoManagerOrder {
   id: number;
@@ -46,6 +47,7 @@ export class EcoManagerService {
   private axiosInstance: any;
   private redis: Redis;
   private config: EcoManagerConfig;
+  private syncPositionManager: SyncPositionManager;
   private readonly RATE_LIMIT_DELAY = 250; // 250ms between requests (4 req/sec max)
   private readonly MAX_RETRIES = 3;
   private readonly BATCH_SIZE = 20; // Reduced batch size to be safer
@@ -61,6 +63,7 @@ export class EcoManagerService {
   constructor(config: EcoManagerConfig, redis: Redis) {
     this.config = config;
     this.redis = redis;
+    this.syncPositionManager = new SyncPositionManager(redis);
     this.axiosInstance = axios.create({
       baseURL: config.baseUrl,
       headers: {
@@ -446,36 +449,73 @@ export class EcoManagerService {
   }
 
   /**
-   * Fetch new orders using OPTIMIZED strategy
+   * Fetch new orders using OPTIMIZED strategy with sync position management and rate limit intelligence
    */
   async fetchNewOrders(lastOrderId: number): Promise<EcoManagerOrder[]> {
     const newOrders: EcoManagerOrder[] = [];
     let consecutiveEmptyPages = 0;
     const maxEmptyPages = 3;
+    const LONG_WAIT_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-    console.log(`Fetching new "En dispatch" orders for ${this.config.storeName}...`);
+    console.log(`🔄 [ENHANCED SYNC] Fetching new "En dispatch" orders for ${this.config.storeName}...`);
     console.log(`Last synced EcoManager order ID for ${this.config.storeName}: ${lastOrderId}`);
 
-    // Get cached page info
-    const pageInfo = await this.getPageInfo();
-    let currentLastPage = pageInfo?.lastPage || 1;
+    // 🚀 NEW: Use SyncPositionManager for intelligent page detection
+    console.log(`📍 [POSITION MANAGER] Getting optimal sync position...`);
+    const syncPosition = await this.syncPositionManager.getSyncPosition(this.config.storeIdentifier);
+    
+    console.log(`📊 [SYNC POSITION] Retrieved position for ${this.config.storeName}:`);
+    console.log(`   - Source: ${syncPosition.source.toUpperCase()}`);
+    console.log(`   - Last Page: ${syncPosition.lastPage}`);
+    console.log(`   - Last Order ID: ${syncPosition.lastOrderId}`);
+    console.log(`   - Timestamp: ${syncPosition.timestamp}`);
 
-    // OPTIMIZATION 1: Scan -10 pages backward and forward until max page found
+    // Use the intelligent starting page instead of cached page info
+    let currentLastPage = syncPosition.lastPage;
     const backwardRange = 10;
     const startPage = Math.max(1, currentLastPage - backwardRange);
     
-    console.log(`Scanning ${this.config.storeName} from page ${startPage} backward (-10) and forward until max page...`);
+    console.log(`🎯 [SMART SCAN] Starting from calculated page ${currentLastPage} (source: ${syncPosition.source})`);
+    console.log(`📍 [SCAN RANGE] Scanning from page ${startPage} backward (-10) and forward until max page...`);
 
     let newLastPage = currentLastPage;
     let foundNewOrders = false;
 
-    // OPTIMIZATION 2: Scan forward from current last page until max page found
+    // OPTIMIZATION 2: Scan forward from intelligent starting page
     let page = currentLastPage;
-    console.log(`Starting forward scan from page ${page}...`);
+    console.log(`⬆️ [FORWARD SCAN] Starting forward scan from page ${page}...`);
     
     while (consecutiveEmptyPages < maxEmptyPages) {
       try {
         console.log(`Fetching ${this.config.storeName} page ${page}...`);
+        
+        // 🚀 NEW: Check for long rate limit waits before making request
+        const rateLimitWaitKey = `ecomanager:rate_limit_wait:${this.config.storeIdentifier}`;
+        const waitUntil = await this.redis.get(rateLimitWaitKey);
+        
+        if (waitUntil) {
+          const waitTime = parseInt(waitUntil) - Date.now();
+          if (waitTime > LONG_WAIT_THRESHOLD) {
+            console.log(`⏰ [RATE LIMIT OPTIMIZATION] Long wait detected: ${Math.round(waitTime / 1000 / 60)} minutes`);
+            console.log(`🔄 [SMART SWITCH] Switching to process discovered orders instead of waiting...`);
+            
+            // Process any orders we've already found
+            if (newOrders.length > 0) {
+              console.log(`✅ [EARLY RETURN] Returning ${newOrders.length} discovered orders to avoid long wait`);
+              break;
+            } else {
+              console.log(`📋 [NO ORDERS] No new orders discovered yet, will wait but with timeout`);
+              // Set a maximum wait time of 5 minutes instead of the full rate limit wait
+              const maxWaitTime = Math.min(waitTime, LONG_WAIT_THRESHOLD);
+              console.log(`⏳ [REDUCED WAIT] Waiting ${Math.round(maxWaitTime / 1000 / 60)} minutes instead of ${Math.round(waitTime / 1000 / 60)} minutes`);
+              await new Promise(resolve => setTimeout(resolve, maxWaitTime));
+              
+              // Clear the rate limit wait to try again
+              await this.redis.del(rateLimitWaitKey);
+            }
+          }
+        }
+
         const orders = await this.fetchOrdersPage(page, this.BATCH_SIZE);
 
         if (!orders || orders.length === 0) {
@@ -499,6 +539,21 @@ export class EcoManagerService {
         
         console.log(`Received ${orders.length} orders. ID range: ${firstId} - ${lastId}`);
 
+        // 🚀 NEW: Check if we're getting the same orders as previous page (end of data)
+        const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
+        const previousPageData = await this.redis.get(pageInfoKey);
+        
+        if (previousPageData) {
+          const previousPageInfo = JSON.parse(previousPageData);
+          if (previousPageInfo.firstId === firstId && previousPageInfo.lastId === lastId) {
+            console.log(`⚠️ [END OF DATA] Same order range as previous page - reached end of available orders`);
+            console.log(`   Previous page ${previousPageInfo.lastPage}: ${previousPageInfo.firstId} - ${previousPageInfo.lastId}`);
+            console.log(`   Current page ${page}: ${firstId} - ${lastId}`);
+            console.log(`🛑 [STOPPING] No more new orders available, stopping forward scan`);
+            break;
+          }
+        }
+
         // OPTIMIZATION 3: Use database query instead of loading all IDs into memory
         const newDispatchOrders = await this.filterNewDispatchOrders(orders, lastOrderId);
 
@@ -520,6 +575,16 @@ export class EcoManagerService {
         page++;
       } catch (error) {
         console.error(`Error fetching page ${page}:`, error);
+        
+        // 🚀 NEW: Check if error is rate limit related
+        if (error instanceof Error && error.message.includes('Rate limit exceeded')) {
+          console.log(`⚠️ [RATE LIMIT HIT] Rate limit error encountered`);
+          if (newOrders.length > 0) {
+            console.log(`✅ [EARLY RETURN] Returning ${newOrders.length} discovered orders due to rate limit`);
+            break;
+          }
+        }
+        
         page++;
         continue;
       }
@@ -562,12 +627,22 @@ export class EcoManagerService {
       }
     }
 
-    // Update last page if changed
+    // 🚀 NEW: Update sync position using SyncPositionManager
     if (newLastPage !== currentLastPage) {
-      console.log(`Updating last page for ${this.config.storeName} from ${currentLastPage} to ${newLastPage}`);
+      console.log(`📊 [POSITION UPDATE] Updating last page for ${this.config.storeName} from ${currentLastPage} to ${newLastPage}`);
       const lastPageOrders = await this.fetchOrdersPage(newLastPage, this.BATCH_SIZE);
       if (lastPageOrders && lastPageOrders.length > 0) {
+        // Update both old system and new system
         await this.savePageInfo(newLastPage, lastPageOrders[lastPageOrders.length - 1].id, lastPageOrders[0].id);
+        
+        // 🚀 NEW: Update SyncPositionManager
+        await this.syncPositionManager.updateSyncPosition(
+          this.config.storeIdentifier,
+          newLastPage,
+          lastPageOrders[lastPageOrders.length - 1].id,
+          lastPageOrders[0].id
+        );
+        console.log(`✅ [POSITION SAVED] Sync position updated in both Redis and JSON backup`);
       }
     }
 
@@ -768,7 +843,7 @@ export class EcoManagerService {
   }
 
   /**
-   * Save page info to cache (like Google Sheets script)
+   * Save page info to cache (like Google Sheets script) + NEW: Backup to JSON
    */
   async savePageInfo(lastPage: number, firstId: number, lastId: number): Promise<void> {
     const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
@@ -781,7 +856,16 @@ export class EcoManagerService {
     };
 
     await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7); // 7 days
-    console.log(`Saved page info for ${this.config.storeName}:`, pageInfo);
+    console.log(`💾 [REDIS] Saved page info for ${this.config.storeName}:`, pageInfo);
+    
+    // 🚀 NEW: Also update SyncPositionManager for backup
+    await this.syncPositionManager.updateSyncPosition(
+      this.config.storeIdentifier,
+      lastPage,
+      firstId,
+      lastId
+    );
+    console.log(`💾 [JSON BACKUP] Sync position backed up to JSON file`);
   }
 
   /**

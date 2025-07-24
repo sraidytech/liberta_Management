@@ -46,6 +46,33 @@ router.get('/stats', async (req, res) => {
 });
 
 /**
+ * @route POST /api/admin/restore-sync-positions
+ * @desc Restore sync positions from JSON backup or calculate from database
+ * @access Admin only
+ */
+router.post('/restore-sync-positions', async (req, res) => {
+  await adminController.restoreSyncPositions(req, res);
+});
+
+/**
+ * @route GET /api/admin/sync-position-status
+ * @desc Get sync position status for all stores
+ * @access Admin only
+ */
+router.get('/sync-position-status', async (req, res) => {
+  await adminController.getSyncPositionStatus(req, res);
+});
+
+/**
+ * @route POST /api/admin/auto-recover-sync-positions
+ * @desc Auto-detect and recover from cache loss
+ * @access Admin only
+ */
+router.post('/auto-recover-sync-positions', async (req, res) => {
+  await adminController.autoRecoverSyncPositions(req, res);
+});
+
+/**
  * @route GET /api/admin/health
  * @desc Health check for admin routes
  * @access Admin only

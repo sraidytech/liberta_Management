@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { Redis } from 'ioredis';
 import { EcoManagerService } from './ecomanager.service';
 import { AgentAssignmentService } from './agent-assignment.service';
+import { SyncPositionManager } from './sync-position-manager.service';
 
 import { prisma } from '../config/database';
 
@@ -9,10 +10,12 @@ export class SyncService {
   private redis: Redis;
   private isRunning: boolean = false;
   private assignmentService: AgentAssignmentService;
+  private syncPositionManager: SyncPositionManager;
 
   constructor(redis: Redis) {
     this.redis = redis;
     this.assignmentService = new AgentAssignmentService(redis);
+    this.syncPositionManager = new SyncPositionManager(redis);
   }
 
   /**
@@ -233,11 +236,24 @@ export class SyncService {
   }
 
   /**
-   * Sync orders from all active stores with comprehensive logging
+   * Sync orders from all active stores with comprehensive logging and auto-recovery
    */
   async syncAllStores(): Promise<{ [storeIdentifier: string]: any }> {
     const syncStartTime = Date.now();
     console.log(`📦 [Sync Start] Beginning store synchronization process...`);
+    
+    // 🚀 NEW: Auto-recovery check before starting sync
+    console.log(`🔍 [AUTO-RECOVERY] Checking for Redis cache issues...`);
+    try {
+      const recovered = await this.syncPositionManager.autoRecover();
+      if (recovered) {
+        console.log(`✅ [AUTO-RECOVERY] Successfully recovered sync positions before sync`);
+      } else {
+        console.log(`ℹ️ [AUTO-RECOVERY] No recovery needed - all positions healthy`);
+      }
+    } catch (error) {
+      console.error(`⚠️ [AUTO-RECOVERY] Auto-recovery failed, continuing with sync:`, error);
+    }
     
     // Get all active API configurations
     const apiConfigs = await prisma.apiConfiguration.findMany({

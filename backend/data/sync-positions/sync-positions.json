@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "timestamp": "2025-07-24T15:31:03.798Z",
+  "stores": {
+    "PURNA": {
+      "storeIdentifier": "PURNA",
+      "storeName": "PURNA - Purna Store",
+      "lastPage": 9504,
+      "lastOrderId": 9509,
+      "firstId": 9461,
+      "lastId": 9509,
+      "timestamp": "2025-07-24T15:31:03.794Z",
+      "source": "redis"
+    },
+    "NATU": {
+      "storeIdentifier": "NATU",
+      "storeName": "NATU - Natural DZ",
+      "lastPage": 4989,
+      "lastOrderId": 99997,
+      "firstId": 99997,
+      "lastId": 99997,
+      "timestamp": "2025-07-24T15:09:28.250Z",
+      "source": "calculated"
+    },
+    "DILST": {
+      "storeIdentifier": "DILST",
+      "storeName": "DILST - Dilst Store",
+      "lastPage": 4976,
+      "lastOrderId": 99729,
+      "firstId": 99729,
+      "lastId": 99729,
+      "timestamp": "2025-07-24T15:09:28.268Z",
+      "source": "calculated"
+    },
+    "MGSTR": {
+      "storeIdentifier": "MGSTR",
+      "storeName": "MGSTR - Magasin Store",
+      "lastPage": 4989,
+      "lastOrderId": 99994,
+      "firstId": 99994,
+      "lastId": 99994,
+      "timestamp": "2025-07-24T15:09:28.286Z",
+      "source": "calculated"
+    },
+    "JWLR": {
+      "storeIdentifier": "JWLR",
+      "storeName": "JWLR - Jewelry Store",
+      "lastPage": 8870,
+      "lastOrderId": 177606,
+      "firstId": 177606,
+      "lastId": 177606,
+      "timestamp": "2025-07-24T15:09:28.316Z",
+      "source": "calculated"
+    }
+  }
+}
