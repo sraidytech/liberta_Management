@@ -820,7 +820,7 @@ export class EcoManagerService {
   }
 
   /**
-   * Save page info to cache (like Google Sheets script) + NEW: Backup to JSON
+   * Save page info to cache (like Google Sheets script) - NO JSON BACKUP TO PREVENT NODEMON RESTARTS
    */
   async savePageInfo(lastPage: number, firstId: number, lastId: number): Promise<void> {
     const pageInfoKey = `ecomanager:pageinfo:${this.config.storeIdentifier}`;
@@ -835,14 +835,9 @@ export class EcoManagerService {
     await this.redis.set(pageInfoKey, JSON.stringify(pageInfo), 'EX', 86400 * 7); // 7 days
     console.log(`💾 [REDIS] Saved page info for ${this.config.storeName}:`, pageInfo);
     
-    // 🚀 NEW: Also update SyncPositionManager for backup
-    await this.syncPositionManager.updateSyncPosition(
-      this.config.storeIdentifier,
-      lastPage,
-      firstId,
-      lastId
-    );
-    console.log(`💾 [JSON BACKUP] Sync position backed up to JSON file`);
+    // 🚫 REMOVED: JSON backup to prevent nodemon restarts during sync
+    // The JSON backup was causing file system changes that trigger nodemon restarts
+    // This causes database disconnections during sync operations
   }
 
   /**
