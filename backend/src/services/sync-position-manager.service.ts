@@ -58,10 +58,30 @@ export class SyncPositionManager {
    */
   private async getSyncPositionFromRedis(storeIdentifier: string): Promise<StoreSyncPosition | null> {
     try {
-      const pageInfoKey = `ecomanager:pageinfo:${storeIdentifier}`;
-      const pageData = await this.redis.get(pageInfoKey);
+      // Try multiple Redis keys (from our complete fix script)
+      const redisKeys = [
+        `sync_position:${storeIdentifier}`,
+        `sync:${storeIdentifier}:position`,
+        `ecomanager:${storeIdentifier}:last_page`,
+        `store:${storeIdentifier}:sync_position`,
+        `ecomanager:pageinfo:${storeIdentifier}` // Legacy key
+      ];
+
+      let pageData: string | null = null;
+      let usedKey = '';
+
+      // Try each key until we find data
+      for (const key of redisKeys) {
+        pageData = await this.redis.get(key);
+        if (pageData) {
+          usedKey = key;
+          console.log(`📊 [REDIS] Found sync position for ${storeIdentifier} using key: ${key}`);
+          break;
+        }
+      }
       
       if (!pageData) {
+        console.log(`📊 [REDIS] No sync position found for ${storeIdentifier} in any Redis key`);
         return null;
       }
 
@@ -77,9 +97,9 @@ export class SyncPositionManager {
         storeIdentifier,
         storeName: store?.storeName || storeIdentifier,
         lastPage: pageInfo.lastPage || 1,
-        lastOrderId: pageInfo.lastId || 0,
-        firstId: pageInfo.firstId || 0,
-        lastId: pageInfo.lastId || 0,
+        lastOrderId: pageInfo.lastOrderId || pageInfo.lastId || 0,
+        firstId: pageInfo.firstId || pageInfo.lastOrderId || 0,
+        lastId: pageInfo.lastId || pageInfo.lastOrderId || 0,
         timestamp: pageInfo.timestamp || new Date().toISOString(),
         source: 'redis'
       };

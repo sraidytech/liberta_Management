@@ -421,16 +421,33 @@ export class SyncService {
     // Get last synced order ID with database query details
     console.log(`🔍 [Database Query] Finding last synced order...`);
     const dbQueryStart = Date.now();
+    
+    // 🚀 FIXED: Query by orderDate to get the actual last order, not by ecoManagerId
     const lastOrder = await prisma.order.findFirst({
-      where: { storeIdentifier },
-      orderBy: { ecoManagerId: 'desc' }
+      where: { 
+        OR: [
+          { storeIdentifier },
+          // Handle NATUR vs NATU case
+          ...(storeIdentifier === 'NATU' ? [{ reference: { startsWith: 'NATUR' } }] : [])
+        ]
+      },
+      orderBy: { orderDate: 'desc' }
     });
     const dbQueryTime = Date.now() - dbQueryStart;
 
-    const lastOrderId = lastOrder?.ecoManagerId ? parseInt(lastOrder.ecoManagerId) : 0;
+    // Extract numeric ID from reference for NATU/NATUR case
+    let lastOrderId = 0;
+    if (lastOrder?.reference) {
+      if (storeIdentifier === 'NATU' && lastOrder.reference.startsWith('NATUR')) {
+        lastOrderId = parseInt(lastOrder.reference.replace('NATUR', '')) || 0;
+      } else {
+        lastOrderId = parseInt(lastOrder.reference.replace(storeIdentifier, '')) || 0;
+      }
+    }
+    
     console.log(`📊 [Database Result] Query completed in ${dbQueryTime}ms:`);
     console.log(`   - Last Order ID: ${lastOrderId}`);
-    console.log(`   - Last Order Date: ${lastOrder?.createdAt ? new Date(lastOrder.createdAt).toLocaleString() : 'None'}`);
+    console.log(`   - Last Order Date: ${lastOrder?.orderDate ? new Date(lastOrder.orderDate).toLocaleString() : 'None'}`);
     console.log(`   - Last Order Reference: ${lastOrder?.reference || 'None'}`);
 
     // Fetch new orders with API call details
