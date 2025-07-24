@@ -107,7 +107,8 @@ export class EcoManagerService {
   }
 
   /**
-   * Enforce comprehensive rate limiting for EcoManager API
+   * Enforce rate limiting for EcoManager API
+   * ⚡ OPTIMIZED: Only per-second and per-minute limits (hourly and daily removed)
    */
   private async enforceRateLimit(): Promise<void> {
     const storeId = this.config.storeIdentifier;
@@ -136,32 +137,7 @@ export class EcoManagerService {
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
       
-      // Check per-hour rate limit
-      const hourKey = `ecomanager:rate:hour:${storeId}:${Math.floor(now / 3600000)}`;
-      const hourCount = await this.redis.incr(hourKey);
-      await this.redis.expire(hourKey, 7200); // Expire after 2 hours
-      
-      if (hourCount > this.RATE_LIMITS.perHour) {
-        const waitTime = 3600000 - (now % 3600000) + 5000; // Wait until next hour + 5s buffer
-        console.log(`⚠️ Per-hour rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
-        
-        // Store rate limit wait time for scheduler to check
-        const waitUntil = now + waitTime;
-        await this.redis.set(`ecomanager:rate_limit_wait:${storeId}`, waitUntil.toString(), 'EX', Math.ceil(waitTime / 1000));
-        
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
-      
-      // Check per-day rate limit
-      const dayKey = `ecomanager:rate:day:${storeId}:${Math.floor(now / 86400000)}`;
-      const dayCount = await this.redis.incr(dayKey);
-      await this.redis.expire(dayKey, 172800); // Expire after 2 days
-      
-      if (dayCount > this.RATE_LIMITS.perDay) {
-        const waitTime = 86400000 - (now % 86400000) + 10000; // Wait until next day + 10s buffer
-        console.log(`⚠️ Per-day rate limit reached for ${this.config.storeName}. Waiting ${waitTime}ms...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
+      // ⚡ REMOVED: Hourly and daily rate limits permanently removed for faster sync
       
       // Always add minimum delay between requests
       const lastRequestKey = `ecomanager:last_request:${storeId}`;
@@ -183,6 +159,7 @@ export class EcoManagerService {
       await new Promise(resolve => setTimeout(resolve, this.RATE_LIMIT_DELAY));
     }
   }
+
 
   /**
    * Get current rate limit status for monitoring
