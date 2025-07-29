@@ -125,6 +125,9 @@ export default function AgentOrdersPage() {
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showShippingStatusDropdown, setShowShippingStatusDropdown] = useState(false);
   const [showOnlyOrdersWithNotes, setShowOnlyOrdersWithNotes] = useState(false);
+  
+  // Date filtering state (matching admin implementation)
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showOrderModal, setShowOrderModal] = useState(false);
   const [editingStatus, setEditingStatus] = useState<string | null>(null);
@@ -294,6 +297,11 @@ export default function AgentOrdersPage() {
         params.append('noteTypes', selectedNoteTypes.join(','));
       }
       if (showOnlyOrdersWithNotes) params.append('hasAgentNotes', 'true');
+      
+      // 🚀 FIXED: Connect date range filter to backend API (filters by orderDate)
+      if (dateRange.start) params.append('startDate', dateRange.start);
+      if (dateRange.end) params.append('endDate', dateRange.end);
+      
       params.append('sortBy', sortBy);
       params.append('sortOrder', sortOrder);
       const url = `${apiBaseUrl}/api/v1/orders?${params.toString()}`;
@@ -774,7 +782,7 @@ export default function AgentOrdersPage() {
         }
       }
     }, 300); // 300ms debounce
-  }, [user?.id, currentPage, limit, search, statusFilter, selectedShippingStatuses, sortBy, sortOrder, hideDeliveredOrders, selectedNoteTypes, showOnlyOrdersWithNotes]);
+  }, [user?.id, currentPage, limit, search, statusFilter, selectedShippingStatuses, sortBy, sortOrder, hideDeliveredOrders, selectedNoteTypes, showOnlyOrdersWithNotes, dateRange]);
 
   // Trigger fetchOrders when filters change (with debouncing)
   useEffect(() => {
@@ -1149,6 +1157,35 @@ export default function AgentOrdersPage() {
 
             {/* Secondary Controls Row */}
             <div className="flex flex-wrap gap-3">
+              {/* Date Range Filter */}
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-500" />
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Start Date"
+                />
+                <span className="text-gray-500 text-sm">to</span>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="End Date"
+                />
+                {(dateRange.start || dateRange.end) && (
+                  <button
+                    onClick={() => setDateRange({ start: '', end: '' })}
+                    className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
+                    title="Clear date filter"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
               {/* Items Per Page */}
               <select
                 value={limit}
