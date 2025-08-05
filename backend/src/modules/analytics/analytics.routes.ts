@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AnalyticsController } from './analytics.controller';
+import { productionAnalyticsController } from './analytics-production-optimized.controller';
 import { requireAdmin } from '@/common/middleware/auth';
 
 const router = Router();
@@ -27,9 +28,9 @@ router.get('/sales', requireAdmin as any, async (req, res) => {
   await analyticsController.getSalesReports(req, res);
 });
 
-// Detailed agent reports
+// Detailed agent reports - PRODUCTION OPTIMIZED VERSION
 router.get('/agents/detailed', requireAdmin as any, async (req, res) => {
-  await analyticsController.getDetailedAgentReports(req, res);
+  await productionAnalyticsController.getDetailedAgentReports(req, res);
 });
 
 // Geographic reports (orders by city/wilaya)
@@ -55,6 +56,19 @@ router.get('/agents/notes', requireAdmin as any, async (req, res) => {
 // Agent performance analytics (agents can view their own, managers can view any)
 router.get('/agents/:agentId/performance', async (req, res) => {
   await analyticsController.getAgentPerformanceAnalytics(req, res);
+});
+
+// Customer list endpoints
+router.get('/customers/active', requireAdmin as any, async (req, res) => {
+  await analyticsController.getActiveCustomersList(req, res);
+});
+
+router.get('/customers/returning', requireAdmin as any, async (req, res) => {
+  await analyticsController.getReturningCustomersList(req, res);
+});
+
+router.get('/customers/export', requireAdmin as any, async (req, res) => {
+  await analyticsController.exportCustomerData(req, res);
 });
 
 export default router;

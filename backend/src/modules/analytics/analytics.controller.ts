@@ -1704,6 +1704,633 @@ export class AnalyticsController {
   }
 
   /**
+   * Get detailed active customers list with pagination and search
+   */
+  async getActiveCustomersList(req: Request, res: Response) {
+    try {
+      const {
+        startDate,
+        endDate,
+        storeId,
+        wilaya,
+        agentId,
+        status,
+        page = '1',
+        limit = '50',
+        search = ''
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const offset = (pageNum - 1) * limitNum;
+
+      // Build where clause for orders in the selected period
+      const orderWhereClause: any = {};
+      
+      if (startDate && endDate) {
+        orderWhereClause.orderDate = {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string)
+        };
+      }
+      
+      if (storeId) orderWhereClause.storeIdentifier = storeId;
+      if (agentId) orderWhereClause.assignedAgentId = agentId;
+      if (status) orderWhereClause.status = status;
+
+      // Customer filter for wilaya and search
+      const customerFilter: any = {};
+      if (wilaya) customerFilter.wilaya = wilaya;
+      
+      // Add search functionality
+      if (search) {
+        customerFilter.OR = [
+          { fullName: { contains: search as string, mode: 'insensitive' } },
+          { telephone: { contains: search as string } },
+          { commune: { contains: search as string, mode: 'insensitive' } }
+        ];
+      }
+
+      // Get active customers (customers with orders in the selected period)
+      const [activeCustomers, totalCount] = await Promise.all([
+        prisma.customer.findMany({
+          where: {
+            ...customerFilter,
+            orders: {
+              some: orderWhereClause // Only customers with orders in the selected period
+            }
+          },
+          select: {
+            id: true,
+            fullName: true,
+            telephone: true,
+            email: true,
+            wilaya: true,
+            commune: true,
+            address: true,
+            totalOrders: true,
+            createdAt: true,
+            orders: {
+              select: {
+                id: true,
+                orderDate: true,
+                status: true,
+                total: true,
+                storeIdentifier: true,
+                items: {
+                  select: {
+                    title: true,
+                    quantity: true,
+                    unitPrice: true
+                  }
+                }
+              },
+              orderBy: { orderDate: 'desc' }
+            }
+          },
+          orderBy: { totalOrders: 'desc' },
+          skip: offset,
+          take: limitNum
+        }),
+
+        // Get total count for pagination
+        prisma.customer.count({
+          where: {
+            ...customerFilter,
+            orders: {
+              some: orderWhereClause
+            }
+          }
+        })
+      ]);
+
+      // Process customer data with order history and calculations
+      const processedCustomers = activeCustomers.map(customer => {
+        // Filter orders to only include those in the selected period
+        const ordersInPeriod = customer.orders.filter((order: any) => {
+          const orderDate = new Date(order.orderDate);
+          if (startDate && endDate) {
+            return orderDate >= new Date(startDate as string) && orderDate <= new Date(endDate as string);
+          }
+          return true;
+        });
+
+        const deliveredOrders = ordersInPeriod.filter((order: any) => order.status === 'DELIVERED');
+        const totalRevenue = deliveredOrders.reduce((sum: number, order: any) => sum + order.total, 0);
+        const averageOrderValue = deliveredOrders.length > 0 ? totalRevenue / deliveredOrders.length : 0;
+        
+        const orderDates = ordersInPeriod.map((order: any) => new Date(order.orderDate)).sort((a, b) => a.getTime() - b.getTime());
+        const firstOrderDate = orderDates[0];
+        const lastOrderDate = orderDates[orderDates.length - 1];
+
+        // Calculate order frequency
+        let orderFrequency = 'One-time';
+        if (ordersInPeriod.length > 1 && firstOrderDate && lastOrderDate) {
+          const daysBetween = Math.abs(lastOrderDate.getTime() - firstOrderDate.getTime()) / (1000 * 60 * 60 * 24);
+          const avgDaysBetweenOrders = daysBetween / (ordersInPeriod.length - 1);
+          
+          if (avgDaysBetweenOrders <= 7) orderFrequency = 'Weekly';
+          else if (avgDaysBetweenOrders <= 30) orderFrequency = 'Monthly';
+          else if (avgDaysBetweenOrders <= 90) orderFrequency = 'Quarterly';
+          else orderFrequency = 'Occasional';
+        }
+
+        // Get preferred products
+        const productCounts: { [key: string]: number } = {};
+        ordersInPeriod.forEach((order: any) => {
+          order.items.forEach((item: any) => {
+            productCounts[item.title] = (productCounts[item.title] || 0) + item.quantity;
+          });
+        });
+        
+        const preferredProducts = Object.entries(productCounts)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 3)
+          .map(([product]) => product);
+
+        return {
+          id: customer.id,
+          fullName: customer.fullName,
+          telephone: customer.telephone,
+          email: customer.email,
+          wilaya: customer.wilaya,
+          commune: customer.commune,
+          address: customer.address,
+          totalOrders: ordersInPeriod.length, // Show orders in period, not total orders
+          totalRevenue,
+          averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+          firstOrderDate,
+          lastOrderDate,
+          orderFrequency,
+          preferredProducts,
+          customerLifetimeValue: totalRevenue,
+          orderHistory: ordersInPeriod.map((order: any) => ({
+            orderId: order.id,
+            orderDate: order.orderDate,
+            status: order.status,
+            total: order.total,
+            storeIdentifier: order.storeIdentifier,
+            products: order.items.map((item: any) => `${item.title} (${item.quantity}x)`)
+          }))
+        };
+      });
+
+      const response = {
+        customers: processedCustomers,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalCount / limitNum),
+          totalCount,
+          hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+          hasPrevPage: pageNum > 1
+        }
+      };
+
+      res.json({
+        success: true,
+        data: response
+      });
+    } catch (error) {
+      console.error('Active customers list error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch active customers list',
+          code: 'ACTIVE_CUSTOMERS_ERROR',
+          statusCode: 500
+        }
+      });
+    }
+  }
+
+  /**
+   * Get detailed returning customers list with pagination and search
+   */
+  async getReturningCustomersList(req: Request, res: Response) {
+    try {
+      const {
+        startDate,
+        endDate,
+        storeId,
+        wilaya,
+        agentId,
+        status,
+        page = '1',
+        limit = '50',
+        search = ''
+      } = req.query;
+
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const offset = (pageNum - 1) * limitNum;
+
+      // Build where clause for orders in the selected period
+      const orderWhereClause: any = {};
+      
+      if (startDate && endDate) {
+        orderWhereClause.orderDate = {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string)
+        };
+      }
+      
+      if (storeId) orderWhereClause.storeIdentifier = storeId;
+      if (agentId) orderWhereClause.assignedAgentId = agentId;
+      if (status) orderWhereClause.status = status;
+
+      // Customer filter for wilaya and search
+      const customerFilter: any = {};
+      if (wilaya) customerFilter.wilaya = wilaya;
+      
+      // Add search functionality
+      if (search) {
+        customerFilter.OR = [
+          { fullName: { contains: search as string, mode: 'insensitive' } },
+          { telephone: { contains: search as string } },
+          { commune: { contains: search as string, mode: 'insensitive' } }
+        ];
+      }
+
+      // Get returning customers (customers with 2+ total orders ever)
+      const [returningCustomers, totalCount] = await Promise.all([
+        prisma.customer.findMany({
+          where: {
+            ...customerFilter,
+            totalOrders: { gte: 2 }, // Returning customers have 2+ orders
+            orders: {
+              some: orderWhereClause // Must have at least one order in the period
+            }
+          },
+          select: {
+            id: true,
+            fullName: true,
+            telephone: true,
+            email: true,
+            wilaya: true,
+            commune: true,
+            address: true,
+            totalOrders: true,
+            createdAt: true,
+            orders: {
+              select: {
+                id: true,
+                orderDate: true,
+                status: true,
+                total: true,
+                storeIdentifier: true,
+                items: {
+                  select: {
+                    title: true,
+                    quantity: true,
+                    unitPrice: true
+                  }
+                }
+              },
+              orderBy: { orderDate: 'desc' }
+            }
+          },
+          orderBy: { totalOrders: 'desc' },
+          skip: offset,
+          take: limitNum
+        }),
+
+        // Get total count for pagination
+        prisma.customer.count({
+          where: {
+            ...customerFilter,
+            totalOrders: { gte: 2 },
+            orders: {
+              some: orderWhereClause // Only count customers with orders in the selected period
+            }
+          }
+        })
+      ]);
+
+      // Process customer data with order history and calculations
+      const processedCustomers = returningCustomers.map(customer => {
+        // Filter orders to only include those in the selected period
+        const ordersInPeriod = customer.orders.filter((order: any) => {
+          const orderDate = new Date(order.orderDate);
+          if (startDate && endDate) {
+            return orderDate >= new Date(startDate as string) && orderDate <= new Date(endDate as string);
+          }
+          return true;
+        });
+
+        const deliveredOrders = ordersInPeriod.filter((order: any) => order.status === 'DELIVERED');
+        const totalRevenue = deliveredOrders.reduce((sum: number, order: any) => sum + order.total, 0);
+        const averageOrderValue = deliveredOrders.length > 0 ? totalRevenue / deliveredOrders.length : 0;
+        
+        const orderDates = ordersInPeriod.map((order: any) => new Date(order.orderDate)).sort((a, b) => a.getTime() - b.getTime());
+        const firstOrderDate = orderDates[0];
+        const lastOrderDate = orderDates[orderDates.length - 1];
+
+        // Calculate order frequency
+        let orderFrequency = 'Occasional';
+        if (ordersInPeriod.length > 1 && firstOrderDate && lastOrderDate) {
+          const daysBetween = Math.abs(lastOrderDate.getTime() - firstOrderDate.getTime()) / (1000 * 60 * 60 * 24);
+          const avgDaysBetweenOrders = daysBetween / (ordersInPeriod.length - 1);
+          
+          if (avgDaysBetweenOrders <= 7) orderFrequency = 'Weekly';
+          else if (avgDaysBetweenOrders <= 30) orderFrequency = 'Monthly';
+          else if (avgDaysBetweenOrders <= 90) orderFrequency = 'Quarterly';
+          else orderFrequency = 'Occasional';
+        }
+
+        // Get preferred products
+        const productCounts: { [key: string]: number } = {};
+        ordersInPeriod.forEach((order: any) => {
+          order.items.forEach((item: any) => {
+            productCounts[item.title] = (productCounts[item.title] || 0) + item.quantity;
+          });
+        });
+        
+        const preferredProducts = Object.entries(productCounts)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 3)
+          .map(([product]) => product);
+
+        return {
+          id: customer.id,
+          fullName: customer.fullName,
+          telephone: customer.telephone,
+          email: customer.email,
+          wilaya: customer.wilaya,
+          commune: customer.commune,
+          address: customer.address,
+          totalOrders: ordersInPeriod.length, // Show orders in period, not total orders
+          totalRevenue,
+          averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+          firstOrderDate,
+          lastOrderDate,
+          orderFrequency,
+          preferredProducts,
+          customerLifetimeValue: totalRevenue,
+          orderHistory: ordersInPeriod.map((order: any) => ({
+            orderId: order.id,
+            orderDate: order.orderDate,
+            status: order.status,
+            total: order.total,
+            storeIdentifier: order.storeIdentifier,
+            products: order.items.map((item: any) => `${item.title} (${item.quantity}x)`)
+          }))
+        };
+      });
+
+      const response = {
+        customers: processedCustomers,
+        pagination: {
+          currentPage: pageNum,
+          totalPages: Math.ceil(totalCount / limitNum),
+          totalCount,
+          hasNextPage: pageNum < Math.ceil(totalCount / limitNum),
+          hasPrevPage: pageNum > 1
+        }
+      };
+
+      res.json({
+        success: true,
+        data: response
+      });
+    } catch (error) {
+      console.error('Returning customers list error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to fetch returning customers list',
+          code: 'RETURNING_CUSTOMERS_ERROR',
+          statusCode: 500
+        }
+      });
+    }
+  }
+
+  /**
+   * Export customer data in Excel or CSV format
+   */
+  async exportCustomerData(req: Request, res: Response) {
+    try {
+      const {
+        type = 'active', // 'active' or 'returning'
+        format = 'excel', // 'excel' or 'csv'
+        startDate,
+        endDate,
+        storeId,
+        wilaya,
+        agentId,
+        status
+      } = req.query;
+
+      // Build where clause for orders in the selected period
+      const orderWhereClause: any = {};
+      
+      if (startDate && endDate) {
+        orderWhereClause.orderDate = {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string)
+        };
+      }
+      
+      if (storeId) orderWhereClause.storeIdentifier = storeId;
+      if (agentId) orderWhereClause.assignedAgentId = agentId;
+      if (status) orderWhereClause.status = status;
+
+      // Customer filter for wilaya
+      const customerFilter: any = {};
+      if (wilaya) customerFilter.wilaya = wilaya;
+
+      // Get customers based on type
+      let customers;
+      if (type === 'returning') {
+        customers = await prisma.customer.findMany({
+          where: {
+            ...customerFilter,
+            totalOrders: { gte: 2 },
+            orders: {
+              some: orderWhereClause // Only customers with orders in the selected period
+            }
+          },
+          select: {
+            id: true,
+            fullName: true,
+            telephone: true,
+            email: true,
+            wilaya: true,
+            commune: true,
+            address: true,
+            totalOrders: true,
+            createdAt: true,
+            orders: {
+              select: {
+                id: true,
+                orderDate: true,
+                status: true,
+                total: true,
+                storeIdentifier: true,
+                items: {
+                  select: {
+                    title: true,
+                    quantity: true,
+                    unitPrice: true
+                  }
+                }
+              },
+              orderBy: { orderDate: 'desc' }
+            }
+          },
+          orderBy: { totalOrders: 'desc' }
+        });
+      } else {
+        customers = await prisma.customer.findMany({
+          where: {
+            ...customerFilter,
+            orders: {
+              some: orderWhereClause
+            }
+          },
+          select: {
+            id: true,
+            fullName: true,
+            telephone: true,
+            email: true,
+            wilaya: true,
+            commune: true,
+            address: true,
+            totalOrders: true,
+            createdAt: true,
+            orders: {
+              where: orderWhereClause,
+              select: {
+                id: true,
+                orderDate: true,
+                status: true,
+                total: true,
+                storeIdentifier: true,
+                items: {
+                  select: {
+                    title: true,
+                    quantity: true,
+                    unitPrice: true
+                  }
+                }
+              },
+              orderBy: { orderDate: 'desc' }
+            }
+          },
+          orderBy: { totalOrders: 'desc' }
+        });
+      }
+
+      // Process customer data
+      const processedCustomers = customers.map(customer => {
+        // Filter orders to only include those in the selected period
+        const ordersInPeriod = customer.orders.filter((order: any) => {
+          const orderDate = new Date(order.orderDate);
+          if (startDate && endDate) {
+            return orderDate >= new Date(startDate as string) && orderDate <= new Date(endDate as string);
+          }
+          return true;
+        });
+
+        const deliveredOrders = ordersInPeriod.filter((order: any) => order.status === 'DELIVERED');
+        const totalRevenue = deliveredOrders.reduce((sum: number, order: any) => sum + order.total, 0);
+        const averageOrderValue = deliveredOrders.length > 0 ? totalRevenue / deliveredOrders.length : 0;
+        
+        const orderDates = ordersInPeriod.map((order: any) => new Date(order.orderDate)).sort((a, b) => a.getTime() - b.getTime());
+        const firstOrderDate = orderDates[0];
+        const lastOrderDate = orderDates[orderDates.length - 1];
+
+        // Get preferred products
+        const productCounts: { [key: string]: number } = {};
+        ordersInPeriod.forEach((order: any) => {
+          order.items.forEach((item: any) => {
+            productCounts[item.title] = (productCounts[item.title] || 0) + item.quantity;
+          });
+        });
+        
+        const preferredProducts = Object.entries(productCounts)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 3)
+          .map(([product]) => product);
+
+        return {
+          id: customer.id,
+          fullName: customer.fullName,
+          telephone: customer.telephone,
+          email: customer.email || '',
+          wilaya: customer.wilaya,
+          commune: customer.commune,
+          address: customer.address || '',
+          totalOrders: ordersInPeriod.length, // Show orders in period, not total orders
+          totalRevenue,
+          averageOrderValue: Math.round(averageOrderValue * 100) / 100,
+          firstOrderDate: firstOrderDate ? firstOrderDate.toISOString().split('T')[0] : '',
+          lastOrderDate: lastOrderDate ? lastOrderDate.toISOString().split('T')[0] : '',
+          preferredProducts: preferredProducts.join(', '),
+          orderHistory: ordersInPeriod.map((order: any) =>
+            `${order.orderDate.toISOString().split('T')[0]} - ${order.status} - ${order.total}DA - ${order.storeIdentifier}`
+          ).join(' | ')
+        };
+      });
+
+      if (format === 'csv') {
+        // Generate CSV
+        const csvHeaders = [
+          'ID', 'Full Name', 'Phone', 'Email', 'Wilaya', 'Commune', 'Address',
+          'Total Orders', 'Total Revenue (DA)', 'Average Order Value (DA)',
+          'First Order Date', 'Last Order Date', 'Preferred Products', 'Order History'
+        ];
+
+        const csvRows = processedCustomers.map(customer => [
+          customer.id,
+          customer.fullName,
+          customer.telephone,
+          customer.email,
+          customer.wilaya,
+          customer.commune,
+          customer.address,
+          customer.totalOrders,
+          customer.totalRevenue,
+          customer.averageOrderValue,
+          customer.firstOrderDate,
+          customer.lastOrderDate,
+          customer.preferredProducts,
+          customer.orderHistory
+        ]);
+
+        const csvContent = [csvHeaders, ...csvRows]
+          .map(row => row.map(field => `"${field}"`).join(','))
+          .join('\n');
+
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${type}_customers_${new Date().toISOString().split('T')[0]}.csv"`);
+        res.send('\ufeff' + csvContent); // Add BOM for UTF-8
+      } else {
+        // For Excel format, return JSON data that frontend can process
+        res.json({
+          success: true,
+          data: {
+            customers: processedCustomers,
+            type,
+            exportDate: new Date().toISOString(),
+            totalCount: processedCustomers.length
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Export customer data error:', error);
+      res.status(500).json({
+        success: false,
+        error: {
+          message: 'Failed to export customer data',
+          code: 'EXPORT_CUSTOMERS_ERROR',
+          statusCode: 500
+        }
+      });
+    }
+  }
+
+  /**
    * Get comprehensive agent notes activity analysis
    */
   async getAgentNotesAnalytics(req: Request, res: Response) {

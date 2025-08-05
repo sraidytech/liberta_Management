@@ -8,7 +8,8 @@ import ReportsFilters from '@/components/admin/reports/reports-filters';
 import SalesReports from '@/components/admin/reports/sales-reports';
 import AgentReports from '@/components/admin/reports/agent-reports';
 import CommuneAnalytics from '@/components/admin/reports/commune-analytics';
-import { useReports } from '@/hooks/useReports';
+import CustomerAnalysis from '@/components/admin/reports/customer-analysis';
+import { useReportsLazy } from '@/hooks/useReportsLazy';
 import {
   BarChart3,
   TrendingUp,
@@ -51,7 +52,7 @@ export default function ReportsPage() {
     refreshData,
     exportData,
     fetchCommuneData
-  } = useReports(filters);
+  } = useReportsLazy(filters, activeTab);
 
   // Auto-refresh functionality
   useEffect(() => {
@@ -351,127 +352,11 @@ export default function ReportsPage() {
               </div>
             )}
             {activeTab === 'customers' && (
-              <div className="space-y-6">
-                {/* Summary Cards */}
-                {customerData?.summary && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Chiffre d\'Affaires Total' : 'Total Revenue'}
-                        </h4>
-                        <DollarSign className="w-8 h-8 text-green-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-green-600">
-                        {customerData.summary.totalRevenue.toLocaleString()} DA
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Commandes livrées uniquement' : 'Delivered orders only'}
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Ventes Totales' : 'Total Sales'}
-                        </h4>
-                        <CheckCircle className="w-8 h-8 text-blue-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-blue-600">
-                        {customerData.summary.totalDeliveredOrders}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Commandes livrées' : 'Delivered orders'}
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Valeur Moyenne' : 'Average Order Value'}
-                        </h4>
-                        <TrendingUp className="w-8 h-8 text-purple-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-purple-600">
-                        {customerData.summary.averageOrderValue.toLocaleString()} DA
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Par commande' : 'Per order'}
-                      </div>
-                    </div>
-                    <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
-                      <div className="flex items-center justify-between mb-4">
-                        <h4 className="font-semibold text-gray-900">
-                          {language === 'fr' ? 'Clients Actifs' : 'Active Customers'}
-                        </h4>
-                        <Users className="w-8 h-8 text-orange-600" />
-                      </div>
-                      <div className="text-3xl font-bold text-orange-600">
-                        {customerData.summary.totalCustomers}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        {language === 'fr' ? 'Dans la période' : 'In period'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div className="text-center py-12">
-                  <UserCheck className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {language === 'fr' ? 'Analyse Clients' : 'Customer Analytics'}
-                  </h3>
-                  <p className="text-gray-600">
-                    {language === 'fr' ? 'Métriques de rétention et comportement client' : 'Customer retention and behavior metrics'}
-                  </p>
-                  {customerData && (
-                    <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-semibold text-gray-900">
-                            {language === 'fr' ? 'Clients Actifs' : 'Active Customers'}
-                          </h4>
-                          <Users className="w-8 h-8 text-green-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-green-600">
-                          {customerData.summary?.totalCustomers || 0}
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-semibold text-gray-900">
-                            {language === 'fr' ? 'Nouveaux Clients' : 'New Customers'}
-                          </h4>
-                          <UserCheck className="w-8 h-8 text-purple-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-purple-600">
-                          {customerData.summary?.newCustomers || 0}
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-semibold text-gray-900">
-                            {language === 'fr' ? 'Clients Récurrents' : 'Returning Customers'}
-                          </h4>
-                          <TrendingUp className="w-8 h-8 text-orange-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-orange-600">
-                          {customerData.summary?.returningCustomers || 0}
-                        </div>
-                      </div>
-                      <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-xl p-6 border border-cyan-100">
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="font-semibold text-gray-900">
-                            {language === 'fr' ? 'Taux de Rétention' : 'Retention Rate'}
-                          </h4>
-                          <BarChart3 className="w-8 h-8 text-cyan-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-cyan-600">
-                          {customerData.summary?.retentionRate ? `${customerData.summary.retentionRate.toFixed(1)}%` : '0%'}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <CustomerAnalysis
+                data={customerData}
+                loading={loading}
+                filters={filters}
+              />
             )}
           </div>
         </div>

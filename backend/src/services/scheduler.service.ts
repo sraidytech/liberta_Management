@@ -2,6 +2,7 @@ import { SyncService } from './sync.service';
 import { MaystroService } from './maystro.service';
 import { MaystroConfigService } from './maystro-config.service';
 import { deadlineNotificationService } from './deadline-notification.service';
+import { EcoManagerService } from './ecomanager.service';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 
@@ -45,7 +46,7 @@ export class SchedulerService {
     this.isRunning = true;
     console.log('🚀 Starting Production Background Job Scheduler...');
 
-    // Schedule EcoManager sync: Every 6 hours at 08:00, 14:00, 20:00
+    // Schedule EcoManager sync: At 08:00, 14:00, 17:00, 18:00, 20:00
     this.scheduleEcoManagerSync();
 
     // Schedule Shipping Status sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00
@@ -63,7 +64,7 @@ export class SchedulerService {
 
     console.log('✅ All background jobs scheduled successfully!');
     console.log('📋 Schedule Summary:');
-    console.log('   🔄 EcoManager Sync: Every 6 hours at 08:00, 14:00, 20:00 (3 times/day)');
+    console.log('   🔄 EcoManager Sync: At 08:00, 14:00, 17:00, 18:00, 20:00 (5 times/day)');
     console.log('   🚚 Shipping Status Sync: Every 6 hours at 00:00, 06:00, 12:00, 18:00');
     console.log('   🚨 Deadline Notifications: Every 4 hours at 06:00, 10:00, 14:00, 18:00');
     console.log('   🧹 Daily Cleanup: Every day at 2 AM');
@@ -92,10 +93,10 @@ export class SchedulerService {
   }
 
   /**
-   * Schedule EcoManager sync every 6 hours at 08:00, 14:00, 20:00
+   * Schedule EcoManager sync at 08:00, 14:00, 17:00, 18:00, 20:00
    */
   private scheduleEcoManagerSync(): void {
-    const syncHours = [8, 14, 20]; // 08:00, 14:00, 20:00
+    const syncHours = [8, 14, 17, 18, 20]; // 08:00, 14:00, 17:00, 18:00, 20:00
 
     const scheduleNextEcoSync = () => {
       const now = new Date();
@@ -296,7 +297,7 @@ export class SchedulerService {
   private calculateNextSyncTime(): string {
     const now = new Date();
     const currentHour = now.getHours();
-    const syncHours = [8, 14, 20]; // 08:00, 14:00, 20:00
+    const syncHours = [8, 14, 17, 18, 20]; // 08:00, 14:00, 17:00, 18:00, 20:00
     
     let nextSyncHour = syncHours.find(hour => hour > currentHour);
     let nextSyncDate = new Date(now);
@@ -441,7 +442,7 @@ export class SchedulerService {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     
     console.log(`🚀 [${startTime.toLocaleString()} ${timezone}] SCHEDULED EcoManager Sync Started`);
-    console.log(`📅 Sync Type: 6-Hour Scheduled Sync`);
+    console.log(`📅 Sync Type: Scheduled Sync`);
     console.log(`⏰ Started At: ${startTime.toISOString()}`);
 
     try {
@@ -451,7 +452,7 @@ export class SchedulerService {
         console.log(`⚠️ SYNC SKIPPED: Rate limit protection active`);
         console.log(`   - Affected stores: ${rateLimitCheck.affectedStores.join(', ')}`);
         console.log(`   - Estimated wait time: ${rateLimitCheck.maxWaitTime}ms`);
-        console.log(`   - Next sync will proceed as scheduled in 6 hours`);
+        console.log(`   - Next sync will proceed as scheduled at next sync time`);
         
         // Store skip reason in Redis
         await this.redis.set('scheduler:last_ecomanager_sync_skipped', JSON.stringify({
@@ -483,8 +484,8 @@ export class SchedulerService {
       console.log(`   - Rate Limits: 4 req/sec per store`);
       console.log(`─────────────────────────────────────────────────────────────`);
 
-      // Run the sync
-      const results = await this.syncService.syncAllStores();
+      // Run the sync using the same logic as admin button (OrdersController.syncAllStores)
+      const results = await this.runOrdersControllerSync();
       
       // Log results
       const endTime = new Date();
@@ -865,5 +866,195 @@ export class SchedulerService {
       message: 'Deadline notification processing completed',
       timestamp: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Run the same sync logic as OrdersController.syncAllStores (admin button)
+   * This ensures scheduler uses identical logic to the manual sync button
+   */
+  private async runOrdersControllerSync(): Promise<{ [storeIdentifier: string]: any }> {
+    const fullSync = false; // Use incremental sync for scheduled runs
+    
+    // Get all active API configurations
+    const activeConfigs = await prisma.apiConfiguration.findMany({
+      where: { isActive: true }
+    });
+
+    if (activeConfigs.length === 0) {
+      console.log('❌ No active store configurations found');
+      return {};
+    }
+
+    console.log(`Starting sync for ${activeConfigs.length} active stores...`);
+
+    const results: { [storeIdentifier: string]: any } = {};
+    let totalSyncedCount = 0;
+    let totalFetchedCount = 0;
+
+    // Process each store sequentially to avoid overwhelming the APIs
+    for (const apiConfig of activeConfigs) {
+      try {
+        console.log(`\n🏪 Processing store: ${apiConfig.storeName} (${apiConfig.storeIdentifier})`);
+
+        // Initialize EcoManager service for this store
+        if (!apiConfig.baseUrl) {
+          throw new Error(`Base URL is missing for store ${apiConfig.storeName}`);
+        }
+
+        const ecoService = new EcoManagerService({
+          storeName: apiConfig.storeName,
+          storeIdentifier: apiConfig.storeIdentifier,
+          apiToken: apiConfig.apiToken,
+          baseUrl: apiConfig.baseUrl
+        }, this.redis);
+
+        // Test connection first
+        const connectionTest = await ecoService.testConnection();
+        if (!connectionTest) {
+          console.log(`❌ Failed to connect to ${apiConfig.storeName} API`);
+          results[apiConfig.storeIdentifier] = {
+            storeIdentifier: apiConfig.storeIdentifier,
+            storeName: apiConfig.storeName,
+            success: false,
+            error: 'Failed to connect to EcoManager API',
+            syncedCount: 0,
+            totalFetched: 0
+          };
+          continue;
+        }
+
+        let syncedCount = 0;
+        let ecoOrders: any[] = [];
+
+        if (fullSync) {
+          // Full sync - fetch all orders
+          ecoOrders = await ecoService.fetchAllOrders();
+        } else {
+          // Incremental sync - fetch new orders only
+          // Get the highest EcoManager ID by converting to integer for proper sorting
+          const lastOrderResult = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+            SELECT "ecoManagerId"
+            FROM "orders"
+            WHERE "storeIdentifier" = ${apiConfig.storeIdentifier}
+              AND "source" = 'ECOMANAGER'
+              AND "ecoManagerId" IS NOT NULL
+            ORDER BY CAST("ecoManagerId" AS INTEGER) DESC
+            LIMIT 1
+          `;
+
+          const lastOrderId = lastOrderResult.length > 0 ? parseInt(lastOrderResult[0].ecoManagerId) : 0;
+          console.log(`Last synced EcoManager order ID for ${apiConfig.storeName}: ${lastOrderId}`);
+          
+          ecoOrders = await ecoService.fetchNewOrders(lastOrderId);
+        }
+
+        console.log(`Processing ${ecoOrders.length} orders for ${apiConfig.storeName}...`);
+
+        // Process orders in smaller batches
+        const batchSize = 10;
+        for (let i = 0; i < ecoOrders.length; i += batchSize) {
+          const batch = ecoOrders.slice(i, i + batchSize);
+          console.log(`Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(ecoOrders.length/batchSize)} for ${apiConfig.storeName} (${batch.length} orders)`);
+          
+          for (const ecoOrder of batch) {
+            try {
+              // Check if order already exists
+              const existingOrder = await prisma.order.findUnique({
+                where: { ecoManagerId: ecoOrder.id.toString() }
+              });
+
+              if (!existingOrder) {
+                // Create new order
+                const orderData = ecoService.mapOrderToDatabase(ecoOrder);
+                
+                // Handle customer creation separately
+                let customer = await prisma.customer.findFirst({
+                  where: { telephone: orderData.customerData.telephone }
+                });
+
+                if (!customer) {
+                  customer = await prisma.customer.create({
+                    data: {
+                      fullName: orderData.customerData.fullName,
+                      telephone: orderData.customerData.telephone,
+                      wilaya: orderData.customerData.wilaya,
+                      commune: orderData.customerData.commune,
+                      totalOrders: 1
+                    }
+                  });
+                } else {
+                  // Update total orders count
+                  await prisma.customer.update({
+                    where: { id: customer.id },
+                    data: { totalOrders: { increment: 1 } }
+                  });
+                }
+
+                // Remove customerData and add customerId
+                const { customerData, ...finalOrderData } = orderData;
+                finalOrderData.customerId = customer.id;
+
+                await prisma.order.create({
+                  data: finalOrderData
+                });
+                syncedCount++;
+                
+                if (syncedCount % 10 === 0) {
+                  console.log(`Synced ${syncedCount} orders for ${apiConfig.storeName} so far...`);
+                }
+              }
+            } catch (orderError) {
+              console.error(`Error processing order ${ecoOrder.id} for ${apiConfig.storeName}:`, orderError);
+              // Continue with next order
+            }
+          }
+        }
+
+        // Update API configuration usage
+        await prisma.apiConfiguration.update({
+          where: { id: apiConfig.id },
+          data: {
+            requestCount: {
+              increment: Math.ceil(ecoOrders.length / 100) // Approximate API calls made
+            },
+            lastUsed: new Date()
+          }
+        });
+
+        // Save sync status
+        if (ecoOrders.length > 0) {
+          const lastOrderId = Math.max(...ecoOrders.map(o => o.id));
+          await ecoService.saveSyncStatus(lastOrderId, syncedCount);
+        }
+
+        results[apiConfig.storeIdentifier] = {
+          storeIdentifier: apiConfig.storeIdentifier,
+          storeName: apiConfig.storeName,
+          success: true,
+          syncedCount,
+          totalFetched: ecoOrders.length,
+          syncType: fullSync ? 'full' : 'incremental'
+        };
+
+        totalSyncedCount += syncedCount;
+        totalFetchedCount += ecoOrders.length;
+
+        console.log(`✅ Completed sync for ${apiConfig.storeName}: ${syncedCount} orders synced`);
+
+      } catch (storeError) {
+        console.error(`Error syncing store ${apiConfig.storeName}:`, storeError);
+        results[apiConfig.storeIdentifier] = {
+          storeIdentifier: apiConfig.storeIdentifier,
+          storeName: apiConfig.storeName,
+          success: false,
+          error: storeError instanceof Error ? storeError.message : 'Unknown error',
+          syncedCount: 0,
+          totalFetched: 0
+        };
+      }
+    }
+
+    console.log(`\n🎉 All stores sync completed. Total synced: ${totalSyncedCount} orders`);
+    return results;
   }
 }

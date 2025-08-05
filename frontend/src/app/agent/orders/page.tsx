@@ -1314,7 +1314,15 @@ export default function AgentOrdersPage() {
           <div className="space-y-3">
             {/* Deadline Notification Banner */}
             {(() => {
+              // 🚀 ENHANCED: Filter urgent orders with exclusions for "Annulation final" and "CANCELLED"
               const urgentOrders = filteredOrders.filter(order => {
+                // Exclude CANCELLED orders
+                if (order.status === 'CANCELLED') return false;
+                
+                // Exclude orders with "Annulation final" in notes
+                if (order.notes?.includes('Annulation final') ||
+                    order.internalNotes?.includes('Annulation final')) return false;
+                
                 const delayInfo = order.delayInfo || calculateOrderDelay(
                   order.id,
                   order.customer.wilaya,
@@ -1367,16 +1375,122 @@ export default function AgentOrdersPage() {
                         {criticalOrders.length === 0 && warningOrders.length > 0 && (
                           `${warningOrders.length} orders are approaching their delivery deadline.`
                         )}
-                        {' '}Most urgent: {urgentOrders.slice(0, 3).map(o => `#${o.reference}`).join(', ')}
+                        <br />
+                        <span className="font-medium">Click on any order to view details: </span>
+                        {urgentOrders.map((order, index) => (
+                          <span key={order.id}>
+                            <button
+                              onClick={() => {
+                                const orderElement = document.querySelector(`[data-order-id="${order.id}"]`);
+                                if (orderElement) {
+                                  orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  // Add highlight effect
+                                  orderElement.classList.add('ring-2', 'ring-red-500', 'ring-opacity-75');
+                                  setTimeout(() => {
+                                    orderElement.classList.remove('ring-2', 'ring-red-500', 'ring-opacity-75');
+                                  }, 3000);
+                                }
+                              }}
+                              className="text-red-800 hover:text-red-900 hover:underline font-semibold cursor-pointer transition-colors"
+                            >
+                              #{order.reference}
+                            </button>
+                            {index < urgentOrders.length - 1 && ', '}
+                          </span>
+                        ))}
                       </p>
                     </div>
                     <button
                       onClick={() => {
-                        // Scroll to first urgent order
-                        const firstUrgentOrder = document.querySelector(`[data-order-id="${urgentOrders[0].id}"]`);
-                        firstUrgentOrder?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        // Show first urgent order
+                        if (urgentOrders.length > 0) {
+                          const firstOrder = urgentOrders[0];
+                          const orderElement = document.querySelector(`[data-order-id="${firstOrder.id}"]`);
+                          if (orderElement) {
+                            orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            orderElement.classList.add('ring-2', 'ring-red-500', 'ring-opacity-75');
+                            setTimeout(() => {
+                              orderElement.classList.remove('ring-2', 'ring-red-500', 'ring-opacity-75');
+                            }, 3000);
+                          }
+                        }
                       }}
                       className="ml-4 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
+                    >
+                      View First
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {(() => {
+              // 🚀 NEW: ALERTÉ Orders Alert Component
+              const alerteOrders = filteredOrders.filter(order => {
+                // Only include orders with ALERTÉ shipping status
+                if (order.shippingStatus !== 'ALERTÉ') return false;
+                
+                // Exclude CANCELLED orders
+                if (order.status === 'CANCELLED') return false;
+                
+                // Exclude orders with "Annulation final" in notes
+                if (order.notes?.includes('Annulation final') ||
+                    order.internalNotes?.includes('Annulation final')) return false;
+                
+                return true;
+              });
+              
+              if (alerteOrders.length === 0) return null;
+              
+              return (
+                <div className="mb-6 p-4 rounded-lg border-l-4 border-yellow-500 bg-yellow-50">
+                  <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-yellow-800">
+                        ⚠️ ALERTÉ: {alerteOrders.length} orders need attention
+                      </h3>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        <span className="font-medium">Orders with ALERTÉ shipping status - Click to view: </span>
+                        {alerteOrders.map((order, index) => (
+                          <span key={order.id}>
+                            <button
+                              onClick={() => {
+                                const orderElement = document.querySelector(`[data-order-id="${order.id}"]`);
+                                if (orderElement) {
+                                  orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  // Add highlight effect
+                                  orderElement.classList.add('ring-2', 'ring-yellow-500', 'ring-opacity-75');
+                                  setTimeout(() => {
+                                    orderElement.classList.remove('ring-2', 'ring-yellow-500', 'ring-opacity-75');
+                                  }, 3000);
+                                }
+                              }}
+                              className="text-yellow-800 hover:text-yellow-900 hover:underline font-semibold cursor-pointer transition-colors"
+                            >
+                              #{order.reference}
+                            </button>
+                            {index < alerteOrders.length - 1 && ', '}
+                          </span>
+                        ))}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        // Show first ALERTÉ order
+                        if (alerteOrders.length > 0) {
+                          const firstOrder = alerteOrders[0];
+                          const orderElement = document.querySelector(`[data-order-id="${firstOrder.id}"]`);
+                          if (orderElement) {
+                            orderElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            orderElement.classList.add('ring-2', 'ring-yellow-500', 'ring-opacity-75');
+                            setTimeout(() => {
+                              orderElement.classList.remove('ring-2', 'ring-yellow-500', 'ring-opacity-75');
+                            }, 3000);
+                          }
+                        }
+                      }}
+                      className="ml-4 px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 transition-colors"
                     >
                       View First
                     </button>
