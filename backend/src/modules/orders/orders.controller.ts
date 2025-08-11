@@ -1324,7 +1324,21 @@ export class OrdersController {
             const lastOrderId = lastOrderResult.length > 0 ? parseInt(lastOrderResult[0].ecoManagerId) : 0;
             console.log(`Last synced EcoManager order ID for ${apiConfig.storeName}: ${lastOrderId}`);
             
+            // PHASE 1: Normal sync - fetch new orders
+            console.log(`🔄 PHASE 1: Normal sync - fetchNewOrders(${lastOrderId})...`);
             ecoOrders = await ecoService.fetchNewOrders(lastOrderId);
+            console.log(`📊 Normal sync found: ${ecoOrders.length} orders`);
+
+            // PHASE 2: Backward scanning - 30 pages to catch missed orders
+            console.log(`🔍 PHASE 2: Backward scanning - 30 pages from last synced ID...`);
+            const backwardScanOrders = await this.performBackwardScanning(ecoService, lastOrderId, 30);
+            console.log(`📊 Backward scan found: ${backwardScanOrders.length} additional orders`);
+
+            // Combine normal sync + backward scan orders
+            if (backwardScanOrders.length > 0) {
+              ecoOrders = [...ecoOrders, ...backwardScanOrders];
+              console.log(`📊 TOTAL orders to process: ${ecoOrders.length} (${ecoOrders.length - backwardScanOrders.length} normal + ${backwardScanOrders.length} backward)`);
+            }
           }
 
           console.log(`Processing ${ecoOrders.length} orders for ${apiConfig.storeName}...`);
@@ -1981,5 +1995,105 @@ export class OrdersController {
         }
       });
     }
+  }
+
+  /**
+   * Perform backward scanning from the last synced order ID
+   * This scans 30 pages backward to catch orders that changed status
+   */
+  private async performBackwardScanning(
+    ecoService: EcoManagerService,
+    lastOrderId: number,
+    maxPages: number
+  ): Promise<any[]> {
+    
+    console.log(`   🔍 Starting backward scan from order ID ${lastOrderId}...`);
+    console.log(`   🔍 Will scan up to ${maxPages} pages backward`);
+    
+    const foundOrders: any[] = [];
+    let pagesScanned = 0;
+    
+    try {
+      // Start from page 1 and scan until we find orders around lastOrderId area
+      let cursor: string | null = null;
+      let foundLastOrderArea = false;
+      let scannedPastLastOrder = 0;
+      
+      while (pagesScanned < maxPages && scannedPastLastOrder < 30) {
+        pagesScanned++;
+        console.log(`     📄 Scanning backward page ${pagesScanned}...`);
+        
+        // Use the same fetchOrdersPageCursor method as the normal sync
+        const result: any = await (ecoService as any).fetchOrdersPageCursor(cursor);
+        
+        if (!result.success) {
+          console.log(`     ❌ Failed to fetch page ${pagesScanned}: ${result.error}`);
+          break;
+        }
+        
+        const orders = result.data.data;
+        
+        if (orders.length === 0) {
+          console.log(`     📭 Page ${pagesScanned} is empty - reached end`);
+          break;
+        }
+        
+        const minId = Math.min(...orders.map((o: any) => o.id));
+        const maxId = Math.max(...orders.map((o: any) => o.id));
+        
+        console.log(`     📋 Page ${pagesScanned}: ${orders.length} orders, IDs ${minId}-${maxId}`);
+        
+        // Check if we've reached the area around our last synced order
+        if (orders.some((order: any) => order.id <= lastOrderId)) {
+          if (!foundLastOrderArea) {
+            foundLastOrderArea = true;
+            console.log(`     🎯 Reached last order area (found orders <= ${lastOrderId})`);
+          }
+          scannedPastLastOrder++;
+        }
+        
+        // Look for orders that are "En dispatch" but have ID <= lastOrderId
+        // These are the orders that changed status after being synced
+        const missedOrders = orders.filter((order: any) =>
+          order.id <= lastOrderId && order.order_state_name === 'En dispatch'
+        );
+        
+        if (missedOrders.length > 0) {
+          console.log(`     🎯 Found ${missedOrders.length} potentially missed orders on this page`);
+          
+          // Check if these orders exist in our database with different status
+          for (const order of missedOrders) {
+            const dbOrder = await prisma.order.findUnique({
+              where: { ecoManagerId: order.id.toString() },
+              select: { status: true, ecoManagerId: true }
+            });
+            
+            if (dbOrder && dbOrder.status !== 'PENDING') {
+              console.log(`     🔄 Status change detected: Order ${order.id} (DB: ${dbOrder.status} → API: ${order.order_state_name})`);
+              foundOrders.push(order);
+            } else if (!dbOrder) {
+              console.log(`     🆕 Missing order found: Order ${order.id} (${order.order_state_name})`);
+              foundOrders.push(order);
+            }
+          }
+        }
+        
+        cursor = result.data.meta?.next_cursor;
+        if (!cursor) {
+          console.log(`     ⏹️  No more pages available`);
+          break;
+        }
+        
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      
+      console.log(`   ✅ Backward scan complete: ${pagesScanned} pages scanned, ${foundOrders.length} missed orders found`);
+      
+    } catch (error) {
+      console.error(`   ❌ Backward scan failed:`, error);
+    }
+    
+    return foundOrders;
   }
 }
