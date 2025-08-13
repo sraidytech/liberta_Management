@@ -1135,7 +1135,7 @@ export class OrdersController {
             AND "source" = 'ECOMANAGER'
             AND "ecoManagerId" IS NOT NULL
             AND "ecoManagerId" LIKE ${apiConfig.storeIdentifier + '%'}
-          ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}) AS INTEGER) DESC
+          ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}::INTEGER) AS INTEGER) DESC
           LIMIT 1
         `;
 
@@ -1345,7 +1345,7 @@ export class OrdersController {
                   AND "source" = 'ECOMANAGER'
                   AND "ecoManagerId" IS NOT NULL
                   AND "ecoManagerId" LIKE ${apiConfig.storeIdentifier + '%'}
-                ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}) AS INTEGER) DESC
+                ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}::INTEGER) AS INTEGER) DESC
                 LIMIT 1
               `;
               
@@ -1598,7 +1598,7 @@ export class OrdersController {
           AND "source" = 'ECOMANAGER'
           AND "ecoManagerId" IS NOT NULL
           AND "ecoManagerId" LIKE ${apiConfig.storeIdentifier + '%'}
-        ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}) AS INTEGER) DESC
+        ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}::INTEGER) AS INTEGER) DESC
         LIMIT 1
       `;
 
