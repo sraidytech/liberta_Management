@@ -405,13 +405,54 @@ export class SyncService {
     // Get last synced order ID with database query details
     console.log(`🔍 [Database Query] Finding last synced order...`);
     const dbQueryStart = Date.now();
-    const lastOrder = await prisma.order.findFirst({
-      where: { storeIdentifier },
-      orderBy: { ecoManagerId: 'desc' }
-    });
-    const dbQueryTime = Date.now() - dbQueryStart;
+    // First try to get the highest prefixed ecoManagerId for this store
+    const prefixedOrderResult = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+      SELECT "ecoManagerId"
+      FROM "orders"
+      WHERE "storeIdentifier" = ${storeIdentifier}
+        AND "source" = 'ECOMANAGER'
+        AND "ecoManagerId" IS NOT NULL
+        AND "ecoManagerId" LIKE ${apiConfig.storeIdentifier + '%'}
+      ORDER BY CAST(SUBSTRING("ecoManagerId", ${apiConfig.storeIdentifier.length + 1}) AS INTEGER) DESC
+      LIMIT 1
+    `;
 
-    const lastOrderId = lastOrder?.ecoManagerId ? parseInt(lastOrder.ecoManagerId) : 0;
+    let lastOrderId = 0;
+    let lastOrder = null;
+    
+    if (prefixedOrderResult.length > 0) {
+      // Extract numeric part from prefixed ID (e.g., "ALPH20525" -> 20525)
+      const prefixedId = prefixedOrderResult[0].ecoManagerId;
+      lastOrderId = parseInt(prefixedId.substring(apiConfig.storeIdentifier.length));
+      
+      // Get the actual order for logging
+      lastOrder = await prisma.order.findUnique({
+        where: { ecoManagerId: prefixedId }
+      });
+    } else {
+      // Fallback: check for non-prefixed ecoManagerIds (backward compatibility)
+      const nonPrefixedOrderResult = await prisma.$queryRaw<Array<{ecoManagerId: string}>>`
+        SELECT "ecoManagerId"
+        FROM "orders"
+        WHERE "storeIdentifier" = ${storeIdentifier}
+          AND "source" = 'ECOMANAGER'
+          AND "ecoManagerId" IS NOT NULL
+          AND "ecoManagerId" NOT LIKE ${apiConfig.storeIdentifier + '%'}
+        ORDER BY CAST("ecoManagerId" AS INTEGER) DESC
+        LIMIT 1
+      `;
+      
+      if (nonPrefixedOrderResult.length > 0) {
+        lastOrderId = parseInt(nonPrefixedOrderResult[0].ecoManagerId);
+        
+        // Get the actual order for logging
+        lastOrder = await prisma.order.findUnique({
+          where: { ecoManagerId: nonPrefixedOrderResult[0].ecoManagerId }
+        });
+      }
+    }
+    
+    const dbQueryTime = Date.now() - dbQueryStart;
     console.log(`📊 [Database Result] Query completed in ${dbQueryTime}ms:`);
     console.log(`   - Last Order ID: ${lastOrderId}`);
     console.log(`   - Last Order Date: ${lastOrder?.createdAt ? new Date(lastOrder.createdAt).toLocaleString() : 'None'}`);
@@ -473,13 +514,18 @@ export class SyncService {
       for (const ecoOrder of batch) {
         try {
           // Check if order already exists
+          // Create store-prefixed ecoManagerId for uniqueness across stores
+          const prefixedEcoManagerId = `${apiConfig.storeIdentifier}${ecoOrder.id}`;
+          
           const existingOrder = await prisma.order.findUnique({
-            where: { ecoManagerId: ecoOrder.id.toString() }
+            where: { ecoManagerId: prefixedEcoManagerId }
           });
 
           if (!existingOrder) {
-            // Create new order
+            // Create new order with store-prefixed ecoManagerId
             const orderData = ecoService.mapOrderToDatabase(ecoOrder);
+            orderData.ecoManagerId = prefixedEcoManagerId;
+            
             const newOrder = await prisma.order.create({
               data: orderData
             });
