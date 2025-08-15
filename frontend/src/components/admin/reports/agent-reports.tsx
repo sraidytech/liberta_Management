@@ -21,9 +21,12 @@ interface AgentData {
   summary: {
     totalAgents: number;
     activeAgents: number;
-    averageUtilization: number;
+    averageQualityScore: number;
+    averageGoalAchievement: number;
     totalOrders: number;
     totalRevenue: number;
+    averageSuccessRate: number;
+    averageNoteCompletionRate: number;
   };
   agentPerformance: Array<{
     id: string;
@@ -32,7 +35,6 @@ interface AgentData {
     availability: string;
     currentOrders: number;
     maxOrders: number;
-    utilization: number;
     totalOrders: number;
     completedOrders: number;
     cancelledOrders: number;
@@ -43,14 +45,22 @@ interface AgentData {
     totalActivities: number;
     totalWorkingHours: number;
     ordersPerDay: number;
+    // New Quality-based KPIs
+    qualityScore: number;
+    goalAchievementRate: number;
+    activityConsistency: number;
+    noteCompletionRate: number;
+    orderSuccessWithNotesRate: number;
+    avgResponseTime: number;
+    performanceScore: number;
   }>;
   workloadDistribution: Array<{
     id: string;
     name: string;
     currentOrders: number;
     maxOrders: number;
-    utilization: number;
     activeOrders: number;
+    workloadPercentage: number;
   }>;
   activityBreakdown: Array<{
     agentId: string;
@@ -157,13 +167,13 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
   const chartData = useMemo(() => {
     if (!data) return null;
 
-    // Top performers
+    // Top performers by quality score
     const topPerformers = [...data.agentPerformance]
-      .sort((a, b) => b.successRate - a.successRate)
+      .sort((a, b) => b.qualityScore - a.qualityScore)
       .slice(0, 5);
 
-    // Utilization distribution
-    const utilizationRanges = [
+    // Quality score distribution
+    const qualityRanges = [
       { range: '0-25%', count: 0, color: '#EF4444' },
       { range: '26-50%', count: 0, color: '#F59E0B' },
       { range: '51-75%', count: 0, color: '#3B82F6' },
@@ -171,13 +181,13 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
     ];
 
     data.agentPerformance.forEach(agent => {
-      if (agent.utilization <= 25) utilizationRanges[0].count++;
-      else if (agent.utilization <= 50) utilizationRanges[1].count++;
-      else if (agent.utilization <= 75) utilizationRanges[2].count++;
-      else utilizationRanges[3].count++;
+      if (agent.qualityScore <= 25) qualityRanges[0].count++;
+      else if (agent.qualityScore <= 50) qualityRanges[1].count++;
+      else if (agent.qualityScore <= 75) qualityRanges[2].count++;
+      else qualityRanges[3].count++;
     });
 
-    return { topPerformers, utilizationRanges };
+    return { topPerformers, qualityRanges };
   }, [data]);
 
   if (loading) {
@@ -237,25 +247,25 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
           <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
         </div>
 
-        {/* Average Utilization */}
+        {/* Average Quality Score */}
         <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <div className="flex items-center space-x-2 mb-2">
-                <Activity className="w-5 h-5 opacity-80" />
+                <Award className="w-5 h-5 opacity-80" />
                 <p className="text-emerald-100 font-medium">
-                  {language === 'fr' ? 'Utilisation Moy.' : 'Avg Utilization'}
+                  {language === 'fr' ? 'Score Qualité Moy.' : 'Avg Quality Score'}
                 </p>
               </div>
               <p className="text-3xl font-bold mb-2">
-                {data.summary.averageUtilization.toFixed(1)}%
+                {data.summary.averageQualityScore.toFixed(1)}%
               </p>
               <p className="text-sm text-emerald-100">
-                {language === 'fr' ? 'Capacité utilisée' : 'Capacity used'}
+                {language === 'fr' ? 'Performance globale' : 'Overall performance'}
               </p>
             </div>
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-              <Activity className="w-8 h-8" />
+              <Award className="w-8 h-8" />
             </div>
           </div>
           <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
@@ -365,30 +375,30 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
           </div>
         </div>
 
-        {/* Utilization Distribution */}
+        {/* Quality Score Distribution */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold text-gray-900 mb-1">
-                {language === 'fr' ? 'Distribution d\'Utilisation' : 'Utilization Distribution'}
+                {language === 'fr' ? 'Distribution des Scores Qualité' : 'Quality Score Distribution'}
               </h3>
               <p className="text-gray-600">
-                {language === 'fr' ? 'Répartition des charges' : 'Workload distribution'}
+                {language === 'fr' ? 'Répartition des performances' : 'Performance distribution'}
               </p>
             </div>
             <BarChart3 className="w-8 h-8 text-gray-400" />
           </div>
 
           <div className="space-y-4">
-            {chartData && chartData.utilizationRanges.map((range, index) => {
-              const maxCount = Math.max(...chartData.utilizationRanges.map(r => r.count));
+            {chartData && chartData.qualityRanges.map((range, index) => {
+              const maxCount = Math.max(...chartData.qualityRanges.map(r => r.count));
               const percentage = maxCount > 0 ? (range.count / maxCount) * 100 : 0;
-              
+
               return (
                 <div key={range.range} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div 
+                      <div
                         className="w-4 h-4 rounded-full"
                         style={{ backgroundColor: range.color }}
                       ></div>
@@ -404,7 +414,7 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className="h-3 rounded-full transition-all duration-500"
-                      style={{ 
+                      style={{
                         width: `${percentage}%`,
                         backgroundColor: range.color
                       }}
@@ -455,25 +465,25 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                     </div>
                   </div>
 
-                  {/* Utilization */}
+                  {/* Quality Score */}
                   <div className="lg:col-span-1">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-gray-600">
-                          {language === 'fr' ? 'Utilisation' : 'Utilization'}
+                          {language === 'fr' ? 'Score Qualité' : 'Quality Score'}
                         </span>
                         <span className="text-sm font-bold text-gray-900">
-                          {agent.utilization.toFixed(1)}%
+                          {agent.qualityScore.toFixed(1)}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
-                          className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                          style={{ width: `${Math.min(agent.utilization, 100)}%` }}
+                          className="bg-purple-500 h-2 rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(agent.qualityScore, 100)}%` }}
                         ></div>
                       </div>
                       <p className="text-xs text-gray-600">
-                        {agent.currentOrders}/{agent.maxOrders}
+                        {language === 'fr' ? 'Performance' : 'Performance'}
                       </p>
                     </div>
                   </div>
@@ -550,6 +560,165 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
         </div>
       </div>
 
+      {/* Quality Performance Metrics */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-1">
+              {language === 'fr' ? 'Métriques de Qualité' : 'Quality Metrics'}
+            </h3>
+            <p className="text-gray-600">
+              {language === 'fr' ? 'Indicateurs de performance basés sur la qualité' : 'Quality-based performance indicators'}
+            </p>
+          </div>
+          <Award className="w-8 h-8 text-gray-400" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Average Quality Score */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Award className="w-5 h-5 text-purple-600" />
+                  <p className="text-purple-700 font-medium text-sm">
+                    {language === 'fr' ? 'Score Qualité Moy.' : 'Avg Quality Score'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-purple-600 mb-1">
+                  {data.summary.averageQualityScore.toFixed(1)}%
+                </p>
+                <p className="text-sm text-purple-600">
+                  {language === 'fr' ? 'performance globale' : 'overall performance'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Award className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Average Goal Achievement */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Target className="w-5 h-5 text-green-600" />
+                  <p className="text-green-700 font-medium text-sm">
+                    {language === 'fr' ? 'Atteinte Objectifs' : 'Goal Achievement'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-green-600 mb-1">
+                  {data.summary.averageGoalAchievement.toFixed(1)}%
+                </p>
+                <p className="text-sm text-green-600">
+                  {language === 'fr' ? 'objectifs atteints' : 'goals achieved'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Average Note Completion */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-blue-600" />
+                  <p className="text-blue-700 font-medium text-sm">
+                    {language === 'fr' ? 'Complétion Notes' : 'Note Completion'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-blue-600 mb-1">
+                  {data.summary.averageNoteCompletionRate.toFixed(1)}%
+                </p>
+                <p className="text-sm text-blue-600">
+                  {language === 'fr' ? 'notes ajoutées' : 'notes added'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Average Success Rate */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="w-5 h-5 text-orange-600" />
+                  <p className="text-orange-700 font-medium text-sm">
+                    {language === 'fr' ? 'Taux Succès Moy.' : 'Avg Success Rate'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-orange-600 mb-1">
+                  {data.summary.averageSuccessRate.toFixed(1)}%
+                </p>
+                <p className="text-sm text-orange-600">
+                  {language === 'fr' ? 'commandes livrées' : 'orders delivered'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Quality Performers */}
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h4 className="text-lg font-bold text-gray-900 mb-1">
+                {language === 'fr' ? 'Meilleurs Performers Qualité' : 'Top Quality Performers'}
+              </h4>
+              <p className="text-gray-600">
+                {language === 'fr' ? 'Classés par score de qualité' : 'Ranked by quality score'}
+              </p>
+            </div>
+            <Zap className="w-8 h-8 text-gray-400" />
+          </div>
+
+          <div className="space-y-4">
+            {chartData && chartData.topPerformers.slice(0, 5).map((agent, index) => (
+              <div key={agent.id} className="flex items-center space-x-4 p-4 bg-white rounded-xl hover:shadow-md transition-all">
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                    {index + 1}
+                  </div>
+                  <div className="relative">
+                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold">{agent.name?.[0] || 'A'}</span>
+                    </div>
+                    <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
+                  </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <p className="font-bold text-gray-900 truncate">{agent.name}</p>
+                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-600">
+                      {language === 'fr' ? 'Qualité' : 'Quality'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {agent.agentCode} • {agent.totalOrders} {language === 'fr' ? 'commandes' : 'orders'}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-xl font-bold text-purple-600">{agent.qualityScore.toFixed(1)}%</p>
+                  <p className="text-xs text-gray-600">{language === 'fr' ? 'score qualité' : 'quality score'}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Workload Distribution */}
       <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between mb-6">
@@ -575,22 +744,22 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   <span className="font-medium text-gray-900 text-sm truncate">{agent.name}</span>
                 </div>
                 <span className="text-xs font-medium text-gray-600">
-                  {agent.utilization.toFixed(0)}%
+                  {agent.workloadPercentage.toFixed(0)}%
                 </span>
               </div>
-              
+
               <div className="space-y-2">
                 <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                   <div
                     className={`h-2 rounded-full transition-all duration-500 ${
-                      agent.utilization >= 80 ? 'bg-red-500' :
-                      agent.utilization >= 60 ? 'bg-amber-500' :
+                      agent.workloadPercentage >= 80 ? 'bg-red-500' :
+                      agent.workloadPercentage >= 60 ? 'bg-amber-500' :
                       'bg-emerald-500'
                     }`}
-                    style={{ width: `${Math.min(agent.utilization, 100)}%` }}
+                    style={{ width: `${Math.min(agent.workloadPercentage, 100)}%` }}
                   ></div>
                 </div>
-                
+
                 <div className="flex justify-between text-xs text-gray-600">
                   <span>{agent.currentOrders}/{agent.maxOrders} {language === 'fr' ? 'commandes' : 'orders'}</span>
                   <span>{agent.activeOrders} {language === 'fr' ? 'actives' : 'active'}</span>

@@ -19,6 +19,15 @@ interface SalesData {
     totalRevenue: number;
     totalOrders: number;
     averageOrderValue: number;
+    // New Financial KPIs
+    grossMargin: number;
+    grossMarginPercentage: number;
+    revenuePerCustomer: number;
+    uniqueCustomers: number;
+    repeatPurchaseRate: number;
+    conversionRate: number;
+    customerLifetimeValue: number;
+    totalAllOrders: number;
   };
   dailyRevenue: Array<{
     date: string;
@@ -57,6 +66,24 @@ interface SalesReportsProps {
 export default function SalesReports({ data, loading, filters }: SalesReportsProps) {
   const { language } = useLanguage();
 
+  // Add safety checks for data structure
+  const safeData = data ? {
+    ...data,
+    summary: {
+      totalRevenue: data.summary?.totalRevenue || 0,
+      totalOrders: data.summary?.totalOrders || 0,
+      averageOrderValue: data.summary?.averageOrderValue || 0,
+      grossMargin: data.summary?.grossMargin || 0,
+      grossMarginPercentage: data.summary?.grossMarginPercentage || 30,
+      revenuePerCustomer: data.summary?.revenuePerCustomer || 0,
+      uniqueCustomers: data.summary?.uniqueCustomers || 0,
+      repeatPurchaseRate: data.summary?.repeatPurchaseRate || 0,
+      conversionRate: data.summary?.conversionRate || 0,
+      customerLifetimeValue: data.summary?.customerLifetimeValue || 0,
+      totalAllOrders: data.summary?.totalAllOrders || 0,
+    }
+  } : null;
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-DZ', {
@@ -86,10 +113,10 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
 
   // Calculate chart dimensions and data
   const chartData = useMemo(() => {
-    if (!data) return null;
+    if (!safeData) return null;
 
     // Daily revenue chart data - limit to last 14 days and recalculate max
-    const limitedDailyData = data.dailyRevenue.slice(-14);
+    const limitedDailyData = (safeData.dailyRevenue || []).slice(-14);
     const maxRevenue = Math.max(...limitedDailyData.map(d => d.revenue));
     const dailyChartData = limitedDailyData.map(item => ({
       ...item,
@@ -97,8 +124,8 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
     }));
 
     // Store performance pie chart
-    const totalStoreRevenue = data.revenueByStore.reduce((sum, store) => sum + store.revenue, 0);
-    const storeChartData = data.revenueByStore.map((store, index) => {
+    const totalStoreRevenue = (safeData.revenueByStore || []).reduce((sum, store) => sum + store.revenue, 0);
+    const storeChartData = (safeData.revenueByStore || []).map((store, index) => {
       const percentage = totalStoreRevenue > 0 ? (store.revenue / totalStoreRevenue) * 100 : 0;
       const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
       return {
@@ -109,7 +136,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
     });
 
     return { dailyChartData, storeChartData };
-  }, [data]);
+  }, [safeData]);
 
   if (loading) {
     return (
@@ -129,7 +156,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
     );
   }
 
-  if (!data) {
+  if (!safeData) {
     return (
       <div className="text-center py-12">
         <BarChart3 className="w-16 h-16 mx-auto text-gray-300 mb-4" />
@@ -142,7 +169,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
 
   return (
     <div className="space-y-8">
-      {/* Summary Cards */}
+      {/* Primary Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Total Revenue */}
         <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-2xl p-6 text-white shadow-xl">
@@ -155,10 +182,10 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
                 </p>
               </div>
               <p className="text-3xl font-bold mb-2">
-                {formatCurrency(data.summary.totalRevenue)}
+                {formatCurrency(safeData.summary.totalRevenue)}
               </p>
               <p className="text-sm text-emerald-100">
-                {formatNumber(data.summary.totalOrders)} {language === 'fr' ? 'commandes' : 'orders'}
+                {formatNumber(safeData.summary.totalOrders)} {language === 'fr' ? 'commandes' : 'orders'}
               </p>
             </div>
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
@@ -179,7 +206,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
                 </p>
               </div>
               <p className="text-3xl font-bold mb-2">
-                {formatNumber(data.summary.totalOrders)}
+                {formatNumber(safeData.summary.totalOrders)}
               </p>
               <p className="text-sm text-blue-100">
                 {language === 'fr' ? 'Période sélectionnée' : 'Selected period'}
@@ -203,7 +230,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
                 </p>
               </div>
               <p className="text-3xl font-bold mb-2">
-                {formatCurrency(data.summary.averageOrderValue)}
+                {formatCurrency(safeData.summary.averageOrderValue)}
               </p>
               <p className="text-sm text-purple-100">
                 {language === 'fr' ? 'Par commande' : 'Per order'}
@@ -214,6 +241,137 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
             </div>
           </div>
           <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+        </div>
+      </div>
+
+      {/* Financial KPIs Section */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-1">
+              {language === 'fr' ? 'Indicateurs Financiers' : 'Financial KPIs'}
+            </h3>
+            <p className="text-gray-600">
+              {language === 'fr' ? 'Métriques financières avancées' : 'Advanced financial metrics'}
+            </p>
+          </div>
+          <BarChart3 className="w-8 h-8 text-gray-400" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Gross Margin */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <TrendingUp className="w-5 h-5 text-green-600" />
+                  <p className="text-green-700 font-medium text-sm">
+                    {language === 'fr' ? 'Marge Brute' : 'Gross Margin'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-green-600 mb-1">
+                  {formatCurrency(safeData.summary.grossMargin)}
+                </p>
+                <p className="text-sm text-green-600">
+                  {safeData.summary.grossMarginPercentage.toFixed(1)}% {language === 'fr' ? 'marge' : 'margin'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue per Customer */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <DollarSign className="w-5 h-5 text-blue-600" />
+                  <p className="text-blue-700 font-medium text-sm">
+                    {language === 'fr' ? 'CA/Client' : 'Revenue/Customer'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-blue-600 mb-1">
+                  {formatCurrency(safeData.summary.revenuePerCustomer)}
+                </p>
+                <p className="text-sm text-blue-600">
+                  {formatNumber(safeData.summary.uniqueCustomers)} {language === 'fr' ? 'clients' : 'customers'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <DollarSign className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Repeat Purchase Rate */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Activity className="w-5 h-5 text-purple-600" />
+                  <p className="text-purple-700 font-medium text-sm">
+                    {language === 'fr' ? 'Taux Fidélité' : 'Repeat Rate'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-purple-600 mb-1">
+                  {safeData.summary.repeatPurchaseRate.toFixed(1)}%
+                </p>
+                <p className="text-sm text-purple-600">
+                  {language === 'fr' ? 'clients fidèles' : 'loyal customers'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Activity className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Conversion Rate */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 border border-orange-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <BarChart3 className="w-5 h-5 text-orange-600" />
+                  <p className="text-orange-700 font-medium text-sm">
+                    {language === 'fr' ? 'Taux Conversion' : 'Conversion Rate'}
+                  </p>
+                </div>
+                <p className="text-2xl font-bold text-orange-600 mb-1">
+                  {safeData.summary.conversionRate.toFixed(1)}%
+                </p>
+                <p className="text-sm text-orange-600">
+                  {safeData.summary.totalOrders}/{safeData.summary.totalAllOrders} {language === 'fr' ? 'livrées' : 'delivered'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Customer Lifetime Value */}
+        <div className="mt-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-lg font-bold text-gray-900 mb-1">
+                {language === 'fr' ? 'Valeur Vie Client (CLV)' : 'Customer Lifetime Value (CLV)'}
+              </h4>
+              <p className="text-gray-600">
+                {language === 'fr' ? 'Valeur moyenne générée par client' : 'Average value generated per customer'}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-3xl font-bold text-indigo-600">
+                {formatCurrency(safeData.summary.customerLifetimeValue)}
+              </p>
+              <p className="text-sm text-indigo-600">
+                {language === 'fr' ? 'par client' : 'per customer'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -325,7 +483,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900">
-                    {data.revenueByStore.length}
+                    {(safeData.revenueByStore || []).length}
                   </div>
                   <div className="text-sm text-gray-600">
                     {language === 'fr' ? 'Magasins' : 'Stores'}
@@ -377,9 +535,9 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
           </div>
 
           <div className="space-y-4">
-            {data.revenueByStatus.map((status) => {
+            {(safeData.revenueByStatus || []).map((status) => {
               // Calculate percentage based on total revenue from all statuses
-              const totalStatusRevenue = data.revenueByStatus.reduce((sum, s) => sum + s.revenue, 0);
+              const totalStatusRevenue = (safeData.revenueByStatus || []).reduce((sum, s) => sum + s.revenue, 0);
               const percentage = totalStatusRevenue > 0
                 ? (status.revenue / totalStatusRevenue) * 100
                 : 0;
@@ -431,7 +589,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
           </div>
 
           <div className="space-y-4">
-            {data.topProducts.slice(0, 5).map((product, index) => (
+            {(safeData.topProducts || []).slice(0, 5).map((product, index) => (
               <div key={product.product} className="flex items-center space-x-4 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">
                   {index + 1}
@@ -466,7 +624,7 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          {data.monthlyComparison.filter(m => m.revenue > 0).slice(-6).map((month) => (
+          {(safeData.monthlyComparison || []).filter(m => m.revenue > 0).slice(-6).map((month) => (
             <div key={month.month} className="text-center p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:from-blue-50 hover:to-blue-100 transition-all">
               <div className="text-sm font-medium text-gray-600 mb-2">
                 {month.month.slice(0, 3)}

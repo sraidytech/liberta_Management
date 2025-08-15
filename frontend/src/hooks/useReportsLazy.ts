@@ -19,6 +19,15 @@ interface SalesData {
     totalRevenue: number;
     totalOrders: number;
     averageOrderValue: number;
+    // New Financial KPIs
+    grossMargin: number;
+    grossMarginPercentage: number;
+    revenuePerCustomer: number;
+    uniqueCustomers: number;
+    repeatPurchaseRate: number;
+    conversionRate: number;
+    customerLifetimeValue: number;
+    totalAllOrders: number;
   };
   dailyRevenue: Array<{
     date: string;
@@ -52,9 +61,12 @@ interface AgentData {
   summary: {
     totalAgents: number;
     activeAgents: number;
-    averageUtilization: number;
+    averageQualityScore: number;
+    averageGoalAchievement: number;
     totalOrders: number;
     totalRevenue: number;
+    averageSuccessRate: number;
+    averageNoteCompletionRate: number;
   };
   agentPerformance: Array<{
     id: string;
@@ -63,7 +75,6 @@ interface AgentData {
     availability: string;
     currentOrders: number;
     maxOrders: number;
-    utilization: number;
     totalOrders: number;
     completedOrders: number;
     cancelledOrders: number;
@@ -74,14 +85,22 @@ interface AgentData {
     totalActivities: number;
     totalWorkingHours: number;
     ordersPerDay: number;
+    // New Quality-based KPIs
+    qualityScore: number;
+    goalAchievementRate: number;
+    activityConsistency: number;
+    noteCompletionRate: number;
+    orderSuccessWithNotesRate: number;
+    avgResponseTime: number;
+    performanceScore: number;
   }>;
   workloadDistribution: Array<{
     id: string;
     name: string;
     currentOrders: number;
     maxOrders: number;
-    utilization: number;
     activeOrders: number;
+    workloadPercentage: number;
   }>;
   activityBreakdown: Array<{
     agentId: string;

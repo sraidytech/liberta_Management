@@ -524,6 +524,26 @@ export class AnalyticsController {
           ? (totalRevenue / completedOrders).toFixed(2)
           : '0';
 
+        // Calculate quality metrics
+        const noteCompletionRate = totalOrders > 0 ? (totalActivities / totalOrders) * 100 : 0;
+        const orderSuccessWithNotesRate = totalOrders > 0 ?
+          (completedOrders > 0 && totalActivities > 0 ? (Math.min(completedOrders, totalActivities) / totalOrders) * 100 : 0) : 0;
+        
+        // Activity consistency (simplified - based on activities vs orders ratio)
+        const activityConsistency = totalOrders > 0 ? Math.min((totalActivities / totalOrders) * 100, 100) : 0;
+        
+        // Goal achievement rate (based on success rate vs target of 80%)
+        const targetSuccessRate = 80;
+        const goalAchievementRate = Math.min((parseFloat(successRate) / targetSuccessRate) * 100, 100);
+        
+        // Quality score calculation (weighted average)
+        const qualityScore = (
+          (parseFloat(successRate) * 0.3) + // 30% weight for success rate
+          (noteCompletionRate * 0.25) + // 25% weight for note completion
+          (orderSuccessWithNotesRate * 0.25) + // 25% weight for orders with notes delivered
+          (activityConsistency * 0.2) // 20% weight for activity consistency
+        );
+
         return {
           id: agent.id,
           name: agent.name,
@@ -541,13 +561,13 @@ export class AnalyticsController {
           confirmationRate: `${confirmationRate}%`,
           cancellationRate: `${cancellationRate}%`,
           activities: totalActivities,
-          utilization: `${utilization}%`,
-          performanceScore: this.calculatePerformanceScore({
-            successRate: parseFloat(successRate),
-            utilization: parseFloat(utilization),
-            totalOrders,
-            activities: totalActivities
-          })
+          // Removed utilization - replaced with quality metrics
+          qualityScore: qualityScore.toFixed(1),
+          goalAchievementRate: goalAchievementRate.toFixed(1),
+          activityConsistency: activityConsistency.toFixed(1),
+          noteCompletionRate: noteCompletionRate.toFixed(1),
+          orderSuccessWithNotesRate: orderSuccessWithNotesRate.toFixed(1),
+          performanceScore: qualityScore.toFixed(1)
         };
       });
 
@@ -621,12 +641,14 @@ export class AnalyticsController {
         // Build where clause based on filters
         const whereClause: any = {};
         
-        if (startDate && endDate) {
-          whereClause.orderDate = {
-            gte: new Date(startDate as string),
-            lte: new Date(endDate as string)
-          };
-        }
+        // Parse dates with proper timezone handling
+        const startDateParsed = startDate ? new Date(startDate as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const endDateParsed = endDate ? new Date(endDate as string) : new Date();
+        
+        whereClause.orderDate = {
+          gte: startDateParsed,
+          lte: endDateParsed
+        };
         
         if (storeId) whereClause.storeIdentifier = storeId;
         if (agentId) whereClause.assignedAgentId = agentId;
@@ -644,6 +666,10 @@ export class AnalyticsController {
           ...whereClause,
           status: OrderStatus.DELIVERED
         };
+
+        // All orders where clause (for conversion metrics)
+        const allOrdersWhereClause: any = { ...whereClause };
+        delete allOrdersWhereClause.status; // Remove status filter for all orders
   
         const [
           dailyRevenue,
@@ -651,7 +677,9 @@ export class AnalyticsController {
           revenueByStatus,
           topProducts,
           commissionData,
-          monthlyComparison
+          monthlyComparison,
+          customerMetrics,
+          conversionMetrics
         ] = await Promise.all([
           // Daily revenue breakdown (delivered orders only)
           prisma.order.findMany({
@@ -721,17 +749,39 @@ export class AnalyticsController {
             }
           }),
   
-          // Monthly comparison (delivered orders only)
+          // Monthly comparison (delivered orders only) - respect date filters
           prisma.order.groupBy({
             by: ['orderDate'],
             where: {
+              ...revenueWhereClause,
               orderDate: {
-                gte: new Date(new Date().getFullYear(), 0, 1), // Start of year
-                lte: new Date()
-              },
-              status: OrderStatus.DELIVERED
+                gte: new Date(Math.min(startDateParsed.getTime(), new Date(startDateParsed.getFullYear(), 0, 1).getTime())),
+                lte: endDateParsed
+              }
             },
             _sum: { total: true },
+            _count: { id: true }
+          }),
+
+          // Customer metrics for financial KPIs
+          prisma.order.findMany({
+            where: revenueWhereClause,
+            select: {
+              customerId: true,
+              total: true,
+              customer: {
+                select: {
+                  id: true,
+                  createdAt: true
+                }
+              }
+            }
+          }),
+
+          // Conversion metrics
+          prisma.order.groupBy({
+            by: ['status'],
+            where: allOrdersWhereClause,
             _count: { id: true }
           })
         ]);
@@ -750,14 +800,48 @@ export class AnalyticsController {
           };
         });
   
+        // Calculate financial KPIs
+        const totalRevenue = dailyRevenue.reduce((sum, item) => sum + (item._sum.total || 0), 0);
+        const totalDeliveredOrders = dailyRevenue.reduce((sum, item) => sum + item._count.id, 0);
+        const totalAllOrders = conversionMetrics.reduce((sum, item) => sum + item._count.id, 0);
+        
+        // Customer analysis
+        const uniqueCustomers = new Set(customerMetrics.map(order => order.customerId)).size;
+        const revenuePerCustomer = uniqueCustomers > 0 ? totalRevenue / uniqueCustomers : 0;
+        
+        // Calculate repeat customers
+        const customerOrderCounts = customerMetrics.reduce((acc, order) => {
+          acc[order.customerId] = (acc[order.customerId] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        const repeatCustomers = Object.values(customerOrderCounts).filter(count => count > 1).length;
+        const repeatPurchaseRate = uniqueCustomers > 0 ? (repeatCustomers / uniqueCustomers) * 100 : 0;
+        
+        // Conversion rate
+        const conversionRate = totalAllOrders > 0 ? (totalDeliveredOrders / totalAllOrders) * 100 : 0;
+        
+        // Calculate gross margin (assuming 30% margin - this should be configurable)
+        const grossMarginPercentage = 30; // This should come from settings
+        const grossMargin = totalRevenue * (grossMarginPercentage / 100);
+        
+        // Customer Lifetime Value (simplified calculation)
+        const avgOrdersPerCustomer = uniqueCustomers > 0 ? totalDeliveredOrders / uniqueCustomers : 0;
+        const customerLifetimeValue = avgOrdersPerCustomer * (totalRevenue / totalDeliveredOrders || 0);
+
         const salesReport = {
           summary: {
-            totalRevenue: dailyRevenue.reduce((sum, item) => sum + (item._sum.total || 0), 0),
-            totalOrders: dailyRevenue.reduce((sum, item) => sum + item._count.id, 0),
-            averageOrderValue: dailyRevenue.length > 0
-              ? dailyRevenue.reduce((sum, item) => sum + (item._sum.total || 0), 0) /
-                dailyRevenue.reduce((sum, item) => sum + item._count.id, 0)
-              : 0
+            totalRevenue,
+            totalOrders: totalDeliveredOrders,
+            averageOrderValue: totalDeliveredOrders > 0 ? totalRevenue / totalDeliveredOrders : 0,
+            // New Financial KPIs
+            grossMargin,
+            grossMarginPercentage,
+            revenuePerCustomer,
+            uniqueCustomers,
+            repeatPurchaseRate,
+            conversionRate,
+            customerLifetimeValue,
+            totalAllOrders
           },
           dailyRevenue: dailyRevenue.map(item => ({
             date: item.orderDate.toISOString().split('T')[0],
@@ -1075,6 +1159,30 @@ export class AnalyticsController {
           const cancellationRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
           const confirmationRate = totalOrders > 0 ? (confirmedOrders / totalOrders) * 100 : 0;
 
+          // Calculate quality metrics
+          const noteCompletionRate = totalOrders > 0 ? (totalActivities / totalOrders) * 100 : 0;
+          const orderSuccessWithNotesRate = totalOrders > 0 ?
+            (completedOrders > 0 && totalActivities > 0 ? (Math.min(completedOrders, totalActivities) / totalOrders) * 100 : 0) : 0;
+          
+          // Activity consistency (simplified - based on activities vs orders ratio)
+          const activityConsistency = totalOrders > 0 ? Math.min((totalActivities / totalOrders) * 100, 100) : 0;
+          
+          // Goal achievement rate (based on success rate vs target of 80%)
+          const targetSuccessRate = 80;
+          const goalAchievementRate = Math.min((successRate / targetSuccessRate) * 100, 100);
+          
+          // Quality score calculation (weighted average)
+          const qualityScore = (
+            (successRate * 0.3) + // 30% weight for success rate
+            (noteCompletionRate * 0.25) + // 25% weight for note completion
+            (orderSuccessWithNotesRate * 0.25) + // 25% weight for orders with notes delivered
+            (activityConsistency * 0.2) // 20% weight for activity consistency
+          );
+          
+          // Response time (simplified - average time between order assignment and first activity)
+          const avgResponseTime = totalOrders > 0 && totalActivities > 0 ?
+            (totalDuration / totalActivities) / 60 : 0; // Convert to hours
+
           return {
             id: agent.id,
             name: agent.name,
@@ -1082,7 +1190,7 @@ export class AnalyticsController {
             availability: agent.availability,
             currentOrders: agent.currentOrders,
             maxOrders: agent.maxOrders,
-            utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
+            // Removed utilization - replaced with quality metrics
             totalOrders,
             completedOrders,
             cancelledOrders,
@@ -1095,36 +1203,45 @@ export class AnalyticsController {
             totalActivities,
             totalWorkingHours: Math.round(totalDuration / 60), // Convert minutes to hours
             ordersPerDay: totalOrders > 0 ? totalOrders / 30 : 0, // Assuming 30-day period
-            performanceScore: this.calculatePerformanceScore({
-              successRate,
-              utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
-              totalOrders,
-              activities: totalActivities
-            })
+            // New Quality-based KPIs
+            qualityScore,
+            goalAchievementRate,
+            activityConsistency,
+            noteCompletionRate,
+            orderSuccessWithNotesRate,
+            avgResponseTime,
+            performanceScore: qualityScore // Use quality score as performance score
           };
         });
 
-        // Process workload distribution
+        // Process workload distribution (removed utilization)
         const workloadDistribution = workloadData.map(agent => ({
           id: agent.id,
           name: agent.name,
           currentOrders: agent.currentOrders,
           maxOrders: agent.maxOrders,
-          utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
-          activeOrders: Number(agent.active_orders) || 0
+          activeOrders: Number(agent.active_orders) || 0,
+          workloadPercentage: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0
         }));
 
         const agentReport = {
           summary: {
             totalAgents: processedAgentData.length,
             activeAgents: processedAgentData.filter(a => a.availability !== AgentAvailability.OFFLINE).length,
-            averageUtilization: processedAgentData.length > 0 
-              ? processedAgentData.reduce((sum, a) => sum + a.utilization, 0) / processedAgentData.length 
+            // Removed averageUtilization - replaced with quality metrics
+            averageQualityScore: processedAgentData.length > 0
+              ? processedAgentData.reduce((sum, a) => sum + a.qualityScore, 0) / processedAgentData.length
+              : 0,
+            averageGoalAchievement: processedAgentData.length > 0
+              ? processedAgentData.reduce((sum, a) => sum + a.goalAchievementRate, 0) / processedAgentData.length
               : 0,
             totalOrders: processedAgentData.reduce((sum, a) => sum + a.totalOrders, 0),
             totalRevenue: processedAgentData.reduce((sum, a) => sum + a.totalRevenue, 0),
             averageSuccessRate: processedAgentData.length > 0
               ? processedAgentData.reduce((sum, a) => sum + a.successRate, 0) / processedAgentData.length
+              : 0,
+            averageNoteCompletionRate: processedAgentData.length > 0
+              ? processedAgentData.reduce((sum, a) => sum + a.noteCompletionRate, 0) / processedAgentData.length
               : 0
           },
           agentPerformance: processedAgentData,

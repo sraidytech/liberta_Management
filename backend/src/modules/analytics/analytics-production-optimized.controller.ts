@@ -176,20 +176,27 @@ export class ProductionOptimizedAnalyticsController {
       name: agent.name,
       currentOrders: agent.currentOrders,
       maxOrders: agent.maxOrders,
-      utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
+      workloadPercentage: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
       activeOrders: agent.assignedOrders.length
     }));
 
     const summary = {
       totalAgents: agentResults.length,
       activeAgents: agentResults.filter(a => a.availability !== 'OFFLINE').length,
-      averageUtilization: agentResults.length > 0 
-        ? agentResults.reduce((sum, a) => sum + a.utilization, 0) / agentResults.length 
+      // Removed averageUtilization - replaced with quality metrics
+      averageQualityScore: agentResults.length > 0
+        ? agentResults.reduce((sum, a) => sum + (a.qualityScore || 0), 0) / agentResults.length
+        : 0,
+      averageGoalAchievement: agentResults.length > 0
+        ? agentResults.reduce((sum, a) => sum + (a.goalAchievementRate || 0), 0) / agentResults.length
         : 0,
       totalOrders: agentResults.reduce((sum, a) => sum + a.totalOrders, 0),
       totalRevenue: agentResults.reduce((sum, a) => sum + a.totalRevenue, 0),
       averageSuccessRate: agentResults.length > 0
         ? agentResults.reduce((sum, a) => sum + a.successRate, 0) / agentResults.length
+        : 0,
+      averageNoteCompletionRate: agentResults.length > 0
+        ? agentResults.reduce((sum, a) => sum + (a.noteCompletionRate || 0), 0) / agentResults.length
         : 0
     };
 
@@ -269,6 +276,30 @@ export class ProductionOptimizedAnalyticsController {
       const cancellationRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
       const confirmationRate = totalOrders > 0 ? (confirmedOrders / totalOrders) * 100 : 0;
 
+      // Calculate quality metrics
+      const noteCompletionRate = totalOrders > 0 ? (totalActivities / totalOrders) * 100 : 0;
+      const orderSuccessWithNotesRate = totalOrders > 0 ?
+        (completedOrders > 0 && totalActivities > 0 ? (Math.min(completedOrders, totalActivities) / totalOrders) * 100 : 0) : 0;
+      
+      // Activity consistency (simplified - based on activities vs orders ratio)
+      const activityConsistency = totalOrders > 0 ? Math.min((totalActivities / totalOrders) * 100, 100) : 0;
+      
+      // Goal achievement rate (based on success rate vs target of 80%)
+      const targetSuccessRate = 80;
+      const goalAchievementRate = Math.min((successRate / targetSuccessRate) * 100, 100);
+      
+      // Quality score calculation (weighted average)
+      const qualityScore = (
+        (successRate * 0.3) + // 30% weight for success rate
+        (noteCompletionRate * 0.25) + // 25% weight for note completion
+        (orderSuccessWithNotesRate * 0.25) + // 25% weight for orders with notes delivered
+        (activityConsistency * 0.2) // 20% weight for activity consistency
+      );
+      
+      // Response time (simplified - average time between order assignment and first activity)
+      const avgResponseTime = totalOrders > 0 && totalActivities > 0 ?
+        (totalDuration / totalActivities) / 60 : 0; // Convert to hours
+
       return {
         id: agent.id,
         name: agent.name,
@@ -276,7 +307,7 @@ export class ProductionOptimizedAnalyticsController {
         availability: agent.availability,
         currentOrders: agent.currentOrders,
         maxOrders: agent.maxOrders,
-        utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
+        // Removed utilization - replaced with quality metrics
         totalOrders,
         completedOrders,
         cancelledOrders,
@@ -289,12 +320,14 @@ export class ProductionOptimizedAnalyticsController {
         totalActivities,
         totalWorkingHours: Math.round(totalDuration / 60),
         ordersPerDay: totalOrders > 0 ? totalOrders / 30 : 0,
-        performanceScore: this.calculatePerformanceScore({
-          successRate,
-          utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
-          totalOrders,
-          activities: totalActivities
-        })
+        // New Quality-based KPIs
+        qualityScore,
+        goalAchievementRate,
+        activityConsistency,
+        noteCompletionRate,
+        orderSuccessWithNotesRate,
+        avgResponseTime,
+        performanceScore: qualityScore // Use quality score as performance score
       };
 
     } catch (error) {
@@ -308,7 +341,6 @@ export class ProductionOptimizedAnalyticsController {
         availability: agent.availability,
         currentOrders: agent.currentOrders,
         maxOrders: agent.maxOrders,
-        utilization: 0,
         totalOrders: 0,
         completedOrders: 0,
         cancelledOrders: 0,
@@ -321,6 +353,13 @@ export class ProductionOptimizedAnalyticsController {
         totalActivities: 0,
         totalWorkingHours: 0,
         ordersPerDay: 0,
+        // New Quality-based KPIs
+        qualityScore: 0,
+        goalAchievementRate: 0,
+        activityConsistency: 0,
+        noteCompletionRate: 0,
+        orderSuccessWithNotesRate: 0,
+        avgResponseTime: 0,
         performanceScore: 0,
         error: 'Data processing failed'
       };
@@ -353,10 +392,12 @@ export class ProductionOptimizedAnalyticsController {
         summary: {
           totalAgents: agents.length,
           activeAgents: agents.filter(a => a.availability !== 'OFFLINE').length,
-          averageUtilization: 0,
+          averageQualityScore: 0,
+          averageGoalAchievement: 0,
           totalOrders: 0,
           totalRevenue: 0,
-          averageSuccessRate: 0
+          averageSuccessRate: 0,
+          averageNoteCompletionRate: 0
         },
         agentPerformance: agents.map(agent => ({
           id: agent.id,
@@ -365,7 +406,6 @@ export class ProductionOptimizedAnalyticsController {
           availability: agent.availability,
           currentOrders: agent.currentOrders,
           maxOrders: agent.maxOrders,
-          utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
           totalOrders: 0,
           completedOrders: 0,
           cancelledOrders: 0,
@@ -378,6 +418,13 @@ export class ProductionOptimizedAnalyticsController {
           totalActivities: 0,
           totalWorkingHours: 0,
           ordersPerDay: 0,
+          // New Quality-based KPIs
+          qualityScore: 0,
+          goalAchievementRate: 0,
+          activityConsistency: 0,
+          noteCompletionRate: 0,
+          orderSuccessWithNotesRate: 0,
+          avgResponseTime: 0,
           performanceScore: 0
         })),
         workloadDistribution: agents.map(agent => ({
@@ -385,8 +432,8 @@ export class ProductionOptimizedAnalyticsController {
           name: agent.name,
           currentOrders: agent.currentOrders,
           maxOrders: agent.maxOrders,
-          utilization: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0,
-          activeOrders: 0
+          activeOrders: 0,
+          workloadPercentage: agent.maxOrders > 0 ? (agent.currentOrders / agent.maxOrders) * 100 : 0
         })),
         activityBreakdown: [],
         fallback: true,
@@ -399,35 +446,6 @@ export class ProductionOptimizedAnalyticsController {
     }
   }
 
-  /**
-   * Calculate performance score
-   */
-  private calculatePerformanceScore(metrics: {
-    successRate: number;
-    utilization: number;
-    totalOrders: number;
-    activities: number;
-  }): number {
-    const { successRate, utilization, totalOrders, activities } = metrics;
-    
-    // Weighted scoring system
-    const successWeight = 0.4;
-    const utilizationWeight = 0.3;
-    const volumeWeight = 0.2;
-    const activityWeight = 0.1;
-    
-    const normalizedVolume = Math.min(totalOrders / 100, 1) * 100; // Cap at 100 orders
-    const normalizedActivity = Math.min(activities / 50, 1) * 100; // Cap at 50 activities
-    
-    const score = (
-      successRate * successWeight +
-      utilization * utilizationWeight +
-      normalizedVolume * volumeWeight +
-      normalizedActivity * activityWeight
-    );
-    
-    return Math.round(score);
-  }
 }
 
 // Export the production-optimized controller
