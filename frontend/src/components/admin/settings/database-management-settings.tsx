@@ -323,7 +323,7 @@ export function DatabaseManagementSettings() {
           <Truck className="h-5 w-5 text-purple-600" />
           Shipping Status Synchronization
         </h3>
-        <p className="text-gray-600 mb-4">Synchronize shipping status updates from Maystro delivery service for all orders with tracking numbers.</p>
+        <p className="text-gray-600 mb-4">Synchronize shipping status updates from Maystro delivery service for the last 40,000 orders with tracking numbers.</p>
         <Button
           onClick={handleSyncShippingStatus}
           disabled={loading === 'syncShipping'}

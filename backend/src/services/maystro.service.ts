@@ -487,7 +487,7 @@ export class MaystroService {
           orderBy: {
             createdAt: 'desc' // Get newest orders first
           },
-          take: 5000 // Limit to latest 5,000 orders
+          take: 40000 // Limit to latest 40,000 orders
         });
       }
 

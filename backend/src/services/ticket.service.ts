@@ -139,6 +139,7 @@ export class TicketService {
     priority?: TicketPriority;
     category?: TicketCategory;
     orderId?: string;
+    orderReference?: string;
     page?: number;
     limit?: number;
   }) {
@@ -174,6 +175,11 @@ export class TicketService {
       }
       if (filters?.orderId) {
         where.orderId = filters.orderId;
+      }
+      if (filters?.orderReference) {
+        where.order = {
+          reference: filters.orderReference
+        };
       }
 
       const [tickets, total] = await Promise.all([

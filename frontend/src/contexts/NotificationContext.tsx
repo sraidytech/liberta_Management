@@ -5,7 +5,7 @@ import { io, Socket } from 'socket.io-client';
 
 export interface Notification {
   id: string;
-  type: 'ORDER_ASSIGNMENT' | 'ORDER_UPDATE' | 'SYSTEM_ALERT' | 'SHIPPING_UPDATE';
+  type: 'ORDER_ASSIGNMENT' | 'ORDER_UPDATE' | 'SYSTEM_ALERT' | 'SHIPPING_UPDATE' | 'TICKET_CREATED' | 'TICKET_UPDATED' | 'TICKET_MESSAGE' | 'NEW_TICKET_MESSAGE' | 'TICKET_STATUS_UPDATED';
   title: string;
   message: string;
   orderId?: string;
@@ -17,6 +17,13 @@ export interface Notification {
       fullName: string;
       telephone: string;
     };
+  };
+  ticketId?: string;
+  ticket?: {
+    id: string;
+    reference: string;
+    status: string;
+    title: string;
   };
   isRead: boolean;
   createdAt: string;

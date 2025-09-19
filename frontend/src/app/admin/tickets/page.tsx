@@ -21,7 +21,9 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
-  MessageCircle
+  MessageCircle,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Ticket {
@@ -83,8 +85,14 @@ export default function AdminTicketsPage() {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTickets, setTotalTickets] = useState(0);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
-  const fetchTickets = async () => {
+  const fetchTickets = async (page: number = currentPage) => {
     if (!user?.id) {
       setLoading(false);
       return;
@@ -94,7 +102,18 @@ export default function AdminTicketsPage() {
       const token = localStorage.getItem('token');
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
       
-      const response = await fetch(`${apiBaseUrl}/api/v1/tickets`, {
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: itemsPerPage.toString()
+      });
+
+      // Add filters if they're not 'ALL'
+      if (statusFilter !== 'ALL') params.append('status', statusFilter);
+      if (priorityFilter !== 'ALL') params.append('priority', priorityFilter);
+      if (categoryFilter !== 'ALL') params.append('category', categoryFilter);
+      
+      const response = await fetch(`${apiBaseUrl}/api/v1/tickets?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -104,6 +123,13 @@ export default function AdminTicketsPage() {
       if (response.ok) {
         const data = await response.json();
         setTickets(data.data?.tickets || []);
+        
+        // Update pagination state
+        if (data.data?.pagination) {
+          setCurrentPage(data.data.pagination.page);
+          setTotalPages(data.data.pagination.pages);
+          setTotalTickets(data.data.pagination.total);
+        }
       } else {
         const errorText = await response.text();
         console.error('❌ Failed to fetch tickets:', response.status, errorText);
@@ -238,21 +264,33 @@ export default function AdminTicketsPage() {
 
   useEffect(() => {
     if (user?.id) {
-      fetchTickets();
+      fetchTickets(1); // Reset to page 1 when filters change
     }
-  }, [user?.id]);
+  }, [user?.id, statusFilter, priorityFilter, categoryFilter, itemsPerPage]);
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.order.reference.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         ticket.order.customer.fullName.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'ALL' || ticket.status === statusFilter;
-    const matchesPriority = priorityFilter === 'ALL' || ticket.priority === priorityFilter;
-    const matchesCategory = categoryFilter === 'ALL' || ticket.category === categoryFilter;
-    
-    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
-  });
+  // Handle search with debounce
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (user?.id) {
+        fetchTickets(1); // Reset to page 1 when search changes
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm]);
+
+  // Since we're doing server-side filtering, we don't need client-side filtering
+  const filteredTickets = tickets;
+
+  // Pagination handlers
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    fetchTickets(page);
+  };
+
+  const handleItemsPerPageChange = (newItemsPerPage: number) => {
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -317,7 +355,7 @@ export default function AdminTicketsPage() {
             <p className="text-gray-600">{t('manageTicketsFromAgents')}</p>
           </div>
           <div className="text-sm text-gray-500">
-            {filteredTickets.length} / {tickets.length} {t('tickets')}
+            Showing {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, totalTickets)} of {totalTickets} {t('tickets')}
           </div>
         </div>
 
@@ -338,8 +376,18 @@ export default function AdminTicketsPage() {
               </div>
             </div>
             
-            {/* Filters */}
+            {/* Filters and Items Per Page */}
             <div className="flex flex-wrap gap-2">
+              <select
+                value={itemsPerPage}
+                onChange={(e) => handleItemsPerPageChange(parseInt(e.target.value))}
+                className="border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+                <option value={100}>100 per page</option>
+              </select>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -486,6 +534,73 @@ export default function AdminTicketsPage() {
             ))
           )}
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="flex items-center space-x-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span>Previous</span>
+                </Button>
+                
+                {/* Page numbers */}
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={currentPage === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => handlePageChange(pageNum)}
+                        className="w-8 h-8 p-0"
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="flex items-center space-x-1"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="text-sm text-gray-600">
+                Total: {totalTickets} tickets
+              </div>
+            </div>
+          </Card>
+        )}
 
         {/* Ticket Detail Modal */}
         {showTicketModal && selectedTicket && (

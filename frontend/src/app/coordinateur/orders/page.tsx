@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import CoordinateurLayout from '@/components/coordinateur/coordinateur-layout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -105,9 +106,10 @@ interface DashboardStats {
   period: string;
 }
 
-export default function CoordinateurOrdersPage() {
+function CoordinateurOrdersPageContent() {
   const { t, language } = useLanguage();
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
 
   // State management
   const [orders, setOrders] = useState<Order[]>([]);
@@ -305,12 +307,16 @@ export default function CoordinateurOrdersPage() {
 
   // Load saved settings from localStorage on component mount
   useEffect(() => {
+    // Check for URL search parameter first
+    const urlSearch = searchParams.get('search');
+    
     // Load filters
     const saved = localStorage.getItem('coordinateurOrderFilters');
     if (saved) {
       try {
         const filters = JSON.parse(saved);
-        setSearchTerm(filters.searchTerm || '');
+        // Use URL search parameter if available, otherwise use saved search term
+        setSearchTerm(urlSearch || filters.searchTerm || '');
         setStatusFilter(filters.statusFilter || '');
         setShippingStatusFilter(filters.shippingStatusFilter || '');
         setStoreFilter(filters.storeFilter || '');
@@ -322,6 +328,9 @@ export default function CoordinateurOrdersPage() {
       } catch (e) {
         console.error('Error loading saved filters:', e);
       }
+    } else if (urlSearch) {
+      // If no saved filters but URL search parameter exists
+      setSearchTerm(urlSearch);
     }
     
     // Load pagination settings
@@ -875,5 +884,15 @@ export default function CoordinateurOrdersPage() {
         />
       </div>
     </CoordinateurLayout>
+  );
+}
+
+export default function CoordinateurOrdersPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+    </div>}>
+      <CoordinateurOrdersPageContent />
+    </Suspense>
   );
 }

@@ -7,6 +7,7 @@ import { createTranslator, Language } from '@/lib/i18n';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { handleNotificationClick, getNotificationNavigationDescription } from '@/lib/notification-navigation';
 
 interface NotificationBellProps {
   className?: string;
@@ -28,10 +29,12 @@ export function NotificationBell({ className = '', language = 'en' }: Notificati
   const router = useRouter();
   const { user } = useAuth();
 
-  const handleNotificationClick = async (notificationId: string, isRead: boolean) => {
-    if (!isRead) {
-      await markAsRead(notificationId);
-    }
+  const handleNotificationItemClick = async (notification: any) => {
+    // Close the dropdown
+    setIsOpen(false);
+    
+    // Handle navigation and mark as read
+    await handleNotificationClick(notification, user?.role, router, markAsRead);
   };
 
   const handleMarkAllRead = async () => {
@@ -46,6 +49,15 @@ export function NotificationBell({ className = '', language = 'en' }: Notificati
         return '🔄';
       case 'SHIPPING_UPDATE':
         return '🚚';
+      case 'TICKET_CREATED':
+        return '🎫';
+      case 'TICKET_UPDATED':
+        return '📝';
+      case 'TICKET_MESSAGE':
+      case 'NEW_TICKET_MESSAGE':
+        return '💬';
+      case 'TICKET_STATUS_UPDATED':
+        return '🔄';
       case 'SYSTEM_ALERT':
         return '⚠️';
       default:
@@ -61,6 +73,15 @@ export function NotificationBell({ className = '', language = 'en' }: Notificati
         return 'border-l-green-500';
       case 'SHIPPING_UPDATE':
         return 'border-l-purple-500';
+      case 'TICKET_CREATED':
+        return 'border-l-indigo-500';
+      case 'TICKET_UPDATED':
+        return 'border-l-cyan-500';
+      case 'TICKET_MESSAGE':
+      case 'NEW_TICKET_MESSAGE':
+        return 'border-l-teal-500';
+      case 'TICKET_STATUS_UPDATED':
+        return 'border-l-orange-500';
       case 'SYSTEM_ALERT':
         return 'border-l-red-500';
       default:
@@ -162,12 +183,13 @@ export function NotificationBell({ className = '', language = 'en' }: Notificati
                   {notifications.slice(0, 5).map((notification) => (
                     <div
                       key={notification.id}
-                      onClick={() => handleNotificationClick(notification.id, notification.isRead)}
+                      onClick={() => handleNotificationItemClick(notification)}
                       className={`px-4 py-3 cursor-pointer transition-colors duration-150 border-l-4 ${
                         notification.isRead
                           ? 'bg-white hover:bg-gray-50'
                           : 'bg-blue-50 hover:bg-blue-100'
-                      } ${getNotificationColor(notification.type)}`}
+                      } ${getNotificationColor(notification.type)} group`}
+                      title={getNotificationNavigationDescription(notification, user?.role)}
                     >
                       <div className="flex items-start space-x-3">
                         {/* Notification Icon */}

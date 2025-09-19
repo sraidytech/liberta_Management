@@ -79,6 +79,7 @@ export class TicketsController {
         priority,
         category,
         orderId,
+        orderReference,
         page = '1',
         limit = '20'
       } = req.query;
@@ -102,6 +103,10 @@ export class TicketsController {
 
       if (orderId) {
         filters.orderId = orderId as string;
+      }
+
+      if (orderReference) {
+        filters.orderReference = orderReference as string;
       }
 
       const result = await TicketService.getTicketsForUser(userId, filters);

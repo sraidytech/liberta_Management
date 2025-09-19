@@ -5,6 +5,8 @@ import { Bell, Check, CheckCheck, Filter, RefreshCw, Trash2 } from 'lucide-react
 import { useNotifications } from '@/contexts/NotificationContext';
 import { createTranslator, Language } from '@/lib/i18n';
 import { formatDistanceToNow } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import { handleNotificationClick, getNotificationNavigationDescription } from '@/lib/notification-navigation';
 
 interface NotificationListProps {
   language?: Language;
@@ -12,6 +14,7 @@ interface NotificationListProps {
 }
 
 export function NotificationList({ language = 'en', userRole }: NotificationListProps) {
+  const router = useRouter();
   const {
     notifications,
     unreadCount,
@@ -70,6 +73,15 @@ export function NotificationList({ language = 'en', userRole }: NotificationList
         return '🔄';
       case 'SHIPPING_UPDATE':
         return '🚚';
+      case 'TICKET_CREATED':
+        return '🎫';
+      case 'TICKET_UPDATED':
+        return '📝';
+      case 'TICKET_MESSAGE':
+      case 'NEW_TICKET_MESSAGE':
+        return '💬';
+      case 'TICKET_STATUS_UPDATED':
+        return '🔄';
       case 'SYSTEM_ALERT':
         return '⚠️';
       default:
@@ -85,6 +97,15 @@ export function NotificationList({ language = 'en', userRole }: NotificationList
         return 'border-l-green-500 bg-green-50';
       case 'SHIPPING_UPDATE':
         return 'border-l-purple-500 bg-purple-50';
+      case 'TICKET_CREATED':
+        return 'border-l-indigo-500 bg-indigo-50';
+      case 'TICKET_UPDATED':
+        return 'border-l-cyan-500 bg-cyan-50';
+      case 'TICKET_MESSAGE':
+      case 'NEW_TICKET_MESSAGE':
+        return 'border-l-teal-500 bg-teal-50';
+      case 'TICKET_STATUS_UPDATED':
+        return 'border-l-orange-500 bg-orange-50';
       case 'SYSTEM_ALERT':
         return 'border-l-red-500 bg-red-50';
       default:
@@ -100,6 +121,15 @@ export function NotificationList({ language = 'en', userRole }: NotificationList
         return t('orderUpdate');
       case 'SHIPPING_UPDATE':
         return t('shippingUpdate');
+      case 'TICKET_CREATED':
+        return 'Ticket Created';
+      case 'TICKET_UPDATED':
+        return 'Ticket Updated';
+      case 'TICKET_MESSAGE':
+      case 'NEW_TICKET_MESSAGE':
+        return 'Ticket Message';
+      case 'TICKET_STATUS_UPDATED':
+        return 'Ticket Status';
       case 'SYSTEM_ALERT':
         return t('systemAlert');
       default:
@@ -114,7 +144,7 @@ export function NotificationList({ language = 'en', userRole }: NotificationList
     return true;
   });
 
-  const notificationTypes = ['ORDER_ASSIGNMENT', 'ORDER_UPDATE', 'SHIPPING_UPDATE', 'SYSTEM_ALERT'];
+  const notificationTypes = ['ORDER_ASSIGNMENT', 'ORDER_UPDATE', 'SHIPPING_UPDATE', 'TICKET_CREATED', 'TICKET_UPDATED', 'TICKET_MESSAGE', 'NEW_TICKET_MESSAGE', 'TICKET_STATUS_UPDATED', 'SYSTEM_ALERT'];
 
   return (
     <div className="max-w-4xl mx-auto p-6">
@@ -240,12 +270,13 @@ export function NotificationList({ language = 'en', userRole }: NotificationList
           filteredNotifications.map((notification) => (
             <div
               key={notification.id}
-              className={`p-4 border-l-4 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md cursor-pointer ${
+              className={`p-4 border-l-4 rounded-lg shadow-sm transition-all duration-200 hover:shadow-md cursor-pointer group ${
                 notification.isRead
                   ? 'bg-white border-l-gray-300'
                   : getNotificationColor(notification.type)
               }`}
-              onClick={() => !notification.isRead && markAsRead(notification.id)}
+              onClick={() => handleNotificationClick(notification, userRole, router, markAsRead)}
+              title={getNotificationNavigationDescription(notification, userRole)}
             >
               <div className="flex items-start space-x-4">
                 {/* Icon */}

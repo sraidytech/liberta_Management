@@ -1,7 +1,8 @@
 'use client';
 
 import AgentLayout from '@/components/agent/agent-layout';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -95,11 +96,12 @@ interface Order {
   };
 }
 
-export default function AgentOrdersPage() {
+function AgentOrdersPageContent() {
   const { user } = useAuth();
   const { language } = useLanguage();
   const t = createTranslator(language);
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
   const [orders, setOrders] = useState<Order[]>([]);
   const [orderTicketCounts, setOrderTicketCounts] = useState<Record<string, number>>({});
   const [totalAssignedOrders, setTotalAssignedOrders] = useState<number>(0);
@@ -753,6 +755,14 @@ export default function AgentOrdersPage() {
     };
     localStorage.setItem('agentOrderFilters', JSON.stringify(filters));
   }, [hideDeliveredOrders, selectedNoteTypes, showOnlyOrdersWithNotes]);
+
+  // Handle URL search parameters
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch) {
+      setSearch(urlSearch);
+    }
+  }, [searchParams]);
 
   // Reset to page 1 when search or filters change
   useEffect(() => {
@@ -2703,5 +2713,15 @@ export default function AgentOrdersPage() {
         )}
       </div>
     </AgentLayout>
+  );
+}
+
+export default function AgentOrdersPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+    </div>}>
+      <AgentOrdersPageContent />
+    </Suspense>
   );
 }
