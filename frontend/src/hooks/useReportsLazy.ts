@@ -49,6 +49,8 @@ interface SalesData {
     revenue: number;
     quantity: number;
     orders: number;
+    deliveredOrders: number;
+    deliveryRate: number;
   }>;
   monthlyComparison: Array<{
     month: string;
@@ -608,9 +610,9 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     }
   }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
 
-  // Refresh data when filters change (only for active tab)
+  // Refresh data when filters change - clear ALL data to ensure filters apply everywhere
   useEffect(() => {
-    // Clear existing data when filters change
+    // Clear ALL existing data when filters change to ensure consistency across tabs
     setTabData({
       sales: null,
       agents: null,
@@ -619,7 +621,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       customers: null
     });
     
-    // Fetch data for current active tab
+    // Only fetch data for current active tab (other tabs will fetch when accessed)
     switch (activeTab) {
       case 'sales':
         fetchSalesData();

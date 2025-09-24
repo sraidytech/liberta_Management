@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
-import { 
-  Users, 
-  TrendingUp, 
-  Activity, 
+import {
+  Users,
+  TrendingUp,
+  Activity,
   Target,
   Clock,
   CheckCircle,
@@ -14,8 +14,47 @@ import {
   BarChart3,
   Zap,
   Award,
-  User
+  User,
+  Info,
+  ShoppingCart,
+  Truck
 } from 'lucide-react';
+
+// Tooltip Component
+interface TooltipProps {
+  content: string;
+  children: React.ReactNode;
+}
+
+function Tooltip({ content, children }: TooltipProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+        className="cursor-help"
+      >
+        {children}
+      </div>
+      {isVisible && (
+        <div className="fixed inset-0 z-[10000] pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="bg-white border-2 border-gray-200 text-gray-800 text-sm leading-relaxed rounded-lg px-4 py-3 max-w-[400px] shadow-2xl">
+              <div className="flex items-start space-x-2">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="break-words">
+                  {content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface AgentData {
   summary: {
@@ -27,6 +66,10 @@ interface AgentData {
     totalRevenue: number;
     averageSuccessRate: number;
     averageNoteCompletionRate: number;
+    // Key Statistics
+    deliveredOrders?: number;
+    cancelledOrders?: number;
+    deliveryRate?: number;
   };
   agentPerformance: Array<{
     id: string;
@@ -232,6 +275,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                 <p className="text-blue-100 font-medium">
                   {language === 'fr' ? 'Agents Totaux' : 'Total Agents'}
                 </p>
+                <Tooltip content={language === 'fr' ?
+                  'Nombre total d\'agents enregistrés dans le système, incluant tous les statuts' :
+                  'Total number of agents registered in the system, including all statuses'}>
+                  <Info className="w-4 h-4 text-blue-200 hover:text-white cursor-help" />
+                </Tooltip>
               </div>
               <p className="text-3xl font-bold mb-2">
                 {data.summary.totalAgents}
@@ -256,6 +304,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                 <p className="text-emerald-100 font-medium">
                   {language === 'fr' ? 'Score Qualité Moy.' : 'Avg Quality Score'}
                 </p>
+                <Tooltip content={language === 'fr' ?
+                  'Score de qualité moyen calculé sur la base des performances, notes et objectifs atteints' :
+                  'Average quality score calculated based on performance, notes and goals achieved'}>
+                  <Info className="w-4 h-4 text-emerald-200 hover:text-white cursor-help" />
+                </Tooltip>
               </div>
               <p className="text-3xl font-bold mb-2">
                 {data.summary.averageQualityScore.toFixed(1)}%
@@ -280,6 +333,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                 <p className="text-purple-100 font-medium">
                   {language === 'fr' ? 'Commandes Traitées' : 'Orders Handled'}
                 </p>
+                <Tooltip content={language === 'fr' ?
+                  'Nombre total de commandes assignées et traitées par tous les agents dans la période' :
+                  'Total number of orders assigned and handled by all agents in the period'}>
+                  <Info className="w-4 h-4 text-purple-200 hover:text-white cursor-help" />
+                </Tooltip>
               </div>
               <p className="text-3xl font-bold mb-2">
                 {formatNumber(data.summary.totalOrders)}
@@ -304,6 +362,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                 <p className="text-orange-100 font-medium">
                   {language === 'fr' ? 'CA Généré' : 'Revenue Generated'}
                 </p>
+                <Tooltip content={language === 'fr' ?
+                  'Chiffre d\'affaires total généré par les commandes traitées par les agents' :
+                  'Total revenue generated from orders handled by agents'}>
+                  <Info className="w-4 h-4 text-orange-200 hover:text-white cursor-help" />
+                </Tooltip>
               </div>
               <p className="text-3xl font-bold mb-2">
                 {formatCurrency(data.summary.totalRevenue)}
@@ -317,6 +380,135 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
             </div>
           </div>
           <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-white/10 rounded-full"></div>
+        </div>
+      </div>
+
+      {/* Key Statistics Section */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-1">
+              {language === 'fr' ? 'Statistiques Clés des Agents' : 'Agent Key Statistics'}
+            </h3>
+            <p className="text-gray-600">
+              {language === 'fr' ? 'Indicateurs essentiels de performance des agents' : 'Essential agent performance indicators'}
+            </p>
+          </div>
+          <BarChart3 className="w-8 h-8 text-gray-400" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Total Orders */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <ShoppingCart className="w-5 h-5 text-blue-600" />
+                  <p className="text-blue-700 font-medium text-sm">
+                    {language === 'fr' ? 'Total Commandes' : 'Total Orders'}
+                  </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Nombre total de commandes assignées aux agents dans la période sélectionnée' :
+                    'Total number of orders assigned to agents in the selected period'}>
+                    <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-blue-600 mb-1">
+                  {formatNumber(data.summary.totalOrders)}
+                </p>
+                <p className="text-sm text-blue-600">
+                  {language === 'fr' ? 'assignées aux agents' : 'assigned to agents'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                <ShoppingCart className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Delivered Orders */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  <p className="text-green-700 font-medium text-sm">
+                    {language === 'fr' ? 'Commandes Livrées' : 'Orders Delivered'}
+                  </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Nombre de commandes traitées par les agents et livrées avec succès' :
+                    'Number of orders handled by agents and successfully delivered'}>
+                    <Info className="w-4 h-4 text-green-500 cursor-help" />
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-green-600 mb-1">
+                  {formatNumber(data.summary.deliveredOrders || Math.round(data.summary.totalOrders * (data.summary.averageSuccessRate / 100)))}
+                </p>
+                <p className="text-sm text-green-600">
+                  {language === 'fr' ? 'livrées avec succès' : 'successfully delivered'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Delivery Rate */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Truck className="w-5 h-5 text-purple-600" />
+                  <p className="text-purple-700 font-medium text-sm">
+                    {language === 'fr' ? 'Taux de Livraison' : 'Delivery Rate'}
+                  </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Pourcentage moyen de commandes livrées par les agents: Taux de succès moyen' :
+                    'Average percentage of orders delivered by agents: Average success rate'}>
+                    <Info className="w-4 h-4 text-purple-500 cursor-help" />
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-purple-600 mb-1">
+                  {data.summary.averageSuccessRate.toFixed(1)}%
+                </p>
+                <p className="text-sm text-purple-600">
+                  {language === 'fr' ? 'taux de succès moyen' : 'average success rate'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Truck className="w-6 h-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+
+          {/* Cancelled Orders */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-6 border border-red-100">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <XCircle className="w-5 h-5 text-red-600" />
+                  <p className="text-red-700 font-medium text-sm">
+                    {language === 'fr' ? 'Commandes Annulées' : 'Orders Cancelled'}
+                  </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Estimation des commandes annulées basée sur le taux d\'échec moyen des agents' :
+                    'Estimated cancelled orders based on average agent failure rate'}>
+                    <Info className="w-4 h-4 text-red-500 cursor-help" />
+                  </Tooltip>
+                </div>
+                <p className="text-2xl font-bold text-red-600 mb-1">
+                  {formatNumber(data.summary.cancelledOrders || Math.round(data.summary.totalOrders * ((100 - data.summary.averageSuccessRate) / 100)))}
+                </p>
+                <p className="text-sm text-red-600">
+                  {language === 'fr' ? 'annulations estimées' : 'estimated cancellations'}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                <XCircle className="w-6 h-6 text-red-600" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -607,6 +799,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   <p className="text-green-700 font-medium text-sm">
                     {language === 'fr' ? 'Atteinte Objectifs' : 'Goal Achievement'}
                   </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Pourcentage moyen d\'atteinte des objectifs fixés par les agents (basé sur les quotas et performances)' :
+                    'Average percentage of goal achievement by agents (based on quotas and performance)'}>
+                    <Info className="w-4 h-4 text-green-500 cursor-help" />
+                  </Tooltip>
                 </div>
                 <p className="text-2xl font-bold text-green-600 mb-1">
                   {data.summary.averageGoalAchievement.toFixed(1)}%
@@ -630,6 +827,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   <p className="text-blue-700 font-medium text-sm">
                     {language === 'fr' ? 'Complétion Notes' : 'Note Completion'}
                   </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Pourcentage de commandes avec notes ajoutées par rapport au total des commandes traitées' :
+                    'Percentage of orders with notes added compared to total orders handled'}>
+                    <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                  </Tooltip>
                 </div>
                 <p className="text-2xl font-bold text-blue-600 mb-1">
                   {data.summary.averageNoteCompletionRate.toFixed(1)}%
@@ -653,6 +855,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   <p className="text-orange-700 font-medium text-sm">
                     {language === 'fr' ? 'Taux Succès Moy.' : 'Avg Success Rate'}
                   </p>
+                  <Tooltip content={language === 'fr' ?
+                    'Pourcentage moyen de commandes livrées avec succès par rapport aux commandes assignées' :
+                    'Average percentage of successfully delivered orders compared to assigned orders'}>
+                    <Info className="w-4 h-4 text-orange-500 cursor-help" />
+                  </Tooltip>
                 </div>
                 <p className="text-2xl font-bold text-orange-600 mb-1">
                   {data.summary.averageSuccessRate.toFixed(1)}%
@@ -719,56 +926,6 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
         </div>
       </div>
 
-      {/* Workload Distribution */}
-      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-gray-900 mb-1">
-              {language === 'fr' ? 'Répartition de la Charge' : 'Workload Distribution'}
-            </h3>
-            <p className="text-gray-600">
-              {language === 'fr' ? 'Charge de travail actuelle' : 'Current workload'}
-            </p>
-          </div>
-          <Zap className="w-8 h-8 text-gray-400" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {data.workloadDistribution.slice(0, 6).map((agent) => (
-            <div key={agent.id} className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl hover:from-blue-50 hover:to-blue-100 transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <span className="text-white font-bold text-xs">{agent.name?.[0] || 'A'}</span>
-                  </div>
-                  <span className="font-medium text-gray-900 text-sm truncate">{agent.name}</span>
-                </div>
-                <span className="text-xs font-medium text-gray-600">
-                  {agent.workloadPercentage.toFixed(0)}%
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      agent.workloadPercentage >= 80 ? 'bg-red-500' :
-                      agent.workloadPercentage >= 60 ? 'bg-amber-500' :
-                      'bg-emerald-500'
-                    }`}
-                    style={{ width: `${Math.min(agent.workloadPercentage, 100)}%` }}
-                  ></div>
-                </div>
-
-                <div className="flex justify-between text-xs text-gray-600">
-                  <span>{agent.currentOrders}/{agent.maxOrders} {language === 'fr' ? 'commandes' : 'orders'}</span>
-                  <span>{agent.activeOrders} {language === 'fr' ? 'actives' : 'active'}</span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Notes Activity Analysis Section */}
       {agentNotesData && (
@@ -776,9 +933,16 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-1">
-                  {language === 'fr' ? 'Analyse d\'Activité des Notes' : 'Notes Activity Analysis'}
-                </h3>
+                <div className="flex items-center space-x-2 mb-1">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    {language === 'fr' ? 'Analyse d\'Activité des Notes' : 'Notes Activity Analysis'}
+                  </h3>
+                  <Tooltip content={language === 'fr' ?
+                    'Analyse complète de l\'activité des agents basée sur leurs notes: fréquence, qualité, temps de réponse et distribution horaire' :
+                    'Complete analysis of agent activity based on their notes: frequency, quality, response time and hourly distribution'}>
+                    <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                  </Tooltip>
+                </div>
                 <p className="text-gray-600">
                   {language === 'fr' ? 'Performance détaillée basée sur l\'activité des notes' : 'Detailed performance based on notes activity'}
                 </p>
@@ -799,6 +963,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                       <p className="text-indigo-100 font-medium">
                         {language === 'fr' ? 'Total des Notes' : 'Total Notes'}
                       </p>
+                      <Tooltip content={language === 'fr' ?
+                        'Nombre total de notes ajoutées par tous les agents dans la période sélectionnée' :
+                        'Total number of notes added by all agents in the selected period'}>
+                        <Info className="w-4 h-4 text-indigo-200 hover:text-white cursor-help" />
+                      </Tooltip>
                     </div>
                     <p className="text-3xl font-bold mb-2">
                       {formatNumber(agentNotesData.summary.totalNotes)}
@@ -823,6 +992,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                       <p className="text-green-100 font-medium">
                         {language === 'fr' ? 'Agents Actifs' : 'Active Agents'}
                       </p>
+                      <Tooltip content={language === 'fr' ?
+                        'Nombre d\'agents ayant ajouté au moins une note dans la période sélectionnée' :
+                        'Number of agents who added at least one note in the selected period'}>
+                        <Info className="w-4 h-4 text-green-200 hover:text-white cursor-help" />
+                      </Tooltip>
                     </div>
                     <p className="text-3xl font-bold mb-2">
                       {agentNotesData.summary.activeAgents}
@@ -847,6 +1021,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                       <p className="text-amber-100 font-medium">
                         {language === 'fr' ? 'Moy. par Agent' : 'Avg per Agent'}
                       </p>
+                      <Tooltip content={language === 'fr' ?
+                        'Nombre moyen de notes ajoutées par agent actif dans la période' :
+                        'Average number of notes added per active agent in the period'}>
+                        <Info className="w-4 h-4 text-amber-200 hover:text-white cursor-help" />
+                      </Tooltip>
                     </div>
                     <p className="text-3xl font-bold mb-2">
                       {agentNotesData.summary.averageNotesPerAgent.toFixed(1)}
@@ -871,6 +1050,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                       <p className="text-purple-100 font-medium">
                         {language === 'fr' ? 'Score Qualité' : 'Quality Score'}
                       </p>
+                      <Tooltip content={language === 'fr' ?
+                        'Score de qualité moyen des notes basé sur la longueur, fréquence et consistance des notes' :
+                        'Average quality score of notes based on length, frequency and consistency of notes'}>
+                        <Info className="w-4 h-4 text-purple-200 hover:text-white cursor-help" />
+                      </Tooltip>
                     </div>
                     <p className="text-3xl font-bold mb-2">
                       {agentNotesData.summary.averageQualityScore.toFixed(1)}%
@@ -892,9 +1076,16 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h4 className="text-lg font-bold text-gray-900 mb-1">
-                      {language === 'fr' ? 'Meilleurs Performeurs de Notes' : 'Top Notes Performers'}
-                    </h4>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <h4 className="text-lg font-bold text-gray-900">
+                        {language === 'fr' ? 'Meilleurs Performeurs de Notes' : 'Top Notes Performers'}
+                      </h4>
+                      <Tooltip content={language === 'fr' ?
+                        'Top 5 des agents avec les meilleurs scores de qualité de notes basés sur productivité et consistance' :
+                        'Top 5 agents with best note quality scores based on productivity and consistency'}>
+                        <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </Tooltip>
+                    </div>
                     <p className="text-gray-600">
                       {language === 'fr' ? 'Classés par score de qualité' : 'Ranked by quality score'}
                     </p>
@@ -942,9 +1133,16 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
               <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h4 className="text-lg font-bold text-gray-900 mb-1">
-                      {language === 'fr' ? 'Heures de Pointe Globales' : 'Global Peak Hours'}
-                    </h4>
+                    <div className="flex items-center space-x-2 mb-1">
+                      <h4 className="text-lg font-bold text-gray-900">
+                        {language === 'fr' ? 'Heures de Pointe Globales' : 'Global Peak Hours'}
+                      </h4>
+                      <Tooltip content={language === 'fr' ?
+                        'Distribution des notes par heure de la journée montrant les heures de plus forte activité des agents' :
+                        'Distribution of notes by hour of day showing peak activity hours for agents'}>
+                        <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </Tooltip>
+                    </div>
                     <p className="text-gray-600">
                       {language === 'fr' ? 'Distribution horaire des notes' : 'Hourly distribution of notes'}
                     </p>
@@ -999,9 +1197,16 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h4 className="text-lg font-bold text-gray-900 mb-1">
-                    {language === 'fr' ? 'Performance Détaillée des Notes' : 'Detailed Notes Performance'}
-                  </h4>
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h4 className="text-lg font-bold text-gray-900">
+                      {language === 'fr' ? 'Performance Détaillée des Notes' : 'Detailed Notes Performance'}
+                    </h4>
+                    <Tooltip content={language === 'fr' ?
+                      'Tableau détaillé des métriques de notes pour chaque agent: total, qualité, temps de réponse, longueur moyenne' :
+                      'Detailed table of note metrics for each agent: total, quality, response time, average length'}>
+                      <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                    </Tooltip>
+                  </div>
                   <p className="text-gray-600">
                     {language === 'fr' ? 'Métriques complètes par agent' : 'Complete metrics per agent'}
                   </p>

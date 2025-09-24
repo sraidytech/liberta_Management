@@ -455,7 +455,7 @@ export class AnalyticsController {
       }
 
       const agentPerformanceData = await prisma.$queryRaw<AgentPerformanceRaw[]>`
-        SELECT 
+        SELECT
           u.id,
           u.name,
           u."agentCode",
@@ -466,8 +466,8 @@ export class AnalyticsController {
           -- Total orders count
           COUNT(DISTINCT o.id) as total_orders,
           
-          -- Completed orders count
-          COUNT(DISTINCT CASE WHEN o.status = 'DELIVERED' THEN o.id END) as completed_orders,
+          -- Completed orders count (using shipping status LIVRÉ)
+          COUNT(DISTINCT CASE WHEN o."shippingStatus" = 'LIVRÉ' THEN o.id END) as completed_orders,
           
           -- Confirmed orders count
           COUNT(DISTINCT CASE WHEN o.status = 'CONFIRMED' THEN o.id END) as confirmed_orders,
@@ -475,22 +475,22 @@ export class AnalyticsController {
           -- Cancelled orders count
           COUNT(DISTINCT CASE WHEN o.status = 'CANCELLED' THEN o.id END) as cancelled_orders,
           
-          -- Total revenue (only delivered orders)
-          COALESCE(SUM(CASE WHEN o.status = 'DELIVERED' THEN o.total ELSE 0 END), 0) as total_revenue,
+          -- Total revenue (only delivered orders with shipping status LIVRÉ)
+          COALESCE(SUM(CASE WHEN o."shippingStatus" = 'LIVRÉ' THEN o.total ELSE 0 END), 0) as total_revenue,
           
           -- Activities count
           COUNT(DISTINCT aa.id) as total_activities
           
         FROM users u
-        LEFT JOIN orders o ON u.id = o."assignedAgentId" 
+        LEFT JOIN orders o ON u.id = o."assignedAgentId"
           AND o."createdAt" >= ${startDateUTC}
-        LEFT JOIN agent_activities aa ON u.id = aa."agentId" 
+        LEFT JOIN agent_activities aa ON u.id = aa."agentId"
           AND aa."createdAt" >= ${startDateUTC}
-        WHERE 
+        WHERE
           u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
           AND u."isActive" = true
-        GROUP BY 
-          u.id, u.name, u."agentCode", u.availability, 
+        GROUP BY
+          u.id, u.name, u."agentCode", u.availability,
           u."currentOrders", u."maxOrders"
         ORDER BY total_orders DESC
       `;
@@ -557,17 +557,20 @@ export class AnalyticsController {
           cancelledOrders,
           totalRevenue,
           averageOrderValue: parseFloat(averageOrderValue),
-          successRate: `${successRate}%`,
-          confirmationRate: `${confirmationRate}%`,
-          cancellationRate: `${cancellationRate}%`,
-          activities: totalActivities,
-          // Removed utilization - replaced with quality metrics
-          qualityScore: qualityScore.toFixed(1),
-          goalAchievementRate: goalAchievementRate.toFixed(1),
-          activityConsistency: activityConsistency.toFixed(1),
-          noteCompletionRate: noteCompletionRate.toFixed(1),
-          orderSuccessWithNotesRate: orderSuccessWithNotesRate.toFixed(1),
-          performanceScore: qualityScore.toFixed(1)
+          successRate: parseFloat(successRate),
+          confirmationRate: parseFloat(confirmationRate),
+          cancellationRate: parseFloat(cancellationRate),
+          totalActivities,
+          // NEW: Quality metrics based on orders with notes and LIVRÉ status
+          qualityScore: parseFloat(qualityScore.toFixed(1)),
+          goalAchievementRate: parseFloat(goalAchievementRate.toFixed(1)),
+          activityConsistency: parseFloat(activityConsistency.toFixed(1)),
+          noteCompletionRate: parseFloat(noteCompletionRate.toFixed(1)),
+          orderSuccessWithNotesRate: parseFloat(noteCompletionRate.toFixed(1)),
+          avgResponseTime: 0,
+          ordersPerDay: totalOrders > 0 ? parseFloat((totalOrders / days).toFixed(1)) : 0,
+          totalWorkingHours: 0,
+          performanceScore: parseFloat(qualityScore.toFixed(1))
         };
       });
 
@@ -661,10 +664,19 @@ export class AnalyticsController {
           if (maxRevenue) whereClause.total.lte = parseFloat(maxRevenue as string);
         }
 
-        // Revenue where clause (only delivered orders)
+        // Revenue where clause (delivered orders - use both status and shipping status)
         const revenueWhereClause: any = {
           ...whereClause,
-          status: OrderStatus.DELIVERED
+          OR: [
+            { status: OrderStatus.DELIVERED },
+            { shippingStatus: 'LIVRÉ' }
+          ]
+        };
+
+        // Shipping status where clause (for shipping-specific queries)
+        const shippingDeliveredWhereClause: any = {
+          ...whereClause,
+          shippingStatus: 'LIVRÉ'
         };
 
         // All orders where clause (for conversion metrics)
@@ -718,24 +730,95 @@ export class AnalyticsController {
             _count: { id: true }
           }),
   
-          // Revenue by status
+          // Revenue by shipping status (instead of order status)
           prisma.order.groupBy({
-            by: ['status'],
-            where: whereClause,
+            by: ['shippingStatus'],
+            where: { ...whereClause, shippingStatus: { not: null } },
             _sum: { total: true },
             _count: { id: true }
           }),
   
-          // Top products by revenue (delivered orders only)
-          prisma.orderItem.groupBy({
-            by: ['title'],
-            where: {
-              order: revenueWhereClause
-            },
-            _sum: { totalPrice: true, quantity: true },
-            _count: { id: true },
-            orderBy: { _sum: { totalPrice: 'desc' } },
-            take: 10
+          // Top products with detailed metrics - sorted by delivered orders count (top sellers)
+          Promise.all([
+            // Get all products with total orders and revenue (all statuses)
+            prisma.orderItem.groupBy({
+              by: ['title'],
+              where: {
+                order: whereClause
+              },
+              _sum: { totalPrice: true, quantity: true },
+              _count: { id: true }
+            }),
+            // Get delivered products with revenue (based on delivered status)
+            prisma.orderItem.groupBy({
+              by: ['title'],
+              where: {
+                order: revenueWhereClause
+              },
+              _sum: { totalPrice: true, quantity: true },
+              _count: { id: true }
+            }),
+            // Get products delivered by shipping status for delivery rate calculation
+            prisma.orderItem.groupBy({
+              by: ['title'],
+              where: {
+                order: shippingDeliveredWhereClause
+              },
+              _count: { id: true }
+            })
+          ]).then(([allProducts, deliveredProducts, shippingDeliveredProducts]) => {
+            // Create maps for quick lookup
+            const allProductsMap = new Map();
+            allProducts.forEach(item => {
+              allProductsMap.set(item.title, {
+                totalOrders: item._count.id,
+                totalQuantity: item._sum.quantity || 0,
+                totalRevenue: item._sum.totalPrice || 0
+              });
+            });
+            
+            const deliveredProductsMap = new Map();
+            deliveredProducts.forEach(item => {
+              deliveredProductsMap.set(item.title, {
+                deliveredOrders: item._count.id,
+                deliveredRevenue: item._sum.totalPrice || 0,
+                deliveredQuantity: item._sum.quantity || 0
+              });
+            });
+            
+            const shippingDeliveredMap = new Map();
+            shippingDeliveredProducts.forEach(item => {
+              shippingDeliveredMap.set(item.title, item._count.id);
+            });
+            
+            // Combine all data and sort by delivered orders count (top sellers)
+            const combinedProducts: any[] = [];
+            
+            // Use all products as base and add delivered data
+            allProducts.forEach(item => {
+              const allData = allProductsMap.get(item.title) || { totalOrders: 0, totalQuantity: 0, totalRevenue: 0 };
+              const deliveredData = deliveredProductsMap.get(item.title) || { deliveredOrders: 0, deliveredRevenue: 0, deliveredQuantity: 0 };
+              const shippingDeliveredOrders = shippingDeliveredMap.get(item.title) || 0;
+              
+              // Use the maximum of delivered orders from both sources
+              const actualDeliveredOrders = Math.max(deliveredData.deliveredOrders, shippingDeliveredOrders);
+              
+              combinedProducts.push({
+                title: item.title,
+                _sum: {
+                  totalPrice: allData.totalRevenue, // Total revenue from all orders
+                  quantity: allData.totalQuantity // Total quantity from all orders
+                },
+                _count: { id: allData.totalOrders }, // Total orders (all statuses)
+                deliveredOrders: actualDeliveredOrders, // Delivered orders count
+                deliveryRate: allData.totalOrders > 0 ? (actualDeliveredOrders / allData.totalOrders) * 100 : 0
+              });
+            });
+            
+            // Sort by delivered orders count (descending) - top sellers first
+            return combinedProducts
+              .sort((a, b) => b.deliveredOrders - a.deliveredOrders)
+              .slice(0, 10);
           }),
   
           // Commission data (if available)
@@ -828,11 +911,24 @@ export class AnalyticsController {
         const avgOrdersPerCustomer = uniqueCustomers > 0 ? totalDeliveredOrders / uniqueCustomers : 0;
         const customerLifetimeValue = avgOrdersPerCustomer * (totalRevenue / totalDeliveredOrders || 0);
 
+        // Calculate delivered orders from shipping status (use correct uppercase)
+        const deliveredOrdersFromShipping = revenueByStatus.find(s => s.shippingStatus === 'LIVRÉ')?._count.id || 0;
+        const deliveredOrdersFromOrderStatus = conversionMetrics.find(s => s.status === 'DELIVERED')?._count.id || 0;
+        const cancelledOrdersFromStatus = conversionMetrics.find(s => s.status === 'CANCELLED')?._count.id || 0;
+        
+        // Total delivered orders (combine both shipping status and order status)
+        const totalDeliveredOrdersActual = Math.max(deliveredOrdersFromShipping, deliveredOrdersFromOrderStatus, totalDeliveredOrders);
+        const deliveryRate = totalAllOrders > 0 ? (totalDeliveredOrdersActual / totalAllOrders) * 100 : 0;
+
         const salesReport = {
           summary: {
             totalRevenue,
             totalOrders: totalDeliveredOrders,
             averageOrderValue: totalDeliveredOrders > 0 ? totalRevenue / totalDeliveredOrders : 0,
+            // Key Statistics for frontend
+            deliveredOrders: totalDeliveredOrdersActual,
+            cancelledOrders: cancelledOrdersFromStatus,
+            deliveryRate: deliveryRate,
             // New Financial KPIs
             grossMargin,
             grossMarginPercentage,
@@ -854,7 +950,7 @@ export class AnalyticsController {
             orders: item._count.id
           })),
           revenueByStatus: revenueByStatus.map(item => ({
-            status: item.status,
+            status: item.shippingStatus || 'Unknown',
             revenue: item._sum.total || 0,
             orders: item._count.id
           })),
@@ -862,8 +958,10 @@ export class AnalyticsController {
             product: item.title,
             revenue: item._sum.totalPrice || 0,
             quantity: item._sum.quantity || 0,
-            orders: item._count.id
-          })),
+            orders: item._count.id,
+            deliveredOrders: item.deliveredOrders || 0,
+            deliveryRate: item.deliveryRate || 0
+          })).sort((a, b) => b.revenue - a.revenue), // Sort by revenue (best sellers first)
           monthlyComparison: monthlyData
         };
   

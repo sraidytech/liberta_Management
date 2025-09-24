@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import { 
   Calendar, 
@@ -33,6 +33,10 @@ interface ReportsFiltersProps {
 export default function ReportsFilters({ filters, onFiltersChange }: ReportsFiltersProps) {
   const { language } = useLanguage();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [localCustomDates, setLocalCustomDates] = useState({
+    startDate: filters.startDate,
+    endDate: filters.endDate
+  });
 
   const dateRangeOptions = [
     { value: 'today', label: language === 'fr' ? 'Aujourd\'hui' : 'Today' },
@@ -74,7 +78,23 @@ export default function ReportsFilters({ filters, onFiltersChange }: ReportsFilt
     onFiltersChange(newFilters);
   };
 
+  const handleCustomDateChange = useCallback((key: 'startDate' | 'endDate', value: string) => {
+    const newLocalDates = { ...localCustomDates, [key]: value };
+    setLocalCustomDates(newLocalDates);
+    
+    // Only trigger filter change if both dates are filled
+    if (newLocalDates.startDate && newLocalDates.endDate) {
+      const newFilters = {
+        ...filters,
+        startDate: newLocalDates.startDate,
+        endDate: newLocalDates.endDate
+      };
+      onFiltersChange(newFilters);
+    }
+  }, [localCustomDates, filters, onFiltersChange]);
+
   const clearFilters = () => {
+    setLocalCustomDates({ startDate: '', endDate: '' });
     onFiltersChange({
       dateRange: 'last30days',
       startDate: '',
@@ -131,7 +151,20 @@ export default function ReportsFilters({ filters, onFiltersChange }: ReportsFilt
             </label>
             <select
               value={filters.dateRange}
-              onChange={(e) => handleFilterChange('dateRange', e.target.value)}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                handleFilterChange('dateRange', newValue);
+                // Reset local custom dates when switching away from custom
+                if (newValue !== 'custom') {
+                  setLocalCustomDates({ startDate: '', endDate: '' });
+                } else {
+                  // Initialize with current filter values when switching to custom
+                  setLocalCustomDates({
+                    startDate: filters.startDate,
+                    endDate: filters.endDate
+                  });
+                }
+              }}
               className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             >
               {dateRangeOptions.map(option => (
@@ -191,8 +224,8 @@ export default function ReportsFilters({ filters, onFiltersChange }: ReportsFilt
               </label>
               <input
                 type="date"
-                value={filters.startDate}
-                onChange={(e) => handleFilterChange('startDate', e.target.value)}
+                value={localCustomDates.startDate}
+                onChange={(e) => handleCustomDateChange('startDate', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
@@ -202,8 +235,8 @@ export default function ReportsFilters({ filters, onFiltersChange }: ReportsFilt
               </label>
               <input
                 type="date"
-                value={filters.endDate}
-                onChange={(e) => handleFilterChange('endDate', e.target.value)}
+                value={localCustomDates.endDate}
+                onChange={(e) => handleCustomDateChange('endDate', e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>

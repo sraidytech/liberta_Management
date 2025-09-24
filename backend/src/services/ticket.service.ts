@@ -219,8 +219,8 @@ export class TicketService {
             }
           },
           orderBy: [
-            { priority: 'desc' },
-            { createdAt: 'desc' }
+            { updatedAt: 'desc' },
+            { priority: 'desc' }
           ],
           skip,
           take: limit,
