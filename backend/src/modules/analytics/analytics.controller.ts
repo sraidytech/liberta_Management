@@ -540,9 +540,9 @@ export class AnalyticsController {
         const ordersWithNotes = Number(agent.orders_with_notes) || 0;
         const completedOrdersWithNotes = Number(agent.completed_orders_with_notes) || 0;
         
-        // Calculate quality score: Success rate for orders with notes only
+        // Calculate quality score: Success rate for orders with notes only (capped at 100%)
         const qualityScore = ordersWithNotes > 0
-          ? (completedOrdersWithNotes / ordersWithNotes) * 100
+          ? Math.min((completedOrdersWithNotes / ordersWithNotes) * 100, 100)
           : 0;
         
         // Keep other metrics for compatibility but focus on the new quality score

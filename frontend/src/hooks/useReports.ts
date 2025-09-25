@@ -647,7 +647,17 @@ export const useReports = (filters: ReportFilters) => {
 
   useEffect(() => {
     refreshData();
-  }, [refreshData]);
+  }, [
+    filters.dateRange,
+    filters.startDate,
+    filters.endDate,
+    filters.storeId,
+    filters.agentId,
+    filters.status,
+    filters.wilaya,
+    filters.minRevenue,
+    filters.maxRevenue
+  ]);
 
   return {
     salesData,

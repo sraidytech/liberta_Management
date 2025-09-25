@@ -311,7 +311,7 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                 </Tooltip>
               </div>
               <p className="text-3xl font-bold mb-2">
-                {data.summary.averageQualityScore.toFixed(1)}%
+                {Math.min(data.summary.averageQualityScore, 100).toFixed(1)}%
               </p>
               <p className="text-sm text-emerald-100">
                 {language === 'fr' ? 'Performance globale' : 'Overall performance'}
@@ -665,7 +665,7 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                           {language === 'fr' ? 'Score Qualité' : 'Quality Score'}
                         </span>
                         <span className="text-sm font-bold text-gray-900">
-                          {agent.qualityScore.toFixed(1)}%
+                          {Math.min(agent.qualityScore, 100).toFixed(1)}%
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
@@ -778,7 +778,7 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   </p>
                 </div>
                 <p className="text-2xl font-bold text-purple-600 mb-1">
-                  {data.summary.averageQualityScore.toFixed(1)}%
+                  {Math.min(data.summary.averageQualityScore, 100).toFixed(1)}%
                 </p>
                 <p className="text-sm text-purple-600">
                   {language === 'fr' ? 'performance globale' : 'overall performance'}
@@ -917,7 +917,7 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                 </div>
 
                 <div className="text-right">
-                  <p className="text-xl font-bold text-purple-600">{agent.qualityScore.toFixed(1)}%</p>
+                  <p className="text-xl font-bold text-purple-600">{Math.min(agent.qualityScore, 100).toFixed(1)}%</p>
                   <p className="text-xs text-gray-600">{language === 'fr' ? 'score qualité' : 'quality score'}</p>
                 </div>
               </div>
