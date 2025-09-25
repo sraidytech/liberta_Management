@@ -305,8 +305,8 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   {language === 'fr' ? 'Score Qualité Moy.' : 'Avg Quality Score'}
                 </p>
                 <Tooltip content={language === 'fr' ?
-                  'Score de qualité moyen calculé sur la base des performances, notes et objectifs atteints' :
-                  'Average quality score calculated based on performance, notes and goals achieved'}>
+                  'Score de qualité = (Commandes livrées avec notes / Commandes avec notes) × 100. Basé uniquement sur les commandes ayant au moins une note de l\'agent ET statut LIVRÉ' :
+                  'Quality Score = (Delivered Orders with Notes / Orders with Notes) × 100. Based only on orders with at least one agent note AND LIVRÉ status'}>
                   <Info className="w-4 h-4 text-emerald-200 hover:text-white cursor-help" />
                 </Tooltip>
               </div>

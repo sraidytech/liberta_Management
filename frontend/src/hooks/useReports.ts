@@ -168,17 +168,25 @@ interface GeographicData {
     totalOrders: number;
     totalRevenue: number;
     totalDeliveredOrders: number;
+    totalCancelledOrders?: number;
+    deliveryRate?: number;
     averageOrderValue: number;
   };
   ordersByWilaya: Array<{
     wilaya: string;
     orders: number;
     revenue: number;
+    completedOrders?: number;
+    cancelledOrders?: number;
+    deliveryRate?: number;
   }>;
   ordersByCommune: Array<{
     location: string;
     orders: number;
     revenue: number;
+    completedOrders?: number;
+    cancelledOrders?: number;
+    deliveryRate?: number;
   }>;
   revenueByWilaya: Array<{
     wilaya: string;
@@ -198,6 +206,8 @@ interface CommuneData {
     totalOrders: number;
     totalRevenue: number;
     totalDeliveredOrders: number;
+    totalCancelledOrders?: number;
+    deliveryRate?: number;
     averageOrderValue: number;
     totalCustomers: number;
   };
@@ -206,6 +216,9 @@ interface CommuneData {
     wilaya: string;
     orders: number;
     revenue: number;
+    completedOrders?: number;
+    cancelledOrders?: number;
+    deliveryRate?: number;
   }>;
   revenueByCommune: Array<{
     commune: string;

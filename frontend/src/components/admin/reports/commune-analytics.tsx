@@ -9,8 +9,47 @@ import {
   TrendingUp,
   Users,
   CheckCircle,
-  BarChart3
+  BarChart3,
+  Info,
+  XCircle,
+  Truck
 } from 'lucide-react';
+
+// Tooltip Component
+interface TooltipProps {
+  content: string;
+  children: React.ReactNode;
+}
+
+function Tooltip({ content, children }: TooltipProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+        className="cursor-help"
+      >
+        {children}
+      </div>
+      {isVisible && (
+        <div className="fixed inset-0 z-[10000] pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="bg-white border-2 border-gray-200 text-gray-800 text-sm leading-relaxed rounded-lg px-4 py-3 max-w-[400px] shadow-2xl">
+              <div className="flex items-start space-x-2">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="break-words">
+                  {content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface CommuneData {
   wilaya: string;
@@ -20,6 +59,8 @@ interface CommuneData {
     totalOrders: number;
     totalRevenue: number;
     totalDeliveredOrders: number;
+    totalCancelledOrders?: number;
+    deliveryRate?: number;
     averageOrderValue: number;
     totalCustomers: number;
   };
@@ -28,6 +69,9 @@ interface CommuneData {
     wilaya: string;
     orders: number;
     revenue: number;
+    completedOrders?: number;
+    cancelledOrders?: number;
+    deliveryRate?: number;
   }>;
   revenueByCommune: Array<{
     commune: string;
@@ -139,22 +183,7 @@ export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnaly
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-          <div className="flex items-center justify-between mb-4">
-            <h4 className="font-semibold text-gray-900">
-              {language === 'fr' ? 'Chiffre d\'Affaires' : 'Total Revenue'}
-            </h4>
-            <DollarSign className="w-8 h-8 text-green-600" />
-          </div>
-          <div className="text-3xl font-bold text-green-600">
-            {data.summary.totalRevenue.toLocaleString()} DA
-          </div>
-          <div className="text-sm text-gray-600 mt-1">
-            {language === 'fr' ? 'Commandes livrées' : 'Delivered orders'}
-          </div>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold text-gray-900">
@@ -170,18 +199,63 @@ export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnaly
           </div>
         </div>
 
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-900">
+              {language === 'fr' ? 'Commandes Livrées' : 'Orders Delivered'}
+            </h4>
+            <CheckCircle className="w-8 h-8 text-green-600" />
+          </div>
+          <div className="text-3xl font-bold text-green-600">
+            {data.summary.totalDeliveredOrders}
+          </div>
+          <div className="text-sm text-gray-600 mt-1">
+            {language === 'fr' ? 'Livrées avec succès' : 'Successfully delivered'}
+          </div>
+        </div>
+
         <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
           <div className="flex items-center justify-between mb-4">
             <h4 className="font-semibold text-gray-900">
-              {language === 'fr' ? 'Valeur Moyenne' : 'Average Order Value'}
+              {language === 'fr' ? 'Taux de Livraison' : 'Delivery Rate'}
             </h4>
-            <TrendingUp className="w-8 h-8 text-purple-600" />
+            <Truck className="w-8 h-8 text-purple-600" />
           </div>
           <div className="text-3xl font-bold text-purple-600">
-            {data.summary.averageOrderValue.toLocaleString()} DA
+            {data.summary.deliveryRate?.toFixed(1) || 0}%
           </div>
           <div className="text-sm text-gray-600 mt-1">
-            {language === 'fr' ? 'Par commande' : 'Per order'}
+            {language === 'fr' ? 'Taux de succès' : 'Success rate'}
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-6 border border-red-100">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-900">
+              {language === 'fr' ? 'Commandes Annulées' : 'Orders Cancelled'}
+            </h4>
+            <XCircle className="w-8 h-8 text-red-600" />
+          </div>
+          <div className="text-3xl font-bold text-red-600">
+            {data.summary.totalCancelledOrders || 0}
+          </div>
+          <div className="text-sm text-gray-600 mt-1">
+            {language === 'fr' ? 'Commandes annulées' : 'Cancelled orders'}
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-6 border border-emerald-100">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-semibold text-gray-900">
+              {language === 'fr' ? 'Chiffre d\'Affaires' : 'Total Revenue'}
+            </h4>
+            <DollarSign className="w-8 h-8 text-emerald-600" />
+          </div>
+          <div className="text-3xl font-bold text-emerald-600">
+            {data.summary.totalRevenue.toLocaleString()} DA
+          </div>
+          <div className="text-sm text-gray-600 mt-1">
+            {language === 'fr' ? 'Commandes livrées' : 'Delivered orders'}
           </div>
         </div>
 
@@ -275,9 +349,27 @@ export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnaly
 
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-600">
-                    {language === 'fr' ? 'Chiffre d\'Affaires' : 'Revenue'}
+                    {language === 'fr' ? 'Livrées' : 'Delivered'}
                   </span>
                   <span className="font-semibold text-green-600">
+                    {commune.completedOrders || 0}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    {language === 'fr' ? 'Taux Livraison' : 'Delivery Rate'}
+                  </span>
+                  <span className="font-semibold text-purple-600">
+                    {commune.deliveryRate?.toFixed(1) || 0}%
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    {language === 'fr' ? 'Chiffre d\'Affaires' : 'Revenue'}
+                  </span>
+                  <span className="font-semibold text-emerald-600">
                     {commune.revenue.toLocaleString()} DA
                   </span>
                 </div>
@@ -286,17 +378,8 @@ export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnaly
                   <span className="text-sm text-gray-600">
                     {language === 'fr' ? 'Clients' : 'Customers'}
                   </span>
-                  <span className="font-semibold text-purple-600">
+                  <span className="font-semibold text-indigo-600">
                     {customers}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">
-                    {language === 'fr' ? 'Valeur Moy.' : 'Avg. Value'}
-                  </span>
-                  <span className="font-semibold text-orange-600">
-                    {averageOrderValue.toLocaleString()} DA
                   </span>
                 </div>
               </div>

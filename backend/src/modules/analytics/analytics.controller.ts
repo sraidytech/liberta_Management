@@ -452,6 +452,8 @@ export class AnalyticsController {
         cancelled_orders: bigint;
         total_revenue: number;
         total_activities: bigint;
+        orders_with_notes: bigint;
+        completed_orders_with_notes: bigint;
       }
 
       const agentPerformanceData = await prisma.$queryRaw<AgentPerformanceRaw[]>`
@@ -479,12 +481,19 @@ export class AnalyticsController {
           COALESCE(SUM(CASE WHEN o."shippingStatus" = 'LIVRÉ' THEN o.total ELSE 0 END), 0) as total_revenue,
           
           -- Activities count
-          COUNT(DISTINCT aa.id) as total_activities
+          COUNT(DISTINCT aa.id) as total_activities,
+          
+          -- NEW: Orders with notes by this agent
+          COUNT(DISTINCT CASE WHEN aa.id IS NOT NULL THEN o.id END) as orders_with_notes,
+          
+          -- NEW: Completed orders that have notes by this agent (for Quality Score)
+          COUNT(DISTINCT CASE WHEN o."shippingStatus" = 'LIVRÉ' AND aa.id IS NOT NULL THEN o.id END) as completed_orders_with_notes
           
         FROM users u
         LEFT JOIN orders o ON u.id = o."assignedAgentId"
           AND o."createdAt" >= ${startDateUTC}
         LEFT JOIN agent_activities aa ON u.id = aa."agentId"
+          AND aa."orderId" = o.id
           AND aa."createdAt" >= ${startDateUTC}
         WHERE
           u.role IN ('AGENT_SUIVI', 'AGENT_CALL_CENTER')
@@ -524,25 +533,23 @@ export class AnalyticsController {
           ? (totalRevenue / completedOrders).toFixed(2)
           : '0';
 
-        // Calculate quality metrics
+        // NEW SIMPLIFIED QUALITY SCORE CALCULATION
+        // Quality Score = (Completed Orders with Notes / Orders with Notes) × 100
+        // Only considers orders that have at least one note by the agent AND were delivered (LIVRÉ status)
+        
+        const ordersWithNotes = Number(agent.orders_with_notes) || 0;
+        const completedOrdersWithNotes = Number(agent.completed_orders_with_notes) || 0;
+        
+        // Calculate quality score: Success rate for orders with notes only
+        const qualityScore = ordersWithNotes > 0
+          ? (completedOrdersWithNotes / ordersWithNotes) * 100
+          : 0;
+        
+        // Keep other metrics for compatibility but focus on the new quality score
         const noteCompletionRate = totalOrders > 0 ? (totalActivities / totalOrders) * 100 : 0;
-        const orderSuccessWithNotesRate = totalOrders > 0 ?
-          (completedOrders > 0 && totalActivities > 0 ? (Math.min(completedOrders, totalActivities) / totalOrders) * 100 : 0) : 0;
-        
-        // Activity consistency (simplified - based on activities vs orders ratio)
+        const orderSuccessWithNotesRate = ordersWithNotes > 0 ? qualityScore : 0;
         const activityConsistency = totalOrders > 0 ? Math.min((totalActivities / totalOrders) * 100, 100) : 0;
-        
-        // Goal achievement rate (based on success rate vs target of 80%)
-        const targetSuccessRate = 80;
-        const goalAchievementRate = Math.min((parseFloat(successRate) / targetSuccessRate) * 100, 100);
-        
-        // Quality score calculation (weighted average)
-        const qualityScore = (
-          (parseFloat(successRate) * 0.3) + // 30% weight for success rate
-          (noteCompletionRate * 0.25) + // 25% weight for note completion
-          (orderSuccessWithNotesRate * 0.25) + // 25% weight for orders with notes delivered
-          (activityConsistency * 0.2) // 20% weight for activity consistency
-        );
+        const goalAchievementRate = Math.min((parseFloat(successRate) / 80) * 100, 100);
 
         return {
           id: agent.id,
@@ -561,12 +568,15 @@ export class AnalyticsController {
           confirmationRate: parseFloat(confirmationRate),
           cancellationRate: parseFloat(cancellationRate),
           totalActivities,
-          // NEW: Quality metrics based on orders with notes and LIVRÉ status
+          // NEW: Simplified Quality Score - Success rate for orders with notes only
           qualityScore: parseFloat(qualityScore.toFixed(1)),
           goalAchievementRate: parseFloat(goalAchievementRate.toFixed(1)),
           activityConsistency: parseFloat(activityConsistency.toFixed(1)),
           noteCompletionRate: parseFloat(noteCompletionRate.toFixed(1)),
-          orderSuccessWithNotesRate: parseFloat(noteCompletionRate.toFixed(1)),
+          orderSuccessWithNotesRate: parseFloat(orderSuccessWithNotesRate.toFixed(1)),
+          // Additional metrics for the new calculation
+          ordersWithNotes,
+          completedOrdersWithNotes,
           avgResponseTime: 0,
           ordersPerDay: totalOrders > 0 ? parseFloat((totalOrders / days).toFixed(1)) : 0,
           totalWorkingHours: 0,
@@ -1450,6 +1460,7 @@ export class AnalyticsController {
           id: true,
           total: true,
           status: true,
+          shippingStatus: true,
           storeIdentifier: true,
           customer: {
             select: {
@@ -1465,20 +1476,33 @@ export class AnalyticsController {
     );
 
     // Process data efficiently in memory (single pass)
-    const wilayaMap = new Map<string, { orders: number; revenue: number }>();
-    const communeMap = new Map<string, { orders: number; revenue: number }>();
+    const wilayaMap = new Map<string, {
+      orders: number;
+      revenue: number;
+      completedOrders: number;
+      cancelledOrders: number;
+    }>();
+    const communeMap = new Map<string, {
+      orders: number;
+      revenue: number;
+      completedOrders: number;
+      cancelledOrders: number;
+    }>();
     const wilayaRevenueMap = new Map<string, number>();
     const cityCustomerMap = new Map<string, number>();
     
     let totalOrders = 0;
     let totalRevenue = 0;
     let totalDeliveredOrders = 0;
+    let totalCancelledOrders = 0;
 
     // Single pass through data for all calculations
     optimizedGeographicData.forEach(order => {
       const customerWilaya = order.customer.wilaya;
       const customerCommune = order.customer.commune;
-      const isDelivered = order.status === OrderStatus.DELIVERED;
+      // Use shipping status 'LIVRÉ' for delivered orders (consistent with agent performance)
+      const isDelivered = order.shippingStatus === 'LIVRÉ' || order.status === OrderStatus.DELIVERED;
+      const isCancelled = order.status === OrderStatus.CANCELLED;
       const orderRevenue = isDelivered ? order.total : 0;
 
       // Filter by wilaya if specified
@@ -1489,18 +1513,35 @@ export class AnalyticsController {
         totalDeliveredOrders++;
         totalRevenue += order.total;
       }
+      if (isCancelled) {
+        totalCancelledOrders++;
+      }
 
       // Wilaya aggregation
-      const wilayaData = wilayaMap.get(customerWilaya) || { orders: 0, revenue: 0 };
+      const wilayaData = wilayaMap.get(customerWilaya) || {
+        orders: 0,
+        revenue: 0,
+        completedOrders: 0,
+        cancelledOrders: 0
+      };
       wilayaData.orders++;
       wilayaData.revenue += orderRevenue;
+      if (isDelivered) wilayaData.completedOrders++;
+      if (isCancelled) wilayaData.cancelledOrders++;
       wilayaMap.set(customerWilaya, wilayaData);
 
       // Commune aggregation
       const communeKey = `${customerCommune}, ${customerWilaya}`;
-      const communeData = communeMap.get(communeKey) || { orders: 0, revenue: 0 };
+      const communeData = communeMap.get(communeKey) || {
+        orders: 0,
+        revenue: 0,
+        completedOrders: 0,
+        cancelledOrders: 0
+      };
       communeData.orders++;
       communeData.revenue += orderRevenue;
+      if (isDelivered) communeData.completedOrders++;
+      if (isCancelled) communeData.cancelledOrders++;
       communeMap.set(communeKey, communeData);
 
       // Revenue by wilaya (delivered only)
@@ -1519,13 +1560,19 @@ export class AnalyticsController {
     const ordersByWilaya = Array.from(wilayaMap.entries()).map(([wilaya, data]) => ({
       wilaya,
       orders: data.orders,
-      revenue: data.revenue
+      revenue: data.revenue,
+      completedOrders: data.completedOrders,
+      cancelledOrders: data.cancelledOrders,
+      deliveryRate: data.orders > 0 ? (data.completedOrders / data.orders) * 100 : 0
     })).sort((a, b) => b.orders - a.orders);
 
     const ordersByCommune = Array.from(communeMap.entries()).map(([location, data]) => ({
       location,
       orders: data.orders,
-      revenue: data.revenue
+      revenue: data.revenue,
+      completedOrders: data.completedOrders,
+      cancelledOrders: data.cancelledOrders,
+      deliveryRate: data.orders > 0 ? (data.completedOrders / data.orders) * 100 : 0
     })).sort((a, b) => b.orders - a.orders).slice(0, 20);
 
     const revenueByWilaya = Array.from(wilayaRevenueMap.entries()).map(([wilaya, revenue]) => ({
@@ -1547,6 +1594,8 @@ export class AnalyticsController {
         totalOrders,
         totalRevenue,
         totalDeliveredOrders,
+        totalCancelledOrders,
+        deliveryRate: totalOrders > 0 ? (totalDeliveredOrders / totalOrders) * 100 : 0,
         averageOrderValue: totalDeliveredOrders > 0 ? totalRevenue / totalDeliveredOrders : 0
       },
       ordersByWilaya,
@@ -1624,6 +1673,7 @@ export class AnalyticsController {
               id: true,
               total: true,
               status: true,
+              shippingStatus: true,
               customer: {
                 select: {
                   id: true,
@@ -1648,17 +1698,20 @@ export class AnalyticsController {
       ]);
 
       // Process data efficiently in memory
-      const communeMap = new Map<string, { orders: number; revenue: number }>();
+      const communeMap = new Map<string, { orders: number; revenue: number; completedOrders: number; cancelledOrders: number }>();
       const communeRevenueMap = new Map<string, number>();
       
       let totalOrders = 0;
       let totalRevenue = 0;
       let totalDeliveredOrders = 0;
+      let totalCancelledOrders = 0;
 
       // Single pass through data
       optimizedCommuneData.forEach(order => {
         const commune = order.customer.commune;
-        const isDelivered = order.status === OrderStatus.DELIVERED;
+        // Use shipping status 'LIVRÉ' for delivered orders (like agent performance)
+        const isDelivered = order.shippingStatus === 'LIVRÉ' || order.status === OrderStatus.DELIVERED;
+        const isCancelled = order.status === OrderStatus.CANCELLED;
         const orderRevenue = isDelivered ? order.total : 0;
 
         totalOrders++;
@@ -1666,11 +1719,16 @@ export class AnalyticsController {
           totalDeliveredOrders++;
           totalRevenue += order.total;
         }
+        if (isCancelled) {
+          totalCancelledOrders++;
+        }
 
-        // Commune aggregation
-        const communeData = communeMap.get(commune) || { orders: 0, revenue: 0 };
+        // Commune aggregation with detailed metrics
+        const communeData = communeMap.get(commune) || { orders: 0, revenue: 0, completedOrders: 0, cancelledOrders: 0 };
         communeData.orders++;
         communeData.revenue += orderRevenue;
+        if (isDelivered) communeData.completedOrders++;
+        if (isCancelled) communeData.cancelledOrders++;
         communeMap.set(commune, communeData);
 
         // Revenue by commune (delivered only)
@@ -1685,7 +1743,10 @@ export class AnalyticsController {
         commune,
         wilaya: wilaya as string,
         orders: data.orders,
-        revenue: data.revenue
+        revenue: data.revenue,
+        completedOrders: data.completedOrders,
+        cancelledOrders: data.cancelledOrders,
+        deliveryRate: data.orders > 0 ? (data.completedOrders / data.orders) * 100 : 0
       })).sort((a, b) => b.orders - a.orders);
 
       const revenueByCommune = Array.from(communeRevenueMap.entries()).map(([commune, revenue]) => ({
@@ -1708,6 +1769,8 @@ export class AnalyticsController {
           totalOrders,
           totalRevenue,
           totalDeliveredOrders,
+          totalCancelledOrders,
+          deliveryRate: totalOrders > 0 ? (totalDeliveredOrders / totalOrders) * 100 : 0,
           averageOrderValue: totalDeliveredOrders > 0 ? totalRevenue / totalDeliveredOrders : 0,
           totalCustomers: customerCounts.reduce((sum, item) => sum + item._count.id, 0)
         },

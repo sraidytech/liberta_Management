@@ -19,8 +19,47 @@ import {
   RefreshCw,
   MapPin,
   UserCheck,
-  CheckCircle
+  CheckCircle,
+  Info,
+  XCircle,
+  Truck
 } from 'lucide-react';
+
+// Tooltip Component
+interface TooltipProps {
+  content: string;
+  children: React.ReactNode;
+}
+
+function Tooltip({ content, children }: TooltipProps) {
+  const [isVisible, setIsVisible] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+        className="cursor-help"
+      >
+        {children}
+      </div>
+      {isVisible && (
+        <div className="fixed inset-0 z-[10000] pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+            <div className="bg-white border-2 border-gray-200 text-gray-800 text-sm leading-relaxed rounded-lg px-4 py-3 max-w-[400px] shadow-2xl">
+              <div className="flex items-start space-x-2">
+                <Info className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                <div className="break-words">
+                  {content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ReportsPage() {
   const { language } = useLanguage();
@@ -309,41 +348,219 @@ export default function ReportsPage() {
                       </div>
                     )}
 
-                    <div className="text-center py-12">
-                      <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {language === 'fr' ? 'Analyse Géographique' : 'Geographic Analytics'}
-                      </h3>
-                      <p className="text-gray-600 mb-4">
-                        {language === 'fr' ? 'Cliquez sur une wilaya pour voir les communes' : 'Click on a wilaya to see communes'}
-                      </p>
+                    <div className="space-y-8">
+                      {/* Geographic Analytics Header */}
+                      <div className="text-center">
+                        <div className="flex items-center justify-center space-x-2 mb-2">
+                          <MapPin className="w-8 h-8 text-gray-400" />
+                          <h3 className="text-xl font-semibold text-gray-900">
+                            {language === 'fr' ? 'Analyse Géographique' : 'Geographic Analytics'}
+                          </h3>
+                          <Tooltip content={language === 'fr' ?
+                            'Analyse détaillée des performances par wilaya incluant commandes totales, livrées, annulées et taux de livraison' :
+                            'Detailed performance analysis by wilaya including total orders, delivered, cancelled and delivery rate'}>
+                            <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                          </Tooltip>
+                        </div>
+                        <p className="text-gray-600">
+                          {language === 'fr' ? 'Cliquez sur une wilaya pour voir les communes' : 'Click on a wilaya to see communes'}
+                        </p>
+                      </div>
+
+                      {/* Geographic Summary Cards */}
                       {geographicData && (
-                        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {geographicData.ordersByWilaya?.map((item) => (
-                            <button
-                              key={item.wilaya}
-                              onClick={() => handleWilayaClick(item.wilaya)}
-                              className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 hover:border-blue-300 hover:shadow-lg transition-all duration-200 cursor-pointer group"
-                            >
-                              <div className="flex items-center justify-between mb-4">
-                                <h4 className="font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                          {/* Total Orders */}
+                          <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <MapPin className="w-5 h-5 text-blue-600" />
+                                  <p className="text-blue-700 font-medium text-sm">
+                                    {language === 'fr' ? 'Total Commandes' : 'Total Orders'}
+                                  </p>
+                                  <Tooltip content={language === 'fr' ?
+                                    'Nombre total de commandes dans toutes les wilayas pour la période sélectionnée' :
+                                    'Total number of orders across all wilayas for the selected period'}>
+                                    <Info className="w-4 h-4 text-blue-500 cursor-help" />
+                                  </Tooltip>
+                                </div>
+                                <p className="text-2xl font-bold text-blue-600 mb-1">
+                                  {geographicData.summary.totalOrders?.toLocaleString() || 0}
+                                </p>
+                                <p className="text-sm text-blue-600">
+                                  {language === 'fr' ? 'toutes wilayas' : 'all wilayas'}
+                                </p>
+                              </div>
+                              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <MapPin className="w-6 h-6 text-blue-600" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Delivered Orders */}
+                          <div className="relative overflow-hidden bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <CheckCircle className="w-5 h-5 text-green-600" />
+                                  <p className="text-green-700 font-medium text-sm">
+                                    {language === 'fr' ? 'Commandes Livrées' : 'Orders Delivered'}
+                                  </p>
+                                  <Tooltip content={language === 'fr' ?
+                                    'Nombre de commandes livrées avec succès (statut LIVRÉ) dans toutes les wilayas' :
+                                    'Number of successfully delivered orders (LIVRÉ status) across all wilayas'}>
+                                    <Info className="w-4 h-4 text-green-500 cursor-help" />
+                                  </Tooltip>
+                                </div>
+                                <p className="text-2xl font-bold text-green-600 mb-1">
+                                  {geographicData.summary.totalDeliveredOrders?.toLocaleString() || 0}
+                                </p>
+                                <p className="text-sm text-green-600">
+                                  {language === 'fr' ? 'livrées avec succès' : 'successfully delivered'}
+                                </p>
+                              </div>
+                              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                                <CheckCircle className="w-6 h-6 text-green-600" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Delivery Rate */}
+                          <div className="relative overflow-hidden bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-6 border border-purple-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <Truck className="w-5 h-5 text-purple-600" />
+                                  <p className="text-purple-700 font-medium text-sm">
+                                    {language === 'fr' ? 'Taux de Livraison' : 'Delivery Rate'}
+                                  </p>
+                                  <Tooltip content={language === 'fr' ?
+                                    'Pourcentage global de commandes livrées par rapport au total des commandes' :
+                                    'Overall percentage of delivered orders compared to total orders'}>
+                                    <Info className="w-4 h-4 text-purple-500 cursor-help" />
+                                  </Tooltip>
+                                </div>
+                                <p className="text-2xl font-bold text-purple-600 mb-1">
+                                  {geographicData.summary.deliveryRate?.toFixed(1) || 0}%
+                                </p>
+                                <p className="text-sm text-purple-600">
+                                  {language === 'fr' ? 'taux global' : 'overall rate'}
+                                </p>
+                              </div>
+                              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                                <Truck className="w-6 h-6 text-purple-600" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Cancelled Orders */}
+                          <div className="relative overflow-hidden bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-6 border border-red-100">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <XCircle className="w-5 h-5 text-red-600" />
+                                  <p className="text-red-700 font-medium text-sm">
+                                    {language === 'fr' ? 'Commandes Annulées' : 'Orders Cancelled'}
+                                  </p>
+                                  <Tooltip content={language === 'fr' ?
+                                    'Nombre total de commandes annulées dans toutes les wilayas' :
+                                    'Total number of cancelled orders across all wilayas'}>
+                                    <Info className="w-4 h-4 text-red-500 cursor-help" />
+                                  </Tooltip>
+                                </div>
+                                <p className="text-2xl font-bold text-red-600 mb-1">
+                                  {geographicData.summary.totalCancelledOrders?.toLocaleString() || 0}
+                                </p>
+                                <p className="text-sm text-red-600">
+                                  {language === 'fr' ? 'commandes annulées' : 'cancelled orders'}
+                                </p>
+                              </div>
+                              <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+                                <XCircle className="w-6 h-6 text-red-600" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Wilaya Cards */}
+                      {geographicData && (
+                        <div className="space-y-6">
+                          <div className="text-center">
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                              {language === 'fr' ? 'Performance par Wilaya' : 'Performance by Wilaya'}
+                            </h3>
+                            <p className="text-gray-600">
+                              {language === 'fr' ? 'Cliquez sur une wilaya pour voir les communes' : 'Click on a wilaya to see communes'}
+                            </p>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {geographicData.ordersByWilaya?.map((item, index) => (
+                              <div
+                                key={item.wilaya}
+                                onClick={() => handleWilayaClick(item.wilaya)}
+                                className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 hover:shadow-lg hover:border-blue-200 transition-all cursor-pointer group"
+                              >
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
+                                    <span className="text-white font-bold text-lg">{index + 1}</span>
+                                  </div>
+                                  <MapPin className="w-6 h-6 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                </div>
+                                
+                                <h4 className="font-semibold text-gray-900 text-lg mb-4 group-hover:text-blue-600 transition-colors">
                                   {item.wilaya}
                                 </h4>
-                                <span className="text-2xl font-bold text-blue-600 group-hover:text-blue-700 transition-colors">
-                                  {item.orders}
-                                </span>
+                                
+                                <div className="space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">
+                                      {language === 'fr' ? 'Total Commandes' : 'Total Orders'}
+                                    </span>
+                                    <span className="font-semibold text-gray-900">{item.orders}</span>
+                                  </div>
+                                  
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">
+                                      {language === 'fr' ? 'Livrées' : 'Delivered'}
+                                    </span>
+                                    <span className="font-semibold text-green-600">{item.completedOrders || 0}</span>
+                                  </div>
+                                  
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">
+                                      {language === 'fr' ? 'Annulées' : 'Cancelled'}
+                                    </span>
+                                    <span className="font-semibold text-red-600">{item.cancelledOrders || 0}</span>
+                                  </div>
+                                  
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-gray-600">
+                                      {language === 'fr' ? 'Taux Livraison' : 'Delivery Rate'}
+                                    </span>
+                                    <span className="font-semibold text-purple-600">{item.deliveryRate?.toFixed(1) || 0}%</span>
+                                  </div>
+                                  
+                                  <div className="pt-3 border-t border-gray-100">
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-gray-600">
+                                        {language === 'fr' ? 'Chiffre d\'Affaires' : 'Revenue'}
+                                      </span>
+                                      <span className="font-bold text-blue-600">{item.revenue?.toLocaleString() || 0} DA</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-4 text-center">
+                                  <span className="text-xs text-gray-500 group-hover:text-blue-500 transition-colors">
+                                    {language === 'fr' ? 'Cliquer pour voir les communes' : 'Click to view communes'}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="text-sm text-gray-600 group-hover:text-gray-700 transition-colors">
-                                {language === 'fr' ? 'Commandes' : 'Orders'}
-                              </div>
-                              <div className="text-sm text-blue-600 font-medium mt-2 group-hover:text-blue-700 transition-colors">
-                                {item.revenue.toLocaleString()} DA
-                              </div>
-                              <div className="text-xs text-gray-500 mt-2 group-hover:text-blue-600 transition-colors">
-                                {language === 'fr' ? 'Cliquer pour voir les communes' : 'Click to view communes'}
-                              </div>
-                            </button>
-                          ))}
+                            ))}
+                          </div>
                         </div>
                       )}
                     </div>
