@@ -7,6 +7,7 @@ export interface MaystroApiKeyConfig {
   baseUrl: string;
   isActive: boolean;
   isPrimary: boolean;
+  storeIdentifiers?: string[]; // NEW: Store identifiers that use this API key
   requestCount: number;
   successCount: number;
   errorCount: number;
@@ -19,21 +20,27 @@ export interface MaystroApiKeyConfig {
 export class MaystroConfigService {
   private redis: Redis;
   private apiKeys: Map<string, MaystroApiKeyConfig> = new Map();
+  private storeToApiKeyMap: Map<string, string> = new Map(); // NEW: Store -> API Key ID mapping
 
   constructor(redis: Redis) {
     this.redis = redis;
     this.loadApiKeysFromEnv();
+    this.buildStoreToApiKeyMap();
   }
 
   /**
    * Load Maystro API keys from environment variables
-   * Supports pattern: MAYSTRO_API_KEY_1, MAYSTRO_API_KEY_1_NAME, etc.
+   * Supports pattern: MAYSTRO_API_KEY_1, MAYSTRO_API_KEY_1_NAME, MAYSTRO_API_KEY_1_STORES, etc.
    */
   private loadApiKeysFromEnv(): void {
     const apiKeys: MaystroApiKeyConfig[] = [];
     
     // Check for single API key (backward compatibility)
     if (process.env.MAYSTRO_API_KEY) {
+      const stores = process.env.MAYSTRO_API_KEY_STORES 
+        ? process.env.MAYSTRO_API_KEY_STORES.split(',').map(s => s.trim())
+        : undefined;
+
       apiKeys.push({
         id: 'primary',
         name: 'Primary API Key',
@@ -41,6 +48,7 @@ export class MaystroConfigService {
         baseUrl: process.env.MAYSTRO_BASE_URL || 'https://backend.maystro-delivery.com',
         isActive: true,
         isPrimary: true,
+        storeIdentifiers: stores,
         requestCount: 0,
         successCount: 0,
         errorCount: 0
@@ -55,6 +63,8 @@ export class MaystroConfigService {
       
       const name = process.env[`MAYSTRO_API_KEY_${keyIndex}_NAME`] || `Maystro API ${keyIndex}`;
       const baseUrl = process.env.MAYSTRO_BASE_URL || 'https://backend.maystro-delivery.com';
+      const storesEnv = process.env[`MAYSTRO_API_KEY_${keyIndex}_STORES`];
+      const stores = storesEnv ? storesEnv.split(',').map(s => s.trim()) : undefined;
 
       apiKeys.push({
         id: `key_${keyIndex}`,
@@ -63,6 +73,7 @@ export class MaystroConfigService {
         baseUrl,
         isActive: true,
         isPrimary: keyIndex === 1 && !process.env.MAYSTRO_API_KEY, // First multi-key is primary if no single key
+        storeIdentifiers: stores,
         requestCount: 0,
         successCount: 0,
         errorCount: 0
@@ -78,8 +89,46 @@ export class MaystroConfigService {
 
     console.log(`🔑 Loaded ${apiKeys.length} Maystro API key(s)`);
     apiKeys.forEach(key => {
-      console.log(`   - ${key.name} (${key.isPrimary ? 'Primary' : 'Secondary'})`);
+      const storesInfo = key.storeIdentifiers 
+        ? ` [Stores: ${key.storeIdentifiers.join(', ')}]`
+        : ' [All stores]';
+      console.log(`   - ${key.name} (${key.isPrimary ? 'Primary' : 'Secondary'})${storesInfo}`);
     });
+  }
+
+  /**
+   * Build store-to-API-key mapping from configured API keys
+   */
+  private buildStoreToApiKeyMap(): void {
+    this.storeToApiKeyMap.clear();
+    
+    this.apiKeys.forEach((config, keyId) => {
+      if (config.storeIdentifiers && config.storeIdentifiers.length > 0) {
+        config.storeIdentifiers.forEach(store => {
+          this.storeToApiKeyMap.set(store, keyId);
+          console.log(`   📍 Mapped store ${store} -> ${config.name}`);
+        });
+      }
+    });
+
+    console.log(`📍 Store-to-API-key mapping complete: ${this.storeToApiKeyMap.size} store(s) mapped`);
+  }
+
+  /**
+   * Get API key for a specific store
+   */
+  public getApiKeyForStore(storeIdentifier: string): MaystroApiKeyConfig | null {
+    const apiKeyId = this.storeToApiKeyMap.get(storeIdentifier);
+    
+    if (apiKeyId) {
+      const apiKey = this.apiKeys.get(apiKeyId);
+      if (apiKey && apiKey.isActive) {
+        return apiKey;
+      }
+    }
+    
+    // Fallback to primary API key if no specific mapping found
+    return this.getPrimaryApiKey();
   }
 
   /**
@@ -234,6 +283,7 @@ export class MaystroConfigService {
       name: key.name,
       isActive: key.isActive,
       isPrimary: key.isPrimary,
+      storeIdentifiers: key.storeIdentifiers,
       requestCount: key.requestCount,
       successCount: key.successCount,
       errorCount: key.errorCount,
@@ -243,7 +293,7 @@ export class MaystroConfigService {
       lastTestStatus: key.lastTestStatus,
       lastTestError: key.lastTestError,
       // Don't expose the actual API key for security
-      apiKeyPreview: `${key.apiKey.substring(0, 8)}...${key.apiKey.substring(-8)}`
+      apiKeyPreview: `${key.apiKey.substring(0, 8)}...${key.apiKey.substring(key.apiKey.length - 8)}`
     }));
   }
 }
