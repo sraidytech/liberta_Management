@@ -131,9 +131,28 @@ export default function SchedulerPage() {
 
     loadData();
 
-    // Refresh data every 30 seconds
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
+    // 🔧 FIX: Reduce aggressive polling - refresh every 2 minutes instead of 30 seconds
+    // Only refresh if page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        // Don't show loading spinner on auto-refresh
+        Promise.all([fetchSchedulerStatus(), fetchNextSyncTimes()]);
+      }
+    }, 120000); // 2 minutes
+    
+    // Refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        Promise.all([fetchSchedulerStatus(), fetchNextSyncTimes()]);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const formatDateTime = (dateString?: string) => {

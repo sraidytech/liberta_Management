@@ -59,9 +59,27 @@ export function SystemSettings() {
   useEffect(() => {
     fetchSystemInfo();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchSystemInfo, 30000);
-    return () => clearInterval(interval);
+    // 🔧 FIX: Reduce aggressive polling - refresh every 2 minutes instead of 30 seconds
+    // Only refresh if page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchSystemInfo();
+      }
+    }, 120000); // 2 minutes
+    
+    // Refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchSystemInfo();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const getStatusBadge = (status: 'connected' | 'disconnected') => {

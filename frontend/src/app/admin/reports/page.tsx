@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '@/lib/language-context';
 import AdminLayout from '@/components/admin/admin-layout';
 import ReportsHeader from '@/components/admin/reports/reports-header';
@@ -93,18 +93,65 @@ export default function ReportsPage() {
     fetchCommuneData
   } = useReportsLazy(filters, activeTab);
 
-  // Auto-refresh functionality
+  // Auto-refresh functionality with Page Visibility API
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshDataRef = useRef(refreshData);
+  
+  // Keep refreshData ref updated
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (autoRefresh) {
-      interval = setInterval(() => {
-        refreshData();
-      }, 5 * 60 * 1000); // 5 minutes
+    refreshDataRef.current = refreshData;
+  }, [refreshData]);
+  
+  useEffect(() => {
+    // Clear any existing interval
+    if (refreshIntervalRef.current) {
+      clearInterval(refreshIntervalRef.current);
+      refreshIntervalRef.current = null;
     }
-    return () => {
-      if (interval) clearInterval(interval);
+    
+    if (!autoRefresh) return;
+    
+    // Set up auto-refresh with Page Visibility API
+    const startInterval = () => {
+      refreshIntervalRef.current = setInterval(() => {
+        // Only refresh if page is visible
+        if (!document.hidden) {
+          refreshDataRef.current();
+        }
+      }, 5 * 60 * 1000); // 5 minutes
     };
-  }, [autoRefresh, refreshData]);
+    
+    // Handle visibility change
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Page is hidden, clear interval
+        if (refreshIntervalRef.current) {
+          clearInterval(refreshIntervalRef.current);
+          refreshIntervalRef.current = null;
+        }
+      } else {
+        // Page is visible, restart interval if autoRefresh is on
+        if (autoRefresh && !refreshIntervalRef.current) {
+          startInterval();
+        }
+      }
+    };
+    
+    // Start interval if page is visible
+    if (!document.hidden) {
+      startInterval();
+    }
+    
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [autoRefresh]);
 
   const handleFilterChange = (newFilters: typeof filters) => {
     setFilters(newFilters);

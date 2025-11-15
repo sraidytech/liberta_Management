@@ -59,10 +59,27 @@ export default function OnlineUsersWidget() {
   useEffect(() => {
     fetchOnlineUsers();
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchOnlineUsers, 30000);
+    // 🔧 FIX: Reduce aggressive polling - refresh every 2 minutes instead of 30 seconds
+    // Only refresh if page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchOnlineUsers();
+      }
+    }, 120000); // 2 minutes
     
-    return () => clearInterval(interval);
+    // Refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchOnlineUsers();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const getRoleLabel = (role: string) => {

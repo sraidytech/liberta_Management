@@ -133,10 +133,27 @@ export default function AssignmentDashboard() {
   useEffect(() => {
     fetchStats();
     
-    // 🔧 FIX: Reduce polling frequency to prevent 429 errors
-    // Refresh stats every 60 seconds instead of 30 seconds
-    const interval = setInterval(fetchStats, 60000);
-    return () => clearInterval(interval);
+    // 🔧 FIX: Reduce polling frequency and add Page Visibility API
+    // Refresh every 2 minutes instead of 60 seconds, only when page is visible
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchStats();
+      }
+    }, 120000); // 2 minutes
+    
+    // Refresh when page becomes visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchStats();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   if (loading) {

@@ -226,10 +226,27 @@ export default function AgentDashboard() {
     if (user?.id) {
       fetchAgentData();
       
-      // 🔧 FIX: Reduce polling frequency to prevent 429 errors
-      // Refresh every 60 seconds instead of 30 seconds
-      const interval = setInterval(fetchAgentData, 60000);
-      return () => clearInterval(interval);
+      // 🔧 FIX: Reduce polling frequency and add Page Visibility API
+      // Refresh every 2 minutes instead of 60 seconds, only when page is visible
+      const interval = setInterval(() => {
+        if (!document.hidden) {
+          fetchAgentData();
+        }
+      }, 120000); // 2 minutes
+      
+      // Refresh when page becomes visible
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          fetchAgentData();
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
   }, [user?.id, fetchAgentData]);
 

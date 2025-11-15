@@ -211,12 +211,28 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
     
-    // Set up periodic refresh every 30 seconds to update online status
+    // 🔧 FIX: Reduce aggressive polling - refresh every 2 minutes instead of 30 seconds
+    // Only refresh if page is visible using Page Visibility API
     const interval = setInterval(() => {
-      fetchUsers();
-    }, 30000);
+      if (!document.hidden) {
+        fetchUsers();
+      }
+    }, 120000); // 2 minutes
     
-    return () => clearInterval(interval);
+    // Pause polling when page is hidden
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // Refresh when page becomes visible again
+        fetchUsers();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const getRoleLabel = (role: string) => {

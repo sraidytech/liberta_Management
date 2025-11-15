@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface ReportFilters {
   dateRange: string;
@@ -302,8 +302,15 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
 
   const [communeData, setCommuneData] = useState<CommuneData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Track which tabs have been loaded to prevent unnecessary refetches
+  const loadedTabsRef = useRef<Set<TabType>>(new Set());
+  
+  // Stable filter reference to prevent unnecessary re-renders
+  const filtersRef = useRef(filters);
+  const prevFiltersRef = useRef(filters);
 
-  // Convert date range to actual dates
+  // Convert date range to actual dates - memoized with stable dependencies
   const getDateRange = useCallback(() => {
     const now = new Date();
     let startDate: Date;
@@ -354,9 +361,10 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     };
   }, [filters.dateRange, filters.startDate, filters.endDate]);
 
-  // Individual fetch functions for each tab
-  const fetchSalesData = useCallback(async () => {
-    if (tabData.sales && !tabLoading.sales) return; // Already loaded
+  // Individual fetch functions for each tab - with stable dependencies
+  const fetchSalesData = useCallback(async (forceRefresh = false) => {
+    // Skip if already loaded and not forcing refresh
+    if (!forceRefresh && loadedTabsRef.current.has('sales')) return;
 
     setTabLoading(prev => ({ ...prev, sales: true }));
     setError(null);
@@ -368,15 +376,16 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       }
 
       const { startDate, endDate } = getDateRange();
+      const currentFilters = filtersRef.current;
       const params = new URLSearchParams({
         startDate,
         endDate,
-        ...(filters.storeId && { storeId: filters.storeId }),
-        ...(filters.agentId && { agentId: filters.agentId }),
-        ...(filters.status && { status: filters.status }),
-        ...(filters.wilaya && { wilaya: filters.wilaya }),
-        ...(filters.minRevenue && { minRevenue: filters.minRevenue }),
-        ...(filters.maxRevenue && { maxRevenue: filters.maxRevenue })
+        ...(currentFilters.storeId && { storeId: currentFilters.storeId }),
+        ...(currentFilters.agentId && { agentId: currentFilters.agentId }),
+        ...(currentFilters.status && { status: currentFilters.status }),
+        ...(currentFilters.wilaya && { wilaya: currentFilters.wilaya }),
+        ...(currentFilters.minRevenue && { minRevenue: currentFilters.minRevenue }),
+        ...(currentFilters.maxRevenue && { maxRevenue: currentFilters.maxRevenue })
       });
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -394,6 +403,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       const result = await response.json();
       if (result.success) {
         setTabData(prev => ({ ...prev, sales: result.data }));
+        loadedTabsRef.current.add('sales');
       } else {
         throw new Error(result.error?.message || 'Failed to fetch sales data');
       }
@@ -403,10 +413,11 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     } finally {
       setTabLoading(prev => ({ ...prev, sales: false }));
     }
-  }, [filters, getDateRange, tabData.sales, tabLoading.sales]);
+  }, [getDateRange]);
 
-  const fetchAgentData = useCallback(async () => {
-    if (tabData.agents && !tabLoading.agents) return; // Already loaded
+  const fetchAgentData = useCallback(async (forceRefresh = false) => {
+    // Skip if already loaded and not forcing refresh
+    if (!forceRefresh && loadedTabsRef.current.has('agents')) return;
 
     setTabLoading(prev => ({ ...prev, agents: true }));
     setError(null);
@@ -418,11 +429,12 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       }
 
       const { startDate, endDate } = getDateRange();
+      const currentFilters = filtersRef.current;
       const params = new URLSearchParams({
         startDate,
         endDate,
-        ...(filters.agentId && { agentId: filters.agentId }),
-        ...(filters.storeId && { storeId: filters.storeId })
+        ...(currentFilters.agentId && { agentId: currentFilters.agentId }),
+        ...(currentFilters.storeId && { storeId: currentFilters.storeId })
       });
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -435,7 +447,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
             'Content-Type': 'application/json',
           },
         }),
-        fetch(`${apiUrl}/api/v1/analytics/agents/notes?period=30d${filters.agentId ? `&agentId=${filters.agentId}` : ''}`, {
+        fetch(`${apiUrl}/api/v1/analytics/agents/notes?period=30d${currentFilters.agentId ? `&agentId=${currentFilters.agentId}` : ''}`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -453,11 +465,12 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       ]);
 
       if (agentResult.success && notesResult.success) {
-        setTabData(prev => ({ 
-          ...prev, 
+        setTabData(prev => ({
+          ...prev,
           agents: agentResult.data,
           agentNotes: notesResult.data
         }));
+        loadedTabsRef.current.add('agents');
       } else {
         throw new Error('Failed to fetch agent data');
       }
@@ -467,10 +480,11 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     } finally {
       setTabLoading(prev => ({ ...prev, agents: false }));
     }
-  }, [filters, getDateRange, tabData.agents, tabLoading.agents]);
+  }, [getDateRange]);
 
-  const fetchGeographicData = useCallback(async () => {
-    if (tabData.geographic && !tabLoading.geographic) return; // Already loaded
+  const fetchGeographicData = useCallback(async (forceRefresh = false) => {
+    // Skip if already loaded and not forcing refresh
+    if (!forceRefresh && loadedTabsRef.current.has('geographic')) return;
 
     setTabLoading(prev => ({ ...prev, geographic: true }));
     setError(null);
@@ -482,10 +496,11 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       }
 
       const { startDate, endDate } = getDateRange();
+      const currentFilters = filtersRef.current;
       const params = new URLSearchParams({
         startDate,
         endDate,
-        ...(filters.wilaya && { wilaya: filters.wilaya })
+        ...(currentFilters.wilaya && { wilaya: currentFilters.wilaya })
       });
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -503,6 +518,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       const result = await response.json();
       if (result.success) {
         setTabData(prev => ({ ...prev, geographic: result.data }));
+        loadedTabsRef.current.add('geographic');
       } else {
         throw new Error(result.error?.message || 'Failed to fetch geographic data');
       }
@@ -512,10 +528,11 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     } finally {
       setTabLoading(prev => ({ ...prev, geographic: false }));
     }
-  }, [filters, getDateRange, tabData.geographic, tabLoading.geographic]);
+  }, [getDateRange]);
 
-  const fetchCustomerData = useCallback(async () => {
-    if (tabData.customers && !tabLoading.customers) return; // Already loaded
+  const fetchCustomerData = useCallback(async (forceRefresh = false) => {
+    // Skip if already loaded and not forcing refresh
+    if (!forceRefresh && loadedTabsRef.current.has('customers')) return;
 
     setTabLoading(prev => ({ ...prev, customers: true }));
     setError(null);
@@ -527,13 +544,14 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       }
 
       const { startDate, endDate } = getDateRange();
+      const currentFilters = filtersRef.current;
       const params = new URLSearchParams({
         startDate,
         endDate,
-        ...(filters.storeId && { storeId: filters.storeId }),
-        ...(filters.wilaya && { wilaya: filters.wilaya }),
-        ...(filters.agentId && { agentId: filters.agentId }),
-        ...(filters.status && { status: filters.status })
+        ...(currentFilters.storeId && { storeId: currentFilters.storeId }),
+        ...(currentFilters.wilaya && { wilaya: currentFilters.wilaya }),
+        ...(currentFilters.agentId && { agentId: currentFilters.agentId }),
+        ...(currentFilters.status && { status: currentFilters.status })
       });
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
@@ -551,6 +569,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       const result = await response.json();
       if (result.success) {
         setTabData(prev => ({ ...prev, customers: result.data }));
+        loadedTabsRef.current.add('customers');
       } else {
         throw new Error(result.error?.message || 'Failed to fetch customer data');
       }
@@ -560,7 +579,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     } finally {
       setTabLoading(prev => ({ ...prev, customers: false }));
     }
-  }, [filters, getDateRange, tabData.customers, tabLoading.customers]);
+  }, [getDateRange]);
 
   const fetchCommuneData = useCallback(async (wilaya: string) => {
     try {
@@ -605,66 +624,81 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     }
   }, [filters, getDateRange]);
 
-  // LAZY LOADING: Only fetch data when the active tab changes
+  // Update filter refs when filters change
+  useEffect(() => {
+    filtersRef.current = filters;
+  }, [filters]);
+
+  // Detect filter changes and clear loaded tabs cache
+  useEffect(() => {
+    const filtersChanged = JSON.stringify(prevFiltersRef.current) !== JSON.stringify(filters);
+    
+    if (filtersChanged) {
+      // Clear loaded tabs cache when filters change
+      loadedTabsRef.current.clear();
+      
+      // Clear ALL existing data when filters change
+      setTabData({
+        sales: null,
+        agents: null,
+        agentNotes: null,
+        geographic: null,
+        customers: null
+      });
+      
+      // Update previous filters
+      prevFiltersRef.current = filters;
+      
+      // Fetch data for current active tab with force refresh
+      switch (activeTab) {
+        case 'sales':
+          fetchSalesData(true);
+          break;
+        case 'agents':
+          fetchAgentData(true);
+          break;
+        case 'geographic':
+          fetchGeographicData(true);
+          break;
+        case 'customers':
+          fetchCustomerData(true);
+          break;
+      }
+    }
+  }, [filters, activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
+
+  // LAZY LOADING: Only fetch data when the active tab changes (if not already loaded)
   useEffect(() => {
     switch (activeTab) {
       case 'sales':
-        fetchSalesData();
+        fetchSalesData(false);
         break;
       case 'agents':
-        fetchAgentData();
+        fetchAgentData(false);
         break;
       case 'geographic':
-        fetchGeographicData();
+        fetchGeographicData(false);
         break;
       case 'customers':
-        fetchCustomerData();
+        fetchCustomerData(false);
         break;
     }
   }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
 
-  // Refresh data when filters change - clear ALL data to ensure filters apply everywhere
-  useEffect(() => {
-    // Clear ALL existing data when filters change to ensure consistency across tabs
-    setTabData({
-      sales: null,
-      agents: null,
-      agentNotes: null,
-      geographic: null,
-      customers: null
-    });
-    
-    // Only fetch data for current active tab (other tabs will fetch when accessed)
-    switch (activeTab) {
-      case 'sales':
-        fetchSalesData();
-        break;
-      case 'agents':
-        fetchAgentData();
-        break;
-      case 'geographic':
-        fetchGeographicData();
-        break;
-      case 'customers':
-        fetchCustomerData();
-        break;
-    }
-  }, [filters]);
-
   const refreshData = useCallback(async () => {
-    // Only refresh the currently active tab
+    // Force refresh the currently active tab
     switch (activeTab) {
       case 'sales':
-        await fetchSalesData();
+        await fetchSalesData(true);
         break;
       case 'agents':
-        await fetchAgentData();
+        await fetchAgentData(true);
         break;
       case 'geographic':
-        await fetchGeographicData();
+        await fetchGeographicData(true);
         break;
       case 'customers':
-        await fetchCustomerData();
+        await fetchCustomerData(true);
         break;
     }
   }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
