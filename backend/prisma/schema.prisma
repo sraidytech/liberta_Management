@@ -40,6 +40,7 @@ model User {
   reportedTickets  Ticket[] @relation("ReportedTickets")
   assignedTickets  Ticket[] @relation("AssignedTickets")
   sentTicketMessages TicketMessage[] @relation("SentTicketMessages")
+  collectedSurveys CustomerSatisfactionSurvey[] @relation("CollectedSurveys")
 
   // NextAuth.js fields
   emailVerified DateTime?
@@ -103,6 +104,7 @@ model Customer {
 
   // Relations
   orders Order[]
+  satisfactionSurveys CustomerSatisfactionSurvey[]
 
   @@map("customers")
 }
@@ -153,6 +155,7 @@ model Order {
   notifications Notification[]
   webhookEvents WebhookEvent[]
   tickets       Ticket[]
+  satisfactionSurveys CustomerSatisfactionSurvey[]
 
   @@map("orders")
 }
@@ -541,4 +544,46 @@ model WilayaDeliverySettings {
   updatedAt       DateTime @updatedAt
   
   @@map("wilaya_delivery_settings")
+}
+
+// Customer Satisfaction Survey Model
+model CustomerSatisfactionSurvey {
+  id          String   @id @default(cuid())
+  orderId     String
+  customerId  String
+  collectedById String
+  collectedAt DateTime @default(now())
+  
+  // Rating fields (1-5 stars, all optional)
+  overallRating        Int?
+  deliverySpeedRating  Int?
+  productQualityRating Int?
+  agentServiceRating   Int?
+  packagingRating      Int?
+  
+  // Feedback fields
+  customerComments String? @db.Text
+  internalNotes    String? @db.Text
+  
+  // Version control for re-surveys
+  surveyVersion Int     @default(1)
+  isLatest      Boolean @default(true)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer     Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  collectedBy  User     @relation("CollectedSurveys", fields: [collectedById], references: [id])
+  
+  @@unique([orderId, isLatest], name: "unique_latest_survey_per_order", map: "customer_satisfaction_surveys_orderId_isLatest_key")
+  @@index([orderId])
+  @@index([customerId])
+  @@index([collectedById])
+  @@index([overallRating])
+  @@index([createdAt])
+  @@index([isLatest])
+  @@map("customer_satisfaction_surveys")
 }

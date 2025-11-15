@@ -789,6 +789,62 @@ export interface Translations {
   contactSystemAdmin: string;
   uptimeFormatted: string;
   primary: string;
+  
+  // Satisfaction Survey System
+  satisfactionSurvey: string;
+  customerSatisfactionSurvey: string;
+  satisfactionAnalytics: string;
+  surveyCollected: string;
+  surveyNotCollected: string;
+  collectSurvey: string;
+  updateSurvey: string;
+  saveSurvey: string;
+  overallSatisfaction: string;
+  deliverySpeed: string;
+  productQuality: string;
+  agentService: string;
+  packaging: string;
+  customerComments: string;
+  internalNotes: string;
+  privateNotes: string;
+  notRated: string;
+  lowRatingDetected: string;
+  lowRatingWarning: string;
+  provideAtLeastOneRating: string;
+  surveySavedSuccessfully: string;
+  surveyUpdatedSuccessfully: string;
+  failedToSaveSurvey: string;
+  enterCustomerFeedback: string;
+  addInternalNotes: string;
+  version: string;
+  lastUpdated: string;
+  surveyHistory: string;
+  viewHistory: string;
+  satisfactionMetrics: string;
+  averageRating: string;
+  totalSurveys: string;
+  responseRate: string;
+  lowRatings: string;
+  highRatings: string;
+  ratingDistribution: string;
+  trendAnalysis: string;
+  agentPerformanceRankings: string;
+  storePerformance: string;
+  productSatisfaction: string;
+  geographicAnalysis: string;
+  satisfactionByWilaya: string;
+  ordersWithoutSurveys: string;
+  surveyReminder: string;
+  collectSurveyForDeliveredOrders: string;
+  exportSatisfactionReport: string;
+  satisfactionDashboard: string;
+  categoryRatings: string;
+  satisfactionTrends: string;
+  topPerformers: string;
+  needsImprovement: string;
+  satisfactionScore: string;
+  surveyCompletionRate: string;
+  collectedBy: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -1581,6 +1637,62 @@ export const translations: Record<Language, Translations> = {
     contactSystemAdmin: 'For technical support, contact your system administrator',
     uptimeFormatted: '{days} days, {hours} hours, {minutes} minutes',
     primary: 'Primary',
+    
+    // Satisfaction Survey System
+    satisfactionSurvey: 'Satisfaction Survey',
+    customerSatisfactionSurvey: 'Customer Satisfaction Survey',
+    satisfactionAnalytics: 'Satisfaction Analytics',
+    surveyCollected: 'Survey Collected',
+    surveyNotCollected: 'Survey Not Collected',
+    collectSurvey: 'Collect Survey',
+    updateSurvey: 'Update Survey',
+    saveSurvey: 'Save Survey',
+    overallSatisfaction: 'Overall Satisfaction',
+    deliverySpeed: 'Delivery Speed',
+    productQuality: 'Product Quality',
+    agentService: 'Agent Service',
+    packaging: 'Packaging',
+    customerComments: 'Customer Comments',
+    internalNotes: 'Internal Notes',
+    privateNotes: 'Private Notes',
+    notRated: 'Not Rated',
+    lowRatingDetected: 'Low Rating Detected',
+    lowRatingWarning: 'This order has received a low satisfaction rating. Consider adding detailed notes about the issue.',
+    provideAtLeastOneRating: 'Please provide at least one rating',
+    surveySavedSuccessfully: 'Survey saved successfully',
+    surveyUpdatedSuccessfully: 'Survey updated successfully',
+    failedToSaveSurvey: 'Failed to save survey',
+    enterCustomerFeedback: 'Enter customer feedback...',
+    addInternalNotes: 'Add internal notes (not visible to customer)...',
+    version: 'Version',
+    lastUpdated: 'Last Updated',
+    surveyHistory: 'Survey History',
+    viewHistory: 'View History',
+    satisfactionMetrics: 'Satisfaction Metrics',
+    averageRating: 'Average Rating',
+    totalSurveys: 'Total Surveys',
+    responseRate: 'Response Rate',
+    lowRatings: 'Low Ratings',
+    highRatings: 'High Ratings',
+    ratingDistribution: 'Rating Distribution',
+    trendAnalysis: 'Trend Analysis',
+    agentPerformanceRankings: 'Agent Performance Rankings',
+    storePerformance: 'Store Performance',
+    productSatisfaction: 'Product Satisfaction',
+    geographicAnalysis: 'Geographic Analysis',
+    satisfactionByWilaya: 'Satisfaction by Wilaya',
+    ordersWithoutSurveys: 'Orders Without Surveys',
+    surveyReminder: 'Survey Reminder',
+    collectSurveyForDeliveredOrders: 'Collect survey for delivered orders',
+    exportSatisfactionReport: 'Export Satisfaction Report',
+    satisfactionDashboard: 'Satisfaction Dashboard',
+    categoryRatings: 'Category Ratings',
+    satisfactionTrends: 'Satisfaction Trends',
+    topPerformers: 'Top Performers',
+    needsImprovement: 'Needs Improvement',
+    satisfactionScore: 'Satisfaction Score',
+    surveyCompletionRate: 'Survey Completion Rate',
+    collectedBy: 'Collected By',
   },
   fr: {
     // Common
@@ -2371,6 +2483,62 @@ export const translations: Record<Language, Translations> = {
     contactSystemAdmin: 'Pour le support technique, contactez votre administrateur système',
     uptimeFormatted: '{days} jours, {hours} heures, {minutes} minutes',
     primary: 'Principal',
+    
+    // Satisfaction Survey System
+    satisfactionSurvey: 'Enquête de Satisfaction',
+    customerSatisfactionSurvey: 'Enquête de Satisfaction Client',
+    satisfactionAnalytics: 'Analyses de Satisfaction',
+    surveyCollected: 'Enquête Collectée',
+    surveyNotCollected: 'Enquête Non Collectée',
+    collectSurvey: 'Collecter l\'Enquête',
+    updateSurvey: 'Mettre à Jour l\'Enquête',
+    saveSurvey: 'Enregistrer l\'Enquête',
+    overallSatisfaction: 'Satisfaction Globale',
+    deliverySpeed: 'Vitesse de Livraison',
+    productQuality: 'Qualité du Produit',
+    agentService: 'Service de l\'Agent',
+    packaging: 'Emballage',
+    customerComments: 'Commentaires du Client',
+    internalNotes: 'Notes Internes',
+    privateNotes: 'Notes Privées',
+    notRated: 'Non Noté',
+    lowRatingDetected: 'Note Faible Détectée',
+    lowRatingWarning: 'Cette commande a reçu une note de satisfaction faible. Envisagez d\'ajouter des notes détaillées sur le problème.',
+    provideAtLeastOneRating: 'Veuillez fournir au moins une note',
+    surveySavedSuccessfully: 'Enquête enregistrée avec succès',
+    surveyUpdatedSuccessfully: 'Enquête mise à jour avec succès',
+    failedToSaveSurvey: 'Échec de l\'enregistrement de l\'enquête',
+    enterCustomerFeedback: 'Entrez les commentaires du client...',
+    addInternalNotes: 'Ajouter des notes internes (non visibles par le client)...',
+    version: 'Version',
+    lastUpdated: 'Dernière Mise à Jour',
+    surveyHistory: 'Historique de l\'Enquête',
+    viewHistory: 'Voir l\'Historique',
+    satisfactionMetrics: 'Métriques de Satisfaction',
+    averageRating: 'Note Moyenne',
+    totalSurveys: 'Total des Enquêtes',
+    responseRate: 'Taux de Réponse',
+    lowRatings: 'Notes Faibles',
+    highRatings: 'Notes Élevées',
+    ratingDistribution: 'Distribution des Notes',
+    trendAnalysis: 'Analyse des Tendances',
+    agentPerformanceRankings: 'Classement des Performances des Agents',
+    storePerformance: 'Performance des Magasins',
+    productSatisfaction: 'Satisfaction des Produits',
+    geographicAnalysis: 'Analyse Géographique',
+    satisfactionByWilaya: 'Satisfaction par Wilaya',
+    ordersWithoutSurveys: 'Commandes Sans Enquêtes',
+    surveyReminder: 'Rappel d\'Enquête',
+    collectSurveyForDeliveredOrders: 'Collecter l\'enquête pour les commandes livrées',
+    exportSatisfactionReport: 'Exporter le Rapport de Satisfaction',
+    satisfactionDashboard: 'Tableau de Bord de Satisfaction',
+    categoryRatings: 'Notes par Catégorie',
+    satisfactionTrends: 'Tendances de Satisfaction',
+    topPerformers: 'Meilleurs Performeurs',
+    needsImprovement: 'Nécessite une Amélioration',
+    satisfactionScore: 'Score de Satisfaction',
+    surveyCompletionRate: 'Taux de Complétion des Enquêtes',
+    collectedBy: 'Collecté Par',
   },
 };
 

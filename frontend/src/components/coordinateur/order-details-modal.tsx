@@ -1,9 +1,12 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useLanguage } from '@/lib/language-context';
-import { X, User, Package, MapPin, Calendar, DollarSign } from 'lucide-react';
+import { useToast } from '@/components/ui/toast';
+import { X, User, Package, MapPin, Calendar, DollarSign, Star } from 'lucide-react';
+import { SatisfactionSurveyForm } from '@/components/satisfaction/satisfaction-survey-form';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -24,6 +27,71 @@ const statusColors = {
 
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
   const { t } = useLanguage();
+  const { showToast } = useToast();
+  const [showSurveyForm, setShowSurveyForm] = useState(false);
+  const [existingSurvey, setExistingSurvey] = useState<any>(null);
+  const [loadingSurvey, setLoadingSurvey] = useState(false);
+
+  // Check if order is delivered
+  const isDelivered = order?.status === 'DELIVERED' || order?.shippingStatus === 'LIVRÉ';
+
+  // Fetch existing survey when modal opens
+  useEffect(() => {
+    if (isOpen && order && isDelivered) {
+      fetchExistingSurvey();
+    }
+  }, [isOpen, order?.id, isDelivered]);
+
+  const fetchExistingSurvey = async () => {
+    if (!order?.id) return;
+    
+    setLoadingSurvey(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/satisfaction-surveys/order/${order.id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Cache-Control': 'no-cache'
+          }
+        }
+      );
+
+      if (response.ok || response.status === 304) {
+        try {
+          const data = await response.json();
+          // Backend returns { success: true, data: survey } - survey is directly in data
+          setExistingSurvey(data.data || null);
+        } catch (e) {
+          // Retry without cache on 304
+          const retryResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/v1/satisfaction-surveys/order/${order.id}?t=${Date.now()}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            setExistingSurvey(retryData.data || null);
+          }
+        }
+      } else if (response.status !== 404) {
+        console.error('Failed to fetch survey');
+      }
+    } catch (error) {
+      console.error('Error fetching survey:', error);
+    } finally {
+      setLoadingSurvey(false);
+    }
+  };
+
+  const handleSurveySuccess = () => {
+    setShowSurveyForm(false);
+    fetchExistingSurvey();
+  };
 
   if (!isOpen || !order) return null;
 
@@ -227,6 +295,125 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                 </div>
               </Card>
             </div>
+
+            {/* Satisfaction Survey Section - Only show for delivered orders */}
+            {isDelivered && (
+              <Card className="p-6 mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center">
+                    <Star className="w-5 h-5 text-yellow-500 mr-2" />
+                    <h3 className="text-lg font-semibold">{t('customerSatisfactionSurvey')}</h3>
+                  </div>
+                  {existingSurvey && !showSurveyForm && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-green-600 font-medium">
+                        ★ {existingSurvey.overallRating || 'N/A'}/5
+                      </span>
+                      <Button
+                        onClick={() => setShowSurveyForm(true)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        {t('updateSurvey')}
+                      </Button>
+                    </div>
+                  )}
+                  {!existingSurvey && !showSurveyForm && (
+                    <Button
+                      onClick={() => setShowSurveyForm(true)}
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                      size="sm"
+                    >
+                      {t('collectSurvey')}
+                    </Button>
+                  )}
+                </div>
+
+                {loadingSurvey ? (
+                  <div className="text-center py-8 text-gray-500">
+                    {t('loading')}...
+                  </div>
+                ) : showSurveyForm ? (
+                  <SatisfactionSurveyForm
+                    orderId={order.id}
+                    orderReference={order.reference}
+                    existingSurvey={existingSurvey}
+                    onSuccess={handleSurveySuccess}
+                    onCancel={() => setShowSurveyForm(false)}
+                  />
+                ) : existingSurvey ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">{t('overallSatisfaction')}</div>
+                        <div className="text-2xl font-bold text-yellow-600">
+                          {existingSurvey.overallRating || '-'}/5
+                        </div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">{t('deliverySpeed')}</div>
+                        <div className="text-2xl font-bold text-blue-600">
+                          {existingSurvey.deliverySpeedRating || '-'}/5
+                        </div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">{t('productQuality')}</div>
+                        <div className="text-2xl font-bold text-green-600">
+                          {existingSurvey.productQualityRating || '-'}/5
+                        </div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">{t('agentService')}</div>
+                        <div className="text-2xl font-bold text-purple-600">
+                          {existingSurvey.agentServiceRating || '-'}/5
+                        </div>
+                      </div>
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-600">{t('packaging')}</div>
+                        <div className="text-2xl font-bold text-orange-600">
+                          {existingSurvey.packagingRating || '-'}/5
+                        </div>
+                      </div>
+                    </div>
+
+                    {existingSurvey.customerComments && (
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <div className="text-sm font-medium text-gray-700 mb-2">
+                          {t('customerComments')}:
+                        </div>
+                        <p className="text-gray-800">{existingSurvey.customerComments}</p>
+                      </div>
+                    )}
+
+                    {existingSurvey.internalNotes && (
+                      <div className="p-4 bg-yellow-50 rounded-lg">
+                        <div className="text-sm font-medium text-gray-700 mb-2">
+                          {t('internalNotes')} ({t('privateNotes')}):
+                        </div>
+                        <p className="text-gray-800">{existingSurvey.internalNotes}</p>
+                      </div>
+                    )}
+
+                    <div className="text-xs text-gray-500 flex items-center justify-between pt-2 border-t">
+                      <span>
+                        {t('collectedBy')}: {existingSurvey.collectedBy?.name || 'Unknown'}
+                      </span>
+                      <span>
+                        {t('version')} {existingSurvey.surveyVersion} • {new Date(existingSurvey.updatedAt).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <Star className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 mb-4">{t('surveyNotCollected')}</p>
+                    <p className="text-sm text-gray-400">
+                      {t('collectSurveyForDeliveredOrders')}
+                    </p>
+                  </div>
+                )}
+              </Card>
+            )}
           </div>
 
           <div className="flex justify-end p-6 border-t border-gray-200">

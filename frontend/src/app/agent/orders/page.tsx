@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { createTranslator } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
+import { SatisfactionSurveyForm } from '@/components/satisfaction/satisfaction-survey-form';
 import {
   calculateOrderDelay,
   getDelayCardClasses,
@@ -45,7 +46,8 @@ import {
   ToggleLeft,
   ToggleRight,
   Check,
-  X as XIcon
+  X as XIcon,
+  Star
 } from 'lucide-react';
 
 interface Order {
@@ -173,6 +175,11 @@ function AgentOrdersPageContent() {
   const [showTicketDetailModal, setShowTicketDetailModal] = useState(false);
   const [newTicketMessage, setNewTicketMessage] = useState('');
   const [sendingTicketMessage, setSendingTicketMessage] = useState(false);
+
+  // Satisfaction survey state
+  const [showSurveyForm, setShowSurveyForm] = useState(false);
+  const [existingSurvey, setExistingSurvey] = useState<any>(null);
+  const [loadingSurvey, setLoadingSurvey] = useState(false);
 
   // Dynamic note options loaded from API
   const [noteOptions, setNoteOptions] = useState<Array<{ value: string; label: string; hasRemark?: boolean }>>([]);
@@ -700,6 +707,75 @@ function AgentOrdersPageContent() {
       showToast({ title: 'Error', message: 'Error adding note', type: 'error' });
     }
   };
+  // Fetch existing satisfaction survey for an order
+  const fetchExistingSurvey = async (orderId: string) => {
+    if (!orderId) return;
+    
+    try {
+      setLoadingSurvey(true);
+      const token = localStorage.getItem('token');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiBaseUrl}/api/v1/satisfaction-surveys/order/${orderId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      if (response.ok || response.status === 304) {
+        // Handle both 200 and 304 responses
+        try {
+          const result = await response.json();
+          console.log('Survey fetch result:', result);
+          // Backend returns { success: true, data: survey } - survey is directly in data
+          setExistingSurvey(result.data || null);
+        } catch (e) {
+          // If JSON parsing fails on 304, try fetching again without cache
+          console.log('Retrying survey fetch without cache...');
+          const retryResponse = await fetch(`${apiBaseUrl}/api/v1/satisfaction-surveys/order/${orderId}?t=${Date.now()}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (retryResponse.ok) {
+            const retryResult = await retryResponse.json();
+            console.log('Retry survey fetch result:', retryResult);
+            setExistingSurvey(retryResult.data || null);
+          } else {
+            setExistingSurvey(null);
+          }
+        }
+      } else if (response.status === 404) {
+        // No survey exists yet - this is normal
+        setExistingSurvey(null);
+      } else {
+        console.error('Failed to fetch survey:', response.status);
+        setExistingSurvey(null);
+      }
+    } catch (error) {
+      console.error('Error fetching survey:', error);
+      setExistingSurvey(null);
+    } finally {
+      setLoadingSurvey(false);
+    }
+  };
+
+  // Handle survey submission success
+  const handleSurveySuccess = () => {
+    setShowSurveyForm(false);
+    if (selectedOrder) {
+      fetchExistingSurvey(selectedOrder.id);
+    }
+    showToast({
+      type: 'success',
+      title: 'Survey Submitted',
+      message: 'Customer satisfaction survey has been recorded successfully'
+    });
+  };
+
 
 
 
@@ -708,6 +784,22 @@ function AgentOrdersPageContent() {
       fetchAvailableAssignees();
     }
   }, [showTicketModal]);
+  // Fetch survey when order modal opens for delivered orders
+  useEffect(() => {
+    if (showOrderModal && selectedOrder) {
+      const isDelivered = selectedOrder.status === 'DELIVERED' || selectedOrder.shippingStatus === 'LIVRÉ';
+      if (isDelivered) {
+        fetchExistingSurvey(selectedOrder.id);
+      } else {
+        setExistingSurvey(null);
+        setShowSurveyForm(false);
+      }
+    } else {
+      setExistingSurvey(null);
+      setShowSurveyForm(false);
+    }
+  }, [showOrderModal, selectedOrder?.id]);
+
 
   // Load pagination and filter settings from localStorage
   useEffect(() => {
@@ -2294,6 +2386,175 @@ function AgentOrdersPageContent() {
                       </div>
                     </Card>
                   </div>
+
+                  {/* Customer Satisfaction Survey Section */}
+                  {(selectedOrder.status === 'DELIVERED' || selectedOrder.shippingStatus === 'LIVRÉ') && (
+                    <Card className="p-6 mt-6 border-2 border-yellow-200 bg-yellow-50">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                          <Star className="w-5 h-5 text-yellow-600 mr-2" />
+                          <h3 className="text-lg font-semibold text-gray-900">
+                            {t('customerSatisfactionSurvey')}
+                          </h3>
+                        </div>
+                        {!showSurveyForm && !existingSurvey && (
+                          <Button
+                            onClick={() => setShowSurveyForm(true)}
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                          >
+                            <Star className="w-4 h-4 mr-2" />
+                            {t('collectSurvey')}
+                          </Button>
+                        )}
+                        {existingSurvey && !showSurveyForm && (
+                          <Button
+                            onClick={() => setShowSurveyForm(true)}
+                            variant="outline"
+                            className="border-yellow-600 text-yellow-600 hover:bg-yellow-50"
+                          >
+                            <Edit className="w-4 h-4 mr-2" />
+                            {t('updateSurvey')}
+                          </Button>
+                        )}
+                      </div>
+
+                      {loadingSurvey ? (
+                        <div className="text-center py-4">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mx-auto"></div>
+                          <p className="text-sm text-gray-600 mt-2">{t('loading')}...</p>
+                        </div>
+                      ) : showSurveyForm ? (
+                        <SatisfactionSurveyForm
+                          orderId={selectedOrder.id}
+                          orderReference={selectedOrder.reference}
+                          existingSurvey={existingSurvey}
+                          onSuccess={handleSurveySuccess}
+                          onCancel={() => setShowSurveyForm(false)}
+                        />
+                      ) : existingSurvey ? (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {existingSurvey.overallRating && (
+                              <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                                <p className="text-xs text-gray-600 mb-1">{t('overallSatisfaction')}</p>
+                                <div className="flex items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${
+                                        i < existingSurvey.overallRating
+                                          ? 'text-yellow-500 fill-yellow-500'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                  <span className="ml-2 font-semibold">{existingSurvey.overallRating}/5</span>
+                                </div>
+                              </div>
+                            )}
+                            {existingSurvey.deliverySpeedRating && (
+                              <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                                <p className="text-xs text-gray-600 mb-1">{t('deliverySpeed')}</p>
+                                <div className="flex items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${
+                                        i < existingSurvey.deliverySpeedRating
+                                          ? 'text-yellow-500 fill-yellow-500'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                  <span className="ml-2 font-semibold">{existingSurvey.deliverySpeedRating}/5</span>
+                                </div>
+                              </div>
+                            )}
+                            {existingSurvey.productQualityRating && (
+                              <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                                <p className="text-xs text-gray-600 mb-1">{t('productQuality')}</p>
+                                <div className="flex items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${
+                                        i < existingSurvey.productQualityRating
+                                          ? 'text-yellow-500 fill-yellow-500'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                  <span className="ml-2 font-semibold">{existingSurvey.productQualityRating}/5</span>
+                                </div>
+                              </div>
+                            )}
+                            {existingSurvey.agentServiceRating && (
+                              <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                                <p className="text-xs text-gray-600 mb-1">{t('agentService')}</p>
+                                <div className="flex items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${
+                                        i < existingSurvey.agentServiceRating
+                                          ? 'text-yellow-500 fill-yellow-500'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                  <span className="ml-2 font-semibold">{existingSurvey.agentServiceRating}/5</span>
+                                </div>
+                              </div>
+                            )}
+                            {existingSurvey.packagingRating && (
+                              <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                                <p className="text-xs text-gray-600 mb-1">{t('packaging')}</p>
+                                <div className="flex items-center">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      className={`w-4 h-4 ${
+                                        i < existingSurvey.packagingRating
+                                          ? 'text-yellow-500 fill-yellow-500'
+                                          : 'text-gray-300'
+                                      }`}
+                                    />
+                                  ))}
+                                  <span className="ml-2 font-semibold">{existingSurvey.packagingRating}/5</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {existingSurvey.comments && (
+                            <div className="bg-white p-3 rounded-lg border border-yellow-200">
+                              <p className="text-xs text-gray-600 mb-1">{t('customerComments')}</p>
+                              <p className="text-sm text-gray-800">{existingSurvey.comments}</p>
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-yellow-200">
+                            <span>
+                              {t('collectedBy')}: {existingSurvey.collectedBy?.name || 'Unknown'}
+                            </span>
+                            <span>
+                              {new Date(existingSurvey.createdAt).toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US')}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-center py-6">
+                          <Star className="w-12 h-12 text-yellow-400 mx-auto mb-3" />
+                          <p className="text-gray-600 mb-4">No satisfaction survey collected yet</p>
+                          <Button
+                            onClick={() => setShowSurveyForm(true)}
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                          >
+                            <Star className="w-4 h-4 mr-2" />
+                            {t('collectSurvey')}
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  )}
 
                   {/* Quick Actions */}
                   <Card className="p-6 mt-6">
