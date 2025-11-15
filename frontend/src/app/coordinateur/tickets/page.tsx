@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useLanguage } from '@/lib/language-context';
 import { createTranslator } from '@/lib/i18n';
 import { useToast } from '@/components/ui/toast';
+import { CriticalTicketsSection } from '@/components/tickets/critical-tickets-section';
 import {
   MessageSquare,
   User,
@@ -77,7 +78,9 @@ function CoordinateurTicketsPageContent() {
   const searchParams = useSearchParams();
   
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [criticalTickets, setCriticalTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingCritical, setLoadingCritical] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
@@ -93,6 +96,37 @@ function CoordinateurTicketsPageContent() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalTickets, setTotalTickets] = useState(0);
   const [itemsPerPage, setItemsPerPage] = useState(20);
+
+  // Fetch critical tickets
+  const fetchCriticalTickets = async () => {
+    if (!user?.id) {
+      setLoadingCritical(false);
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiBaseUrl}/api/v1/tickets/critical?limit=10`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCriticalTickets(data.data?.tickets || []);
+      } else {
+        console.error('❌ Failed to fetch critical tickets:', response.status);
+      }
+    } catch (error) {
+      console.error('💥 Error fetching critical tickets:', error);
+    } finally {
+      setLoadingCritical(false);
+    }
+  };
 
   const fetchTickets = async (page: number = currentPage) => {
     if (!user?.id) {
@@ -278,6 +312,7 @@ function CoordinateurTicketsPageContent() {
   useEffect(() => {
     if (user?.id) {
       fetchTickets(1); // Reset to page 1 when filters change
+      fetchCriticalTickets(); // Also fetch critical tickets
     }
   }, [user?.id, statusFilter, priorityFilter, categoryFilter, itemsPerPage]);
 
@@ -290,6 +325,13 @@ function CoordinateurTicketsPageContent() {
     }, 500);
     return () => clearTimeout(timeoutId);
   }, [searchTerm]);
+
+  // Fetch critical tickets on mount
+  useEffect(() => {
+    if (user?.id) {
+      fetchCriticalTickets();
+    }
+  }, [user?.id]);
 
   // Since we're doing server-side filtering, we don't need client-side filtering
   const filteredTickets = tickets;
@@ -372,6 +414,35 @@ function CoordinateurTicketsPageContent() {
           </div>
         </div>
 
+        {/* Critical Tickets Section */}
+        <CriticalTicketsSection
+          tickets={criticalTickets}
+          loading={loadingCritical}
+          onViewTicket={async (ticket) => {
+            try {
+              const token = localStorage.getItem('token');
+              const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+              
+              const response = await fetch(`${apiBaseUrl}/api/v1/tickets/${ticket.id}`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                setSelectedTicket(data.data.ticket);
+                setShowTicketModal(true);
+              }
+            } catch (error) {
+              console.error('Error fetching ticket:', error);
+            }
+          }}
+          formatDate={formatDate}
+          t={t}
+        />
+
         {/* Filters */}
         <Card className="p-4">
           <div className="flex flex-col lg:flex-row gap-4">
@@ -432,6 +503,9 @@ function CoordinateurTicketsPageContent() {
                 className="border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="ALL">All Categories</option>
+                <option value="EXCHANGE">🔄 Exchange</option>
+                <option value="REFUND">💰 Refund</option>
+                <option value="QUALITY_CONTROL">⚠️ Quality Control</option>
                 <option value="CUSTOMER_ISSUE">{t('customerIssue')}</option>
                 <option value="PRODUCT_ISSUE">{t('productIssue')}</option>
                 <option value="DELIVERY_ISSUE">{t('deliveryIssue')}</option>

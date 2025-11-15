@@ -499,6 +499,9 @@ enum TicketCategory {
   DELIVERY_ISSUE      // Shipping problems, address issues, etc.
   SYSTEM_ISSUE        // Technical problems, app issues, etc.
   PAYMENT_ISSUE       // Payment problems, refunds, etc.
+  EXCHANGE            // Product exchange requests - CRITICAL
+  REFUND              // Refund requests - CRITICAL
+  QUALITY_CONTROL     // Product quality issues - CRITICAL
   OTHER               // Other issues
 }
 

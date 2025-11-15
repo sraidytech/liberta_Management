@@ -20,6 +20,11 @@ router.get('/assignees', async (req, res) => {
   await TicketsController.getAvailableAssignees(req, res);
 });
 
+// Get critical tickets only (EXCHANGE, REFUND, QUALITY_CONTROL)
+router.get('/critical', async (req, res) => {
+  await TicketsController.getCriticalTickets(req, res);
+});
+
 // Get all tickets for current user
 router.get('/', async (req, res) => {
   await TicketsController.getTickets(req, res);

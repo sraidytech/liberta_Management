@@ -63,6 +63,52 @@ export class TicketsController {
     }
   }
 
+  // Get critical tickets only (EXCHANGE, REFUND, QUALITY_CONTROL)
+  static async getCriticalTickets(req: Request, res: Response) {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+      }
+
+      const {
+        status,
+        priority,
+        page = '1',
+        limit = '20'
+      } = req.query;
+
+      const filters: any = {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string)
+      };
+
+      if (status && Object.values(TicketStatus).includes(status as TicketStatus)) {
+        filters.status = status as TicketStatus;
+      }
+
+      if (priority && Object.values(TicketPriority).includes(priority as TicketPriority)) {
+        filters.priority = priority as TicketPriority;
+      }
+
+      const result = await TicketService.getCriticalTickets(userId, filters);
+
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (error) {
+      console.error('Error getting critical tickets:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to get critical tickets'
+      });
+    }
+  }
+
   // Get tickets for current user
   static async getTickets(req: Request, res: Response) {
     try {

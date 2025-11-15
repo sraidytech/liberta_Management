@@ -1,0 +1,3 @@
+[migration]
+name = "add_critical_ticket_categories"
+description = "Add EXCHANGE, REFUND, and QUALITY_CONTROL categories to ticket system for critical issue handling"

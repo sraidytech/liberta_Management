@@ -4,6 +4,44 @@ import { notificationService } from './notification.service';
 const prisma = new PrismaClient();
 
 export class TicketService {
+  // Helper method to check if ticket category is critical
+  static isCriticalCategory(category: TicketCategory): boolean {
+    const criticalCategories = ['EXCHANGE', 'REFUND', 'QUALITY_CONTROL'];
+    return criticalCategories.includes(category as string);
+  }
+
+  // Helper method to notify all supervisors (Team Managers + Coordinateurs)
+  static async notifyAllSupervisors(ticketId: string, orderId: string, title: string, category: TicketCategory) {
+    try {
+      // Get all active Team Managers and Coordinateurs
+      const supervisors = await prisma.user.findMany({
+        where: {
+          role: {
+            in: [UserRole.TEAM_MANAGER, UserRole.COORDINATEUR]
+          },
+          isActive: true,
+        },
+        select: { id: true }
+      });
+
+      // Send notification to each supervisor
+      const notificationPromises = supervisors.map(supervisor =>
+        notificationService.createNotification({
+          userId: supervisor.id,
+          orderId,
+          type: 'SYSTEM_ALERT',
+          title: `🚨 CRITICAL TICKET: ${category}`,
+          message: `Critical ticket requires immediate attention: ${title}`,
+        })
+      );
+
+      await Promise.all(notificationPromises);
+      console.log(`✅ Notified ${supervisors.length} supervisors about critical ticket ${ticketId}`);
+    } catch (error) {
+      console.error('❌ Error notifying supervisors:', error);
+    }
+  }
+
   // Create a new ticket
   static async createTicket(data: {
     orderId: string;
@@ -15,6 +53,15 @@ export class TicketService {
     assigneeId?: string;
   }) {
     try {
+      // Check if this is a critical ticket
+      const isCritical = this.isCriticalCategory(data.category);
+      
+      // If critical, automatically set priority to HIGH or URGENT
+      let priority = data.priority;
+      if (isCritical && (priority === TicketPriority.LOW || priority === TicketPriority.MEDIUM)) {
+        priority = TicketPriority.HIGH;
+      }
+
       // If no assignee specified, auto-assign based on reporter's hierarchy
       let assigneeId = data.assigneeId;
       
@@ -30,7 +77,7 @@ export class TicketService {
           assigneeId,
           title: data.title,
           category: data.category,
-          priority: data.priority,
+          priority: priority, // Use the potentially updated priority
           description: data.description,
           status: TicketStatus.OPEN,
         },
@@ -88,9 +135,14 @@ export class TicketService {
         }
       });
 
-      // Send notification to assignee if assigned
-      if (assigneeId) {
-        await this.createTicketNotification(ticket.id, assigneeId, 'NEW_TICKET');
+      // If critical ticket, notify ALL supervisors
+      if (isCritical) {
+        await this.notifyAllSupervisors(ticket.id, data.orderId, data.title, data.category);
+      } else {
+        // For regular tickets, send notification to assignee if assigned
+        if (assigneeId) {
+          await this.createTicketNotification(ticket.id, assigneeId, 'NEW_TICKET');
+        }
       }
 
       return ticket;
@@ -156,8 +208,14 @@ export class TicketService {
 
       let where: any = {};
       
-      // If not admin, restrict access to only tickets they're involved in
-      if (user?.role !== 'ADMIN') {
+      // Role-based access control
+      if (user?.role === UserRole.ADMIN) {
+        // Admins see ALL tickets (no filter)
+      } else if (user?.role === UserRole.TEAM_MANAGER || user?.role === UserRole.COORDINATEUR) {
+        // Team Managers and Coordinateurs see ALL tickets (no filter)
+        // This allows them to collaborate on all tickets
+      } else {
+        // Agents (AGENT_SUIVI, AGENT_CALL_CENTER) see only their own tickets
         where.OR = [
           { reporterId: userId },
           { assigneeId: userId }
@@ -243,6 +301,104 @@ export class TicketService {
     }
   }
 
+  // Get critical tickets only (EXCHANGE, REFUND, QUALITY_CONTROL)
+  static async getCriticalTickets(userId: string, filters?: {
+    status?: TicketStatus;
+    priority?: TicketPriority;
+    page?: number;
+    limit?: number;
+  }) {
+    try {
+      const page = filters?.page || 1;
+      const limit = filters?.limit || 20;
+      const skip = (page - 1) * limit;
+
+      // Check user role
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true }
+      });
+
+      // Only supervisors (Team Managers, Coordinateurs) and Admins can access critical tickets
+      const allowedRoles = ['ADMIN', 'TEAM_MANAGER', 'COORDINATEUR'];
+      if (!user || !allowedRoles.includes(user.role as string)) {
+        throw new Error('Access denied: Only supervisors can view critical tickets');
+      }
+
+      let where: any = {
+        category: {
+          in: ['EXCHANGE', 'REFUND', 'QUALITY_CONTROL']
+        }
+      };
+
+      if (filters?.status) {
+        where.status = filters.status;
+      }
+      if (filters?.priority) {
+        where.priority = filters.priority;
+      }
+
+      const [tickets, total] = await Promise.all([
+        prisma.ticket.findMany({
+          where,
+          include: {
+            order: {
+              select: {
+                reference: true,
+                customer: {
+                  select: {
+                    fullName: true,
+                    telephone: true,
+                  }
+                }
+              }
+            },
+            reporter: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+                agentCode: true,
+              }
+            },
+            assignee: {
+              select: {
+                id: true,
+                name: true,
+                role: true,
+              }
+            },
+            _count: {
+              select: {
+                messages: true
+              }
+            }
+          },
+          orderBy: [
+            { priority: 'desc' },
+            { createdAt: 'desc' }
+          ],
+          skip,
+          take: limit,
+        }),
+        prisma.ticket.count({ where })
+      ]);
+
+      return {
+        tickets,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      };
+    } catch (error) {
+      console.error('Error getting critical tickets:', error);
+      throw new Error('Failed to get critical tickets');
+    }
+  }
+
   // Get ticket by ID with messages
   static async getTicketById(ticketId: string, userId: string) {
     try {
@@ -254,8 +410,13 @@ export class TicketService {
 
       let whereClause: any = { id: ticketId };
       
-      // If not admin, restrict access to only tickets they're involved in
-      if (user?.role !== 'ADMIN') {
+      // Role-based access control
+      if (user?.role === UserRole.ADMIN) {
+        // Admins see ALL tickets (no additional filter)
+      } else if (user?.role === UserRole.TEAM_MANAGER || user?.role === UserRole.COORDINATEUR) {
+        // Team Managers and Coordinateurs see ALL tickets (no additional filter)
+      } else {
+        // Agents see only their own tickets
         whereClause.OR = [
           { reporterId: userId },
           { assigneeId: userId }
