@@ -2675,6 +2675,9 @@ function AgentOrdersPageContent() {
                     onChange={(e) => setTicketCategory(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                   >
+                    <option value="EXCHANGE">🔄 Exchange</option>
+                    <option value="REFUND">💰 Refund</option>
+                    <option value="QUALITY_CONTROL">⚠️ Quality Control</option>
                     <option value="CUSTOMER_ISSUE">{t('customerIssue')}</option>
                     <option value="PRODUCT_ISSUE">{t('productIssue')}</option>
                     <option value="DELIVERY_ISSUE">{t('deliveryIssue')}</option>
