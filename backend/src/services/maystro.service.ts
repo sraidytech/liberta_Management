@@ -839,6 +839,7 @@ export class MaystroService {
 
   /**
    * Process webhook data from Maystro
+   * 🔄 UPDATED: Now finds orders by trackingNumber OR maystroOrderId (for already synced orders)
    */
   async processWebhook(webhookData: any): Promise<{
     success: boolean;
@@ -848,63 +849,115 @@ export class MaystroService {
     try {
       console.log('🔔 Processing Maystro webhook:', webhookData);
 
-      const { event, payload } = webhookData;
+      const { event, payload, instance_uuid } = webhookData;
 
       if (event === 'OrderStatusChanged' && payload) {
-        const { external_order_id, status, display_id_order } = payload;
+        const {
+          id: maystroId,
+          status,
+          display_id_order,
+          external_order_id,
+          alerted_at,
+          alert_reason,
+          abort_reason,
+          delivered_at
+        } = payload;
 
-        if (external_order_id) {
-          // Find order by reference
-          const order = await prisma.order.findUnique({
+        // 🎯 STRATEGY: Find order by trackingNumber OR maystroOrderId (for already synced orders)
+        // Priority: trackingNumber (display_id_order) → maystroOrderId (id/instance_uuid) → external_order_id
+        let order = null;
+        let searchMethod = '';
+
+        // Method 1: Try finding by trackingNumber (most reliable for synced orders)
+        if (display_id_order) {
+          order = await prisma.order.findFirst({
+            where: { trackingNumber: display_id_order }
+          });
+          if (order) searchMethod = 'trackingNumber';
+        }
+
+        // Method 2: Try finding by maystroOrderId (Maystro's internal UUID)
+        if (!order && (maystroId || instance_uuid)) {
+          const maystroUuid = maystroId || instance_uuid;
+          order = await prisma.order.findFirst({
+            where: { maystroOrderId: maystroUuid }
+          });
+          if (order) searchMethod = 'maystroOrderId';
+        }
+
+        // Method 3: Fallback to external_order_id (our reference) if provided
+        if (!order && external_order_id) {
+          order = await prisma.order.findUnique({
             where: { reference: external_order_id }
           });
+          if (order) searchMethod = 'reference';
+        }
 
-          if (order) {
-            const shippingStatus = this.mapStatus(status);
-            
-            // Prepare update data
-            const updateData: any = {
-              shippingStatus,
-              trackingNumber: display_id_order,
-              updatedAt: new Date()
-            };
+        if (order) {
+          const shippingStatus = this.mapStatus(status);
+          
+          console.log(`✅ Order found via ${searchMethod}: ${order.reference} (${display_id_order || maystroId})`);
+          
+          // Prepare update data
+          const updateData: any = {
+            shippingStatus,
+            trackingNumber: display_id_order || order.trackingNumber,
+            maystroOrderId: maystroId || instance_uuid || order.maystroOrderId,
+            alertedAt: alerted_at ? new Date(alerted_at) : order.alertedAt,
+            alertReason: alert_reason || order.alertReason,
+            abortReason: abort_reason ? String(abort_reason) : order.abortReason,
+            updatedAt: new Date()
+          };
 
-            // 🎯 AUTO-UPDATE: If shipping status is "LIVRÉ", automatically set order status to "DELIVERED"
-            if (shippingStatus === 'LIVRÉ') {
-              updateData.status = 'DELIVERED';
-              console.log(`🚚 Auto-updating order ${external_order_id} status to DELIVERED (shipping status: LIVRÉ) via webhook`);
-            }
-            
-            await prisma.order.update({
-              where: { id: order.id },
-              data: updateData
-            });
-
-            // Create webhook event record
-            await prisma.webhookEvent.create({
-              data: {
-                orderId: order.id,
-                source: 'MAYSTRO',
-                eventType: event,
-                payload: webhookData,
-                processed: true
-              }
-            });
-
-            console.log(`✅ Updated order ${external_order_id} shipping status to: ${shippingStatus}`);
-
-            return {
-              success: true,
-              message: `Order ${external_order_id} shipping status updated to ${shippingStatus}`,
-              orderId: order.id
-            };
-          } else {
-            console.log(`⚠️ Order not found for reference: ${external_order_id}`);
-            return {
-              success: false,
-              message: `Order not found for reference: ${external_order_id}`
-            };
+          // 🎯 AUTO-UPDATE: If shipping status is "LIVRÉ", automatically set order status to "DELIVERED"
+          if (shippingStatus === 'LIVRÉ') {
+            updateData.status = 'DELIVERED';
+            console.log(`🚚 Auto-updating order ${order.reference} status to DELIVERED (shipping status: LIVRÉ) via webhook`);
           }
+          
+          await prisma.order.update({
+            where: { id: order.id },
+            data: updateData
+          });
+
+          // Create webhook event record
+          await prisma.webhookEvent.create({
+            data: {
+              orderId: order.id,
+              source: 'MAYSTRO',
+              eventType: event,
+              payload: webhookData,
+              processed: true
+            }
+          });
+
+          console.log(`✅ Updated order ${order.reference} shipping status to: ${shippingStatus} via webhook`);
+
+          return {
+            success: true,
+            message: `Order ${order.reference} shipping status updated to ${shippingStatus}`,
+            orderId: order.id
+          };
+        } else {
+          // Order not found - likely not synced yet via API
+          const identifier = display_id_order || maystroId || external_order_id || 'unknown';
+          console.log(`⚠️  Order not found for webhook (not synced yet): ${identifier}`);
+          
+          // Create webhook event record for tracking (but mark as not processed)
+          await prisma.webhookEvent.create({
+            data: {
+              source: 'MAYSTRO',
+              eventType: event,
+              payload: webhookData,
+              processed: false,
+              error: `Order not found - not synced yet (${identifier})`
+            }
+          });
+
+          return {
+            success: false,
+            message: `Order not found - not synced yet (${identifier}). Will be updated on next API sync.`
+          };
         }
       }
 

@@ -27,6 +27,37 @@ export class MaystroProvider implements IShippingProvider {
     };
 
     this.maystroService = new MaystroService(config, redis);
+
+    // 🔔 AUTO-SETUP WEBHOOK: Automatically configure webhook for real-time order status updates
+    this.autoSetupWebhook().catch(error => {
+      console.error(`⚠️  Failed to auto-setup webhook for ${config.name}:`, error.message);
+      // Don't throw error - webhook setup failure shouldn't prevent provider initialization
+    });
+  }
+
+  /**
+   * Automatically setup webhook during provider initialization
+   * This runs asynchronously and doesn't block provider creation
+   */
+  private async autoSetupWebhook(): Promise<void> {
+    try {
+      // Get webhook URL from environment or use default
+      const webhookUrl = process.env.WEBHOOK_BASE_URL
+        ? `${process.env.WEBHOOK_BASE_URL}/api/webhooks/maystro`
+        : 'https://app.libertadz.shop/api/webhooks/maystro';
+
+      console.log(`🔄 Auto-setting up webhook for Maystro provider...`);
+      const result = await this.setupWebhook(webhookUrl);
+
+      if (result.success) {
+        console.log(`✅ ${result.message}`);
+      } else {
+        console.warn(`⚠️  Webhook setup warning: ${result.message}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ Auto-setup webhook error:`, error.message);
+      // Silently fail - webhook is optional, provider should still work
+    }
   }
 
   async createOrder(orderData: any): Promise<any> {
@@ -87,5 +118,125 @@ export class MaystroProvider implements IShippingProvider {
    */
   getService(): MaystroService {
     return this.maystroService;
+  }
+
+  // ============================================
+  // WEBHOOK MANAGEMENT METHODS
+  // ============================================
+
+  /**
+   * Get available webhook types from Maystro API
+   * @returns Array of webhook trigger types
+   */
+  async getWebhookTypes(): Promise<any[]> {
+    return await this.maystroService.getWebhookTypes();
+  }
+
+  /**
+   * Get all configured webhooks for this Maystro account
+   * @returns Array of configured webhooks
+   */
+  async getWebhooks(): Promise<any[]> {
+    return await this.maystroService.getWebhooks();
+  }
+
+  /**
+   * Create a new webhook for order status updates
+   * @param endpoint - The webhook endpoint URL (e.g., https://app.libertadz.shop/api/webhooks/maystro)
+   * @param triggerTypeId - The trigger type ID (use getWebhookTypes() to find the correct ID)
+   * @returns Created webhook configuration
+   */
+  async createWebhook(endpoint: string, triggerTypeId: string): Promise<any> {
+    return await this.maystroService.createWebhook(endpoint, triggerTypeId);
+  }
+
+  /**
+   * Delete a webhook by ID
+   * @param webhookId - The webhook ID to delete
+   * @returns True if deleted successfully
+   */
+  async deleteWebhook(webhookId: string): Promise<boolean> {
+    return await this.maystroService.deleteWebhook(webhookId);
+  }
+
+  /**
+   * Send a test webhook to verify endpoint is working
+   * @returns True if test webhook sent successfully
+   */
+  async sendTestWebhook(): Promise<boolean> {
+    return await this.maystroService.sendTestWebhook();
+  }
+
+  /**
+   * Setup webhook automatically for OrderStatusChanged events
+   * This is called during provider initialization
+   * @param webhookUrl - The webhook endpoint URL
+   * @returns Setup result with webhook configuration
+   */
+  async setupWebhook(webhookUrl: string): Promise<{
+    success: boolean;
+    message: string;
+    webhook?: any;
+  }> {
+    try {
+      console.log(`🔔 Setting up Maystro webhook for ${webhookUrl}...`);
+
+      // Step 1: Get available webhook types
+      const webhookTypes = await this.getWebhookTypes();
+      console.log(`📋 Available webhook types:`, webhookTypes.map(t => t.name));
+
+      // Step 2: Find "OrderStatusChanged" or "all" trigger type
+      let triggerType = webhookTypes.find(t =>
+        t.name.toLowerCase() === 'orderstatuschanged' ||
+        t.name.toLowerCase() === 'order_status_changed'
+      );
+
+      // Fallback to "all" if OrderStatusChanged not found
+      if (!triggerType) {
+        triggerType = webhookTypes.find(t => t.name.toLowerCase() === 'all');
+      }
+
+      if (!triggerType) {
+        return {
+          success: false,
+          message: 'No suitable webhook trigger type found (OrderStatusChanged or all)'
+        };
+      }
+
+      console.log(`✅ Using trigger type: ${triggerType.name} (${triggerType.id})`);
+
+      // Step 3: Check if webhook already exists for this endpoint
+      const existingWebhooks = await this.getWebhooks();
+      const existingWebhook = existingWebhooks.find(w =>
+        w.endpoint === webhookUrl &&
+        w.triggers.some((t: any) => t.id === triggerType.id)
+      );
+
+      if (existingWebhook) {
+        console.log(`ℹ️  Webhook already exists for ${webhookUrl}`);
+        return {
+          success: true,
+          message: 'Webhook already configured',
+          webhook: existingWebhook
+        };
+      }
+
+      // Step 4: Create new webhook
+      const newWebhook = await this.createWebhook(webhookUrl, triggerType.id);
+      console.log(`✅ Webhook created successfully:`, newWebhook);
+
+      return {
+        success: true,
+        message: 'Webhook created successfully',
+        webhook: newWebhook
+      };
+
+    } catch (error: any) {
+      console.error(`❌ Error setting up webhook:`, error.message);
+      return {
+        success: false,
+        message: `Failed to setup webhook: ${error.message}`
+      };
+    }
   }
 }
