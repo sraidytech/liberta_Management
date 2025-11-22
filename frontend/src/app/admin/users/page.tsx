@@ -1,6 +1,7 @@
 'use client';
 
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import AdminLayout from '@/components/admin/admin-layout';
 import { useToast } from '@/components/ui/toast';
 import { Pagination } from '@/components/ui/pagination';
@@ -45,6 +46,7 @@ interface User {
 
 export default function UserManagement() {
   const { t, language } = useLanguage();
+  const { user: currentUser } = useAuth();
   const { showToast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -543,17 +545,20 @@ export default function UserManagement() {
                           <Unlock className="w-4 h-4" />
                         )}
                       </button>
-                      <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowDeleteModal(true);
-                        }}
-                        disabled={user.role === 'ADMIN'}
-                        className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                        title={language === 'fr' ? 'Supprimer' : 'Delete'}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {/* Only show delete button for Admin users */}
+                      {currentUser?.role === 'ADMIN' && (
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowDeleteModal(true);
+                          }}
+                          disabled={user.role === 'ADMIN'}
+                          className="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={language === 'fr' ? 'Supprimer' : 'Delete'}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

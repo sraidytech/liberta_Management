@@ -104,9 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Redirect based on role
         console.log('🔀 Redirecting user based on role:', userData.role);
-        if (userData.role === 'ADMIN' || userData.role === 'TEAM_MANAGER') {
+        if (userData.role === 'ADMIN') {
           console.log('👑 Redirecting to admin panel');
           router.push('/admin');
+        } else if (userData.role === 'TEAM_MANAGER') {
+          console.log('👔 Redirecting team manager to orders');
+          router.push('/admin/orders');
         } else if (userData.role === 'AGENT_SUIVI' || userData.role === 'AGENT_CALL_CENTER') {
           console.log('👤 Redirecting to agent portal');
           router.push('/agent');

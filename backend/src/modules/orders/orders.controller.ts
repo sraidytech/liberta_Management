@@ -173,9 +173,9 @@ export class OrdersController {
         ];
       }
 
-      // Apply product-based filtering for non-admin users
+      // Apply product-based filtering for non-admin and non-team-manager users
       const user = req.user;
-      if (user && user.role !== 'ADMIN') {
+      if (user && user.role !== 'ADMIN' && user.role !== 'TEAM_MANAGER') {
         // 🚨 CRITICAL FIX: Product assignments should ONLY be used for NEW order assignments
         // When viewing existing assigned orders (assignedAgentId is specified),
         // agents should see ALL their assigned orders regardless of product assignments

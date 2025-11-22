@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import {
   Users,
   Download,
@@ -97,6 +98,19 @@ interface CustomerAnalysisProps {
 
 export default function CustomerAnalysis({ data, loading, filters }: CustomerAnalysisProps) {
   const { language } = useLanguage();
+  const { user } = useAuth();
+  
+  // Check if user is Team Manager
+  const isTeamManager = user?.role === 'TEAM_MANAGER';
+  
+  // Format currency - hide for Team Manager
+  const formatCurrency = (amount: number) => {
+    if (isTeamManager) {
+      return '***';
+    }
+    return `${amount.toLocaleString()} DA`;
+  };
+  
   const [activeCustomers, setActiveCustomers] = useState<CustomerListData | null>(null);
   const [returningCustomers, setReturningCustomers] = useState<CustomerListData | null>(null);
   const [activeCustomersLoading, setActiveCustomersLoading] = useState(false);
@@ -354,7 +368,7 @@ export default function CustomerAnalysis({ data, loading, filters }: CustomerAna
               <DollarSign className="w-8 h-8 text-green-600" />
             </div>
             <div className="text-3xl font-bold text-green-600">
-              {data.summary.totalRevenue.toLocaleString()} DA
+              {formatCurrency(data.summary.totalRevenue)}
             </div>
             <div className="text-sm text-gray-600 mt-1">
               {language === 'fr' ? 'Commandes livrées uniquement' : 'Delivered orders only'}
@@ -849,7 +863,7 @@ export default function CustomerAnalysis({ data, loading, filters }: CustomerAna
                     {language === 'fr' ? 'Chiffre d\'Affaires' : 'Total Revenue'}
                   </div>
                   <div className="text-2xl font-bold text-green-900 mt-1">
-                    {selectedCustomer.totalRevenue.toLocaleString()} DA
+                    {formatCurrency(selectedCustomer.totalRevenue)}
                   </div>
                 </div>
                 <div className="bg-purple-50 rounded-lg p-4">
@@ -857,7 +871,7 @@ export default function CustomerAnalysis({ data, loading, filters }: CustomerAna
                     {language === 'fr' ? 'Valeur Moyenne' : 'Average Order'}
                   </div>
                   <div className="text-2xl font-bold text-purple-900 mt-1">
-                    {selectedCustomer.averageOrderValue.toLocaleString()} DA
+                    {formatCurrency(selectedCustomer.averageOrderValue)}
                   </div>
                 </div>
               </div>

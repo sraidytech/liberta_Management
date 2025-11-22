@@ -28,9 +28,12 @@ export default function DashboardPage() {
     if (user) {
       // Redirect based on user role
       console.log('🔀 Dashboard redirect for user role:', user.role);
-      if (user.role === 'ADMIN' || user.role === 'TEAM_MANAGER') {
+      if (user.role === 'ADMIN') {
         console.log('👑 Redirecting admin to admin panel');
         router.push('/admin');
+      } else if (user.role === 'TEAM_MANAGER') {
+        console.log('👔 Redirecting team manager to orders');
+        router.push('/admin/orders');
       } else if (user.role === 'COORDINATEUR') {
         console.log('🎯 Redirecting coordinateur to coordinateur panel');
         router.push('/coordinateur');
@@ -96,7 +99,7 @@ export default function DashboardPage() {
 
         {/* Role-based Navigation */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(user?.role === 'ADMIN' || user?.role === 'TEAM_MANAGER') && (
+          {user?.role === 'ADMIN' && (
             <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin')}>
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -105,6 +108,21 @@ export default function DashboardPage() {
                 <div className="flex-1">
                   <h3 className="font-semibold">Admin Panel</h3>
                   <p className="text-sm text-gray-600">Manage system and users</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400" />
+              </div>
+            </Card>
+          )}
+
+          {user?.role === 'TEAM_MANAGER' && (
+            <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/orders')}>
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Package className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">Orders Management</h3>
+                  <p className="text-sm text-gray-600">View and manage all orders</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-gray-400" />
               </div>

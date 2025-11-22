@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import {
   MapPin,
   ArrowLeft,
@@ -93,7 +94,19 @@ interface CommuneAnalyticsProps {
 
 export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnalyticsProps) {
   const { language } = useLanguage();
+  const { user } = useAuth();
   const [sortBy, setSortBy] = useState<'orders' | 'revenue' | 'customers'>('orders');
+  
+  // Check if user is Team Manager
+  const isTeamManager = user?.role === 'TEAM_MANAGER';
+  
+  // Format currency - hide for Team Manager
+  const formatCurrency = (amount: number) => {
+    if (isTeamManager) {
+      return '***';
+    }
+    return `${amount.toLocaleString()} DA`;
+  };
 
   if (loading) {
     return (
@@ -370,7 +383,7 @@ export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnaly
                     {language === 'fr' ? 'Chiffre d\'Affaires' : 'Revenue'}
                   </span>
                   <span className="font-semibold text-emerald-600">
-                    {commune.revenue.toLocaleString()} DA
+                    {formatCurrency(commune.revenue)}
                   </span>
                 </div>
 
@@ -437,7 +450,7 @@ export default function CommuneAnalytics({ data, loading, onBack }: CommuneAnaly
                 {language === 'fr' ? 'Plus de revenus' : 'Highest Revenue'}
               </div>
               <div className="text-lg font-semibold text-gray-900">
-                {[...sortedCommunes].sort((a, b) => b.revenue - a.revenue)[0]?.revenue.toLocaleString()} DA
+                {formatCurrency([...sortedCommunes].sort((a, b) => b.revenue - a.revenue)[0]?.revenue || 0)}
               </div>
             </div>
             

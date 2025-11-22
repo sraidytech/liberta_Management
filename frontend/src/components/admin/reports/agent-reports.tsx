@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import {
   Users,
   TrendingUp,
@@ -172,8 +173,12 @@ interface AgentReportsProps {
 export default function AgentReports({ data, agentNotesData, loading, filters }: AgentReportsProps) {
   const { language } = useLanguage();
 
-  // Format currency
+  // Format currency - hide for Team Manager
   const formatCurrency = (amount: number) => {
+    const { user } = useAuth();
+    if (user?.role === 'TEAM_MANAGER') {
+      return '***';
+    }
     return new Intl.NumberFormat('fr-DZ', {
       style: 'currency',
       currency: 'DZD',

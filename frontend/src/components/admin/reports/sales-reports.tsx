@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useLanguage } from '@/lib/language-context';
+import { useAuth } from '@/lib/auth-context';
 import {
   TrendingUp,
   DollarSign,
@@ -112,6 +113,10 @@ interface SalesReportsProps {
 
 export default function SalesReports({ data, loading, filters }: SalesReportsProps) {
   const { language } = useLanguage();
+  const { user } = useAuth();
+  
+  // Check if user is Team Manager
+  const isTeamManager = user?.role === 'TEAM_MANAGER';
 
   // Add safety checks for data structure
   const safeData = data ? {
@@ -136,8 +141,11 @@ export default function SalesReports({ data, loading, filters }: SalesReportsPro
     }
   } : null;
 
-  // Format currency
+  // Format currency - hide for Team Manager
   const formatCurrency = (amount: number) => {
+    if (isTeamManager) {
+      return '***';
+    }
     return new Intl.NumberFormat('fr-DZ', {
       style: 'currency',
       currency: 'DZD',

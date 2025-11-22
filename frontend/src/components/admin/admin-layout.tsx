@@ -53,80 +53,98 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     );
   }
 
-  const sidebarItems = [
+  // Define all sidebar items
+  const allSidebarItems = [
     {
       name: language === 'fr' ? 'Tableau de Bord' : 'Dashboard',
       icon: BarChart3,
       href: '/admin',
-      active: pathname === '/admin'
+      active: pathname === '/admin',
+      roles: ['ADMIN'] // Only for Admin
     },
     {
       name: language === 'fr' ? 'Gestion des Utilisateurs' : 'User Management',
       icon: Users,
       href: '/admin/users',
-      active: pathname === '/admin/users'
+      active: pathname === '/admin/users',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Commandes' : 'Orders',
       icon: ShoppingCart,
       href: '/admin/orders',
-      active: pathname === '/admin/orders'
+      active: pathname === '/admin/orders',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Magasins' : 'Stores',
       icon: Store,
       href: '/admin/stores',
-      active: pathname === '/admin/stores'
+      active: pathname === '/admin/stores',
+      roles: ['ADMIN'] // Only for Admin
     },
     {
       name: language === 'fr' ? 'Attribution des Agents' : 'Agent Assignment',
       icon: UserCheck,
       href: '/admin/assignments',
-      active: pathname === '/admin/assignments'
+      active: pathname === '/admin/assignments',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Gestion des Commissions' : 'Commission Management',
       icon: Calculator,
       href: '/admin/commissions',
-      active: pathname === '/admin/commissions'
+      active: pathname === '/admin/commissions',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Assignation de Produits' : 'Product Assignment',
       icon: Package,
       href: '/admin/product-assignments',
-      active: pathname === '/admin/product-assignments'
+      active: pathname === '/admin/product-assignments',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',
       icon: FileText,
       href: '/admin/reports',
-      active: pathname === '/admin/reports'
+      active: pathname === '/admin/reports',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Notifications' : 'Notifications',
       icon: Bell,
       href: '/admin/notifications',
-      active: pathname === '/admin/notifications'
+      active: pathname === '/admin/notifications',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Tickets' : 'Tickets',
       icon: MessageSquare,
       href: '/admin/tickets',
-      active: pathname === '/admin/tickets'
+      active: pathname === '/admin/tickets',
+      roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
     },
     {
       name: language === 'fr' ? 'Journaux d\'Activité' : 'Activity Logs',
       icon: Activity,
       href: '/admin/activity-logs',
-      active: pathname === '/admin/activity-logs'
+      active: pathname === '/admin/activity-logs',
+      roles: ['ADMIN'] // Only for Admin
     },
     {
       name: language === 'fr' ? 'Paramètres' : 'Settings',
       icon: Settings,
       href: '/admin/settings',
-      active: pathname === '/admin/settings'
+      active: pathname === '/admin/settings',
+      roles: ['ADMIN'] // Only for Admin
     }
   ];
+
+  // Filter sidebar items based on user role
+  const sidebarItems = allSidebarItems.filter(item =>
+    item.roles.includes(user.role as any)
+  );
 
   return (
     <NotificationProvider userId={user.id} userRole={user.role}>
