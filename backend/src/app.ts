@@ -33,6 +33,7 @@ import noteTypesRoutes from '@/modules/note-types/note-types.routes';
 import wilayaSettingsRoutes from '@/modules/wilaya-settings/wilaya-settings.routes';
 import adminRoutes from '@/modules/admin/admin.routes';
 import satisfactionSurveysRoutes from '@/modules/satisfaction-surveys/satisfaction-surveys.routes';
+import { createShippingRoutes } from '@/modules/shipping/shipping.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -134,6 +135,7 @@ class App {
     this.app.use('/api/v1/wilaya-settings', authMiddleware, userRateLimit, wilayaSettingsRoutes); // Wilaya delivery settings routes
     this.app.use('/api/v1/admin', adminRoutes); // Admin management routes (auth middleware included in routes)
     this.app.use('/api/v1/satisfaction-surveys', authMiddleware, userRateLimit, satisfactionSurveysRoutes); // Customer satisfaction surveys routes
+    this.app.use('/api/v1/shipping', createShippingRoutes(redis)); // Shipping companies and accounts management routes
 
     // Root route
     this.app.get('/', (req, res) => {

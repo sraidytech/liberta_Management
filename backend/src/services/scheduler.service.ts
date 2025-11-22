@@ -1,6 +1,7 @@
 import { SyncService } from './sync.service';
 import { MaystroService } from './maystro.service';
 import { MaystroConfigService } from './maystro-config.service';
+import { ShippingSyncService } from './shipping-sync.service';
 import { deadlineNotificationService } from './deadline-notification.service';
 import { EcoManagerService } from './ecomanager.service';
 import { Redis } from 'ioredis';
@@ -12,6 +13,7 @@ export class SchedulerService {
   private syncService: SyncService;
   private maystroService: MaystroService | null = null;
   private maystroConfigService: MaystroConfigService;
+  private shippingSyncService: ShippingSyncService;
   private redis: Redis;
   private isRunning: boolean = false;
   private scheduledJobs: Map<string, NodeJS.Timeout> = new Map();
@@ -20,15 +22,19 @@ export class SchedulerService {
     this.redis = redis;
     this.syncService = new SyncService(redis);
     this.maystroConfigService = new MaystroConfigService(redis);
+    this.shippingSyncService = new ShippingSyncService(redis);
     
-    // Initialize Maystro service with all configured API keys
+    // Initialize Maystro service with all configured API keys (kept for backward compatibility)
     const allApiKeys = this.maystroConfigService.getAllApiKeys();
     if (allApiKeys.length > 0) {
       this.maystroService = new MaystroService(allApiKeys, redis);
-      console.log(`🔑 Initialized MaystroService with ${allApiKeys.length} API key(s) for dual API support`);
+      console.log(`🔑 Initialized MaystroService with ${allApiKeys.length} API key(s) for backward compatibility`);
     } else {
-      console.warn('⚠️ No Maystro API keys configured. Shipping status sync will be disabled.');
+      console.warn('⚠️ No Maystro API keys configured in legacy system.');
     }
+    
+    // Initialize new multi-shipping sync service
+    console.log(`🚚 Initialized ShippingSyncService for multi-company shipping support (Maystro, Guepex, Nord West)`);
     
     // Load API key statistics from Redis
     this.maystroConfigService.loadApiKeyStatsFromRedis();
@@ -560,40 +566,86 @@ export class SchedulerService {
   }
 
   /**
-   * Execute Shipping Status sync
+   * Execute Shipping Status sync - NOW SUPPORTS ALL SHIPPING COMPANIES (Maystro, Guepex, Nord West)
    */
   private async runShippingStatusSync(): Promise<void> {
     const startTime = new Date();
-    console.log(`🚚 [${startTime.toLocaleString()}] Starting scheduled Shipping Status sync...`);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    console.log(`🚚 [${startTime.toLocaleString()} ${timezone}] SCHEDULED Multi-Company Shipping Status Sync Started`);
+    console.log(`📅 Sync Type: Scheduled Multi-Company Sync`);
+    console.log(`⏰ Started At: ${startTime.toISOString()}`);
 
     try {
       // Log sync start
       await this.redis.set('scheduler:last_shipping_sync_start', startTime.toISOString());
 
-      // Check if Maystro service is available
-      if (!this.maystroService) {
-        throw new Error('Maystro service not configured - no API keys available');
-      }
+      // Get count of orders with shipping accounts
+      const ordersWithShipping = await prisma.order.count({
+        where: {
+          shippingAccountId: { not: null },
+          trackingNumber: { not: null },
+          shippingStatus: { not: 'LIVRÉ' }
+        }
+      });
 
-      // Run the sync
-      const results = await this.maystroService.syncShippingStatus();
+      // Get count of shipping accounts
+      const shippingAccounts = await prisma.shippingAccount.findMany({
+        where: { isActive: true },
+        include: { company: true }
+      });
+
+      console.log(`📊 Sync Configuration:`);
+      console.log(`   - Orders to Sync: ${ordersWithShipping}`);
+      console.log(`   - Active Shipping Accounts: ${shippingAccounts.length}`);
+      console.log(`   - Companies: ${shippingAccounts.map(a => a.company.name).join(', ')}`);
+      console.log(`   - Expected Duration: 30-120 seconds`);
+      console.log(`─────────────────────────────────────────────────────────────`);
+
+      // Run the NEW multi-company sync
+      const syncResults = await this.shippingSyncService.syncAllPendingOrders(500);
       
       // Log results
       const endTime = new Date();
       const duration = endTime.getTime() - startTime.getTime();
       
       await this.redis.set('scheduler:last_shipping_sync_end', endTime.toISOString());
-      await this.redis.set('scheduler:last_shipping_sync_results', JSON.stringify(results));
+      await this.redis.set('scheduler:last_shipping_sync_results', JSON.stringify(syncResults));
 
-      console.log(`✅ [${endTime.toLocaleString()}] Shipping Status sync completed in ${duration}ms`);
-      console.log(`   📊 Orders updated: ${results.updated}`);
-      console.log(`   ❌ Errors: ${results.errors}`);
+      console.log(`─────────────────────────────────────────────────────────────`);
+      console.log(`✅ [${endTime.toLocaleString()} ${timezone}] Multi-Company Shipping Status Sync Completed`);
+      console.log(`📊 Final Results:`);
+      console.log(`   - Duration: ${(duration / 1000).toFixed(1)}s (${duration}ms)`);
+      console.log(`   - Total Orders Processed: ${syncResults.total}`);
+      console.log(`   - Successfully Synced: ${syncResults.synced}`);
+      console.log(`   - Failed: ${syncResults.failed}`);
+      
+      // Log per-account breakdown
+      if (Object.keys(syncResults.byAccount).length > 0) {
+        console.log(`\n📦 Per-Account Breakdown:`);
+        for (const [accountId, stats] of Object.entries(syncResults.byAccount)) {
+          const account = shippingAccounts.find(a => a.id === accountId);
+          const accountName = account ? `${account.name} (${account.company.name})` : accountId;
+          console.log(`   - ${accountName}: ${stats.synced} synced, ${stats.failed} failed`);
+        }
+      }
+
+      // Also run legacy Maystro sync for backward compatibility with old orders
+      if (this.maystroService) {
+        console.log(`\n🔄 Running legacy Maystro sync for backward compatibility...`);
+        try {
+          const legacyResults = await this.maystroService.syncShippingStatus();
+          console.log(`✅ Legacy Maystro sync: ${legacyResults.updated} orders updated, ${legacyResults.errors} errors`);
+        } catch (legacyError) {
+          console.warn(`⚠️ Legacy Maystro sync failed (non-critical):`, legacyError);
+        }
+      }
 
       // Notify via global io if available
       if ((global as any).io) {
         (global as any).io.emit('sync_completed', {
-          type: 'shipping_status',
-          results,
+          type: 'shipping_status_multi_company',
+          results: syncResults,
           duration,
           timestamp: endTime.toISOString()
         });
@@ -601,7 +653,7 @@ export class SchedulerService {
 
     } catch (error) {
       const endTime = new Date();
-      console.error(`❌ [${endTime.toLocaleString()}] Shipping Status sync failed:`, error);
+      console.error(`❌ [${endTime.toLocaleString()} ${timezone}] Multi-Company Shipping Status sync failed:`, error);
       
       await this.redis.set('scheduler:last_shipping_sync_error', JSON.stringify({
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -611,7 +663,7 @@ export class SchedulerService {
       // Notify via global io if available
       if ((global as any).io) {
         (global as any).io.emit('sync_error', {
-          type: 'shipping_status',
+          type: 'shipping_status_multi_company',
           error: error instanceof Error ? error.message : 'Unknown error',
           timestamp: endTime.toISOString()
         });

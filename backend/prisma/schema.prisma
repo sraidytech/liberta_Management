@@ -135,7 +135,7 @@ model Order {
   ecoManagerStatus String?
   storeIdentifier  String?
 
-  // Maystro integration
+  // Maystro integration (kept for backward compatibility)
   trackingNumber      String?
   shippingStatus      String?
   maystroOrderId      String?
@@ -143,6 +143,10 @@ model Order {
   alertReason         String?
   abortReason         String?
   additionalMetaData  Json?
+
+  // 🆕 NEW: Optional link to shipping account (for future orders)
+  shippingAccountId   String?
+  shippingAccount     ShippingAccount? @relation(fields: [shippingAccountId], references: [id])
 
   // Timestamps
   orderDate DateTime @default(now())
@@ -222,10 +226,62 @@ model ApiConfiguration {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // 🆕 NEW: Link to shipping account
+  shippingAccountId   String?  // Optional - can be null for stores without shipping
+  shippingAccount     ShippingAccount? @relation(fields: [shippingAccountId], references: [id])
+
   // Relations
   createdBy User @relation("CreatedBy", fields: [createdById], references: [id])
 
   @@map("api_configurations")
+}
+
+// Shipping Company Model
+model ShippingCompany {
+  id          String   @id @default(cuid())
+  name        String   @unique // "Maystro", "Guepex", "Nord West"
+  slug        String   @unique // "maystro", "guepex", "nord_west"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  accounts    ShippingAccount[]
+  
+  @@map("shipping_companies")
+}
+
+// Shipping Account Model
+model ShippingAccount {
+  id                String   @id @default(cuid())
+  name              String   // "Maystro Account A", "Guepex Main"
+  companyId         String
+  company           ShippingCompany @relation(fields: [companyId], references: [id])
+  
+  // Flexible credentials stored as JSON
+  credentials       Json     // { apiKey, apiToken, apiId, userGuid, etc. }
+  baseUrl           String?  // Optional custom base URL
+  
+  isActive          Boolean  @default(true)
+  isPrimary         Boolean  @default(false) // One primary per company
+  
+  // Statistics
+  requestCount      Int      @default(0)
+  successCount      Int      @default(0)
+  errorCount        Int      @default(0)
+  lastUsed          DateTime?
+  lastTestAt        DateTime?
+  lastTestStatus    String?  // "success" | "error"
+  lastTestError     String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  stores            ApiConfiguration[]
+  orders            Order[]
+  
+  @@map("shipping_accounts")
 }
 
 model WebhookEvent {

@@ -20,6 +20,17 @@ export class StoresController {
               name: true,
               email: true
             }
+          },
+          shippingAccount: {
+            include: {
+              company: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true
+                }
+              }
+            }
           }
         },
         orderBy: {
@@ -718,6 +729,136 @@ export class StoresController {
       res.status(500).json({
         success: false,
         message: errorMessage,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Link a shipping account to a store
+   * PUT /api/v1/stores/:id/shipping-account
+   */
+  static async linkShippingAccount(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { shippingAccountId } = req.body;
+
+      if (!shippingAccountId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Shipping account ID is required'
+        });
+      }
+
+      // Check if store exists
+      const store = await prisma.apiConfiguration.findUnique({
+        where: { id }
+      });
+
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          message: 'Store not found'
+        });
+      }
+
+      // Check if shipping account exists and is active
+      const shippingAccount = await prisma.shippingAccount.findUnique({
+        where: { id: shippingAccountId },
+        include: {
+          company: true
+        }
+      });
+
+      if (!shippingAccount) {
+        return res.status(404).json({
+          success: false,
+          message: 'Shipping account not found'
+        });
+      }
+
+      if (!shippingAccount.isActive) {
+        return res.status(400).json({
+          success: false,
+          message: 'Cannot link to an inactive shipping account'
+        });
+      }
+
+      // Update store with shipping account
+      const updatedStore = await prisma.apiConfiguration.update({
+        where: { id },
+        data: {
+          shippingAccountId
+        },
+        include: {
+          shippingAccount: {
+            include: {
+              company: true
+            }
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        message: `Store linked to ${shippingAccount.company.name} account successfully`,
+        data: updatedStore
+      });
+    } catch (error) {
+      console.error('Error linking shipping account:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to link shipping account',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Unlink shipping account from a store
+   * DELETE /api/v1/stores/:id/shipping-account
+   */
+  static async unlinkShippingAccount(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      // Check if store exists
+      const store = await prisma.apiConfiguration.findUnique({
+        where: { id }
+      });
+
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          message: 'Store not found'
+        });
+      }
+
+      if (!store.shippingAccountId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Store does not have a linked shipping account'
+        });
+      }
+
+      // Remove shipping account link
+      const updatedStore = await prisma.apiConfiguration.update({
+        where: { id },
+        data: {
+          shippingAccountId: null
+        }
+      });
+
+      res.json({
+        success: true,
+        message: 'Shipping account unlinked successfully',
+        data: updatedStore
+      });
+    } catch (error) {
+      console.error('Error unlinking shipping account:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to unlink shipping account',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

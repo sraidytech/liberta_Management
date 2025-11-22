@@ -1,0 +1,3 @@
+[migration]
+name = "add_multi_shipping_support"
+description = "Add ShippingCompany and ShippingAccount tables with optional links to ApiConfiguration and Order tables. Includes seed data for Maystro, Guepex, and Nord West shipping companies."

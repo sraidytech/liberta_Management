@@ -48,4 +48,13 @@ router.post('/:id/sync', requireAdmin as any, async (req, res) => {
   await StoresController.syncStoreOrders(req, res);
 });
 
+// Shipping account linking routes
+router.put('/:id/shipping-account', requireAdmin as any, async (req, res) => {
+  await StoresController.linkShippingAccount(req, res);
+});
+
+router.delete('/:id/shipping-account', requireAdmin as any, async (req, res) => {
+  await StoresController.unlinkShippingAccount(req, res);
+});
+
 export default router;
