@@ -526,6 +526,14 @@ export class SyncService {
             const orderData = ecoService.mapOrderToDatabase(ecoOrder);
             orderData.ecoManagerId = prefixedEcoManagerId;
             
+            // 🔥 CRITICAL FIX: Automatically assign shipping account from store
+            if (apiConfig.shippingAccountId) {
+              orderData.shippingAccountId = apiConfig.shippingAccountId;
+              console.log(`   🚚 Auto-assigned shipping account: ${apiConfig.shippingAccountId}`);
+            } else {
+              console.log(`   ⚠️  No shipping account linked to store ${apiConfig.storeName}`);
+            }
+            
             const newOrder = await prisma.order.create({
               data: orderData
             });
@@ -704,6 +712,12 @@ export class SyncService {
         for (const ecoOrder of batch) {
           try {
             const orderData = ecoService.mapOrderToDatabase(ecoOrder);
+            
+            // 🔥 CRITICAL FIX: Automatically assign shipping account from store
+            if (apiConfig.shippingAccountId) {
+              orderData.shippingAccountId = apiConfig.shippingAccountId;
+            }
+            
             const newOrder = await prisma.order.create({
               data: orderData
             });
