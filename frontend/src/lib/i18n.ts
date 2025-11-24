@@ -35,6 +35,7 @@ export interface Translations {
   // Home page
   homeTitle: string;
   homeSubtitle: string;
+  welcome: string;
   getStarted: string;
   learnMore: string;
   ecoManagerIntegration: string;
@@ -100,6 +101,8 @@ export interface Translations {
   items: string;
   unassigned: string;
   viewDetails: string;
+  viewAll: string;
+  recentTickets: string;
   noOrdersFound: string;
   searchOrders: string;
   failedToFetchOrders: string;
@@ -845,6 +848,115 @@ export interface Translations {
   satisfactionScore: string;
   surveyCompletionRate: string;
   collectedBy: string;
+  
+  // Quality Agent
+  qualityAgent: string;
+  qualityDashboard: string;
+  qualityTickets: string;
+  qualityReview: string;
+  qualityStatistics: string;
+  qualityInspection: string;
+  qualityControl: string;
+  
+  // Review Stages
+  initialReview: string;
+  inspection: string;
+  decision: string;
+  resolution: string;
+  reviewStage: string;
+  
+  // Severity Levels
+  minorSeverity: string;
+  moderateSeverity: string;
+  majorSeverity: string;
+  criticalSeverity: string;
+  severity: string;
+  currentSeverity: string;
+  
+  // Quality Actions
+  approveQuality: string;
+  rejectQuality: string;
+  escalateQuality: string;
+  addInspectionNote: string;
+  updateReviewStage: string;
+  qualityDecision: string;
+  
+  // Quality Metrics
+  pendingReviews: string;
+  approvalRate: string;
+  averageReviewTime: string;
+  issuesBySeverity: string;
+  resolutionTimeByCategory: string;
+  qualityTrends: string;
+  agentPerformanceComparison: string;
+  
+  // Quality Messages
+  qualityApprovedSuccessfully: string;
+  qualityRejectedSuccessfully: string;
+  qualityEscalatedSuccessfully: string;
+  inspectionNoteAdded: string;
+  reviewStageUpdated: string;
+  mandatoryNotesRequired: string;
+  approvalNotes: string;
+  rejectionReason: string;
+  escalationReason: string;
+  qualityNotes: string;
+  qualityMetrics: string;
+  reportedBy: string;
+  assignedTo: string;
+  products: string;
+  
+  // Quality Filters
+  allStages: string;
+  allSeverities: string;
+  allDecisions: string;
+  filterByStage: string;
+  filterBySeverity: string;
+  filterByDecision: string;
+  
+  // Additional UI
+  viewAndManageQualityTickets: string;
+  viewDetailedStatistics: string;
+  needHelp: string;
+  contactYourTeamManager: string;
+  
+  // Missing translations for quality review page
+  notesRequired: string;
+  ticketApprovedSuccessfully: string;
+  errorApprovingTicket: string;
+  ticketRejectedSuccessfully: string;
+  errorRejectingTicket: string;
+  ticketEscalatedSuccessfully: string;
+  errorEscalatingTicket: string;
+  ticketNotFound: string;
+  back: string;
+  ticketDetails: string;
+  ticketInformation: string;
+  updateSeverity: string;
+  approve: string;
+  reject: string;
+  escalate: string;
+  metadata: string;
+  created: string;
+  reviewed: string;
+  approveTicket: string;
+  enterApprovalNotes: string;
+  confirm: string;
+  rejectTicket: string;
+  enterRejectionReason: string;
+  escalateTicket: string;
+  enterEscalationReason: string;
+  description: string;
+  messages: string;
+  lastQuarter: string;
+  totalReviews: string;
+  approved: string;
+  rejected: string;
+  escalated: string;
+  avgReviewTime: string;
+  lastYear: string;
+  customRange: string;
+  apply: string;
 }
 
 export const translations: Record<Language, Translations> = {
@@ -883,6 +995,7 @@ export const translations: Record<Language, Translations> = {
     // Home page
     homeTitle: 'Order Management System',
     homeSubtitle: 'Intelligent order processing and agent assignment platform designed for order fulfillment companies.',
+    welcome: 'Welcome',
     getStarted: 'Get started',
     learnMore: 'Learn more',
     ecoManagerIntegration: 'EcoManager Integration',
@@ -948,6 +1061,8 @@ export const translations: Record<Language, Translations> = {
     items: 'items',
     unassigned: 'Unassigned',
     viewDetails: 'View Details',
+    viewAll: 'View All',
+    recentTickets: 'Recent Tickets',
     noOrdersFound: 'No orders found',
     searchOrders: 'Search orders...',
     failedToFetchOrders: 'Failed to fetch orders',
@@ -1693,6 +1808,115 @@ export const translations: Record<Language, Translations> = {
     satisfactionScore: 'Satisfaction Score',
     surveyCompletionRate: 'Survey Completion Rate',
     collectedBy: 'Collected By',
+    
+    // Quality Agent
+    qualityAgent: 'Quality Agent',
+    qualityDashboard: 'Quality Dashboard',
+    qualityTickets: 'Quality Tickets',
+    qualityReview: 'Quality Review',
+    qualityStatistics: 'Quality Statistics',
+    qualityInspection: 'Quality Inspection',
+    qualityControl: 'Quality Control',
+    
+    // Review Stages
+    initialReview: 'Initial Review',
+    inspection: 'Inspection',
+    decision: 'Decision',
+    resolution: 'Resolution',
+    reviewStage: 'Review Stage',
+    
+    // Severity Levels
+    minorSeverity: 'Minor',
+    moderateSeverity: 'Moderate',
+    majorSeverity: 'Major',
+    criticalSeverity: 'Critical',
+    severity: 'Severity',
+    currentSeverity: 'Current Severity',
+    
+    // Quality Actions
+    approveQuality: 'Approve',
+    rejectQuality: 'Reject',
+    escalateQuality: 'Escalate',
+    addInspectionNote: 'Add Inspection Note',
+    updateReviewStage: 'Update Review Stage',
+    qualityDecision: 'Quality Decision',
+    
+    // Quality Metrics
+    pendingReviews: 'Pending Reviews',
+    approvalRate: 'Approval Rate',
+    averageReviewTime: 'Average Review Time',
+    issuesBySeverity: 'Issues by Severity',
+    resolutionTimeByCategory: 'Resolution Time by Category',
+    qualityTrends: 'Quality Trends',
+    agentPerformanceComparison: 'Agent Performance',
+    
+    // Quality Messages
+    qualityApprovedSuccessfully: 'Quality approved successfully',
+    qualityRejectedSuccessfully: 'Quality rejected successfully',
+    qualityEscalatedSuccessfully: 'Escalated to Team Manager',
+    inspectionNoteAdded: 'Inspection note added',
+    reviewStageUpdated: 'Review stage updated',
+    mandatoryNotesRequired: 'Notes are mandatory for this action',
+    approvalNotes: 'Approval Notes',
+    rejectionReason: 'Rejection Reason',
+    escalationReason: 'Escalation Reason',
+    qualityNotes: 'Quality Notes',
+    qualityMetrics: 'Quality Metrics',
+    reportedBy: 'Reported By',
+    assignedTo: 'Assigned To',
+    products: 'Products',
+    
+    // Quality Filters
+    allStages: 'All Stages',
+    allSeverities: 'All Severities',
+    allDecisions: 'All Decisions',
+    filterByStage: 'Filter by Stage',
+    filterBySeverity: 'Filter by Severity',
+    filterByDecision: 'Filter by Decision',
+    
+    // Additional UI
+    viewAndManageQualityTickets: 'View and manage quality tickets',
+    viewDetailedStatistics: 'View detailed statistics and trends',
+    needHelp: 'Need Help?',
+    contactYourTeamManager: 'Contact your team manager for assistance',
+    
+    // Missing translations for quality review page
+    notesRequired: 'Notes are required',
+    ticketApprovedSuccessfully: 'Ticket approved successfully',
+    errorApprovingTicket: 'Error approving ticket',
+    ticketRejectedSuccessfully: 'Ticket rejected successfully',
+    errorRejectingTicket: 'Error rejecting ticket',
+    ticketEscalatedSuccessfully: 'Ticket escalated successfully',
+    errorEscalatingTicket: 'Error escalating ticket',
+    ticketNotFound: 'Ticket not found',
+    back: 'Back',
+    ticketDetails: 'Ticket Details',
+    ticketInformation: 'Ticket Information',
+    updateSeverity: 'Update Severity',
+    approve: 'Approve',
+    reject: 'Reject',
+    escalate: 'Escalate',
+    metadata: 'Metadata',
+    created: 'Created',
+    reviewed: 'Reviewed',
+    approveTicket: 'Approve Ticket',
+    enterApprovalNotes: 'Enter approval notes...',
+    confirm: 'Confirm',
+    rejectTicket: 'Reject Ticket',
+    enterRejectionReason: 'Enter rejection reason...',
+    escalateTicket: 'Escalate Ticket',
+    enterEscalationReason: 'Enter escalation reason...',
+    description: 'Description',
+    messages: 'Messages',
+    lastQuarter: 'Last Quarter',
+    totalReviews: 'Total Reviews',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    escalated: 'Escalated',
+    avgReviewTime: 'Avg Review Time',
+    lastYear: 'Last Year',
+    customRange: 'Custom Range',
+    apply: 'Apply',
   },
   fr: {
     // Common
@@ -1729,6 +1953,7 @@ export const translations: Record<Language, Translations> = {
     // Home page
     homeTitle: 'Système de Gestion des Commandes',
     homeSubtitle: 'Plateforme intelligente de traitement des commandes et d\'affectation d\'agents conçue pour les entreprises de traitement de commandes.',
+    welcome: 'Bienvenue',
     getStarted: 'Commencer',
     learnMore: 'En savoir plus',
     ecoManagerIntegration: 'Intégration EcoManager',
@@ -1794,6 +2019,8 @@ export const translations: Record<Language, Translations> = {
     items: 'articles',
     unassigned: 'Non assigné',
     viewDetails: 'Voir Détails',
+    viewAll: 'Voir Tout',
+    recentTickets: 'Tickets Récents',
     noOrdersFound: 'Aucune commande trouvée',
     searchOrders: 'Rechercher commandes...',
     failedToFetchOrders: 'Échec de récupération des commandes',
@@ -2539,6 +2766,115 @@ export const translations: Record<Language, Translations> = {
     satisfactionScore: 'Score de Satisfaction',
     surveyCompletionRate: 'Taux de Complétion des Enquêtes',
     collectedBy: 'Collecté Par',
+    
+    // Quality Agent
+    qualityAgent: 'Agent Qualité',
+    qualityDashboard: 'Tableau de Bord Qualité',
+    qualityTickets: 'Tickets Qualité',
+    qualityReview: 'Révision Qualité',
+    qualityStatistics: 'Statistiques Qualité',
+    qualityInspection: 'Inspection Qualité',
+    qualityControl: 'Contrôle Qualité',
+    
+    // Review Stages
+    initialReview: 'Révision Initiale',
+    inspection: 'Inspection',
+    decision: 'Décision',
+    resolution: 'Résolution',
+    reviewStage: 'Étape de Révision',
+    
+    // Severity Levels
+    minorSeverity: 'Mineur',
+    moderateSeverity: 'Modéré',
+    majorSeverity: 'Majeur',
+    criticalSeverity: 'Critique',
+    severity: 'Gravité',
+    currentSeverity: 'Gravité Actuelle',
+    
+    // Quality Actions
+    approveQuality: 'Approuver',
+    rejectQuality: 'Rejeter',
+    escalateQuality: 'Escalader',
+    addInspectionNote: 'Ajouter Note d\'Inspection',
+    updateReviewStage: 'Mettre à Jour l\'Étape',
+    qualityDecision: 'Décision Qualité',
+    
+    // Quality Metrics
+    pendingReviews: 'Révisions en Attente',
+    approvalRate: 'Taux d\'Approbation',
+    averageReviewTime: 'Temps Moyen de Révision',
+    issuesBySeverity: 'Problèmes par Gravité',
+    resolutionTimeByCategory: 'Temps de Résolution par Catégorie',
+    qualityTrends: 'Tendances Qualité',
+    agentPerformanceComparison: 'Performance des Agents',
+    
+    // Quality Messages
+    qualityApprovedSuccessfully: 'Qualité approuvée avec succès',
+    qualityRejectedSuccessfully: 'Qualité rejetée avec succès',
+    qualityEscalatedSuccessfully: 'Escaladé au Responsable d\'Équipe',
+    inspectionNoteAdded: 'Note d\'inspection ajoutée',
+    reviewStageUpdated: 'Étape de révision mise à jour',
+    mandatoryNotesRequired: 'Les notes sont obligatoires pour cette action',
+    approvalNotes: 'Notes d\'Approbation',
+    rejectionReason: 'Raison du Rejet',
+    escalationReason: 'Raison de l\'Escalade',
+    reportedBy: 'Signalé Par',
+    assignedTo: 'Assigné À',
+    products: 'Produits',
+    qualityNotes: 'Notes Qualité',
+    qualityMetrics: 'Métriques Qualité',
+    
+    // Quality Filters
+    allStages: 'Toutes les Étapes',
+    allSeverities: 'Toutes les Gravités',
+    allDecisions: 'Toutes les Décisions',
+    filterByStage: 'Filtrer par Étape',
+    filterBySeverity: 'Filtrer par Gravité',
+    filterByDecision: 'Filtrer par Décision',
+    
+    // Additional UI
+    viewAndManageQualityTickets: 'Voir et gérer les tickets qualité',
+    viewDetailedStatistics: 'Voir les statistiques et tendances détaillées',
+    needHelp: 'Besoin d\'Aide?',
+    contactYourTeamManager: 'Contactez votre responsable d\'équipe pour assistance',
+    
+    // Missing translations for quality review page
+    notesRequired: 'Les notes sont requises',
+    ticketApprovedSuccessfully: 'Ticket approuvé avec succès',
+    errorApprovingTicket: 'Erreur lors de l\'approbation du ticket',
+    ticketRejectedSuccessfully: 'Ticket rejeté avec succès',
+    errorRejectingTicket: 'Erreur lors du rejet du ticket',
+    ticketEscalatedSuccessfully: 'Ticket escaladé avec succès',
+    errorEscalatingTicket: 'Erreur lors de l\'escalade du ticket',
+    ticketNotFound: 'Ticket non trouvé',
+    back: 'Retour',
+    ticketDetails: 'Détails du Ticket',
+    ticketInformation: 'Informations du Ticket',
+    updateSeverity: 'Mettre à Jour la Gravité',
+    approve: 'Approuver',
+    reject: 'Rejeter',
+    escalate: 'Escalader',
+    metadata: 'Métadonnées',
+    created: 'Créé',
+    reviewed: 'Révisé',
+    approveTicket: 'Approuver le Ticket',
+    enterApprovalNotes: 'Entrez les notes d\'approbation...',
+    confirm: 'Confirmer',
+    rejectTicket: 'Rejeter le Ticket',
+    enterRejectionReason: 'Entrez la raison du rejet...',
+    escalateTicket: 'Escalader le Ticket',
+    enterEscalationReason: 'Entrez la raison de l\'escalade...',
+    description: 'Description',
+    messages: 'Messages',
+    lastQuarter: 'Dernier Trimestre',
+    totalReviews: 'Total des Révisions',
+    approved: 'Approuvé',
+    rejected: 'Rejeté',
+    escalated: 'Escaladé',
+    avgReviewTime: 'Temps Moyen de Révision',
+    lastYear: 'Dernière Année',
+    customRange: 'Plage Personnalisée',
+    apply: 'Appliquer',
   },
 };
 

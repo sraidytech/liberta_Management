@@ -34,6 +34,7 @@ import wilayaSettingsRoutes from '@/modules/wilaya-settings/wilaya-settings.rout
 import adminRoutes from '@/modules/admin/admin.routes';
 import satisfactionSurveysRoutes from '@/modules/satisfaction-surveys/satisfaction-surveys.routes';
 import { createShippingRoutes } from '@/modules/shipping/shipping.routes';
+import qualityRoutes from '@/modules/quality/quality.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -131,6 +132,7 @@ class App {
     this.app.use('/api/v1/scheduler', schedulerRoutes); // Scheduler routes for background job management
     this.app.use('/api/v1/product-assignments', productAssignmentRoutes); // Product assignment routes have their own auth middleware
     this.app.use('/api/v1/tickets', authMiddleware, userRateLimit, ticketRoutes); // Ticket system routes with rate limiting
+    this.app.use('/api/v1/quality', qualityRoutes); // Quality control routes (auth middleware included in routes)
     this.app.use('/api/v1/note-types', authMiddleware, userRateLimit, noteTypesRoutes); // Note types management routes
     this.app.use('/api/v1/wilaya-settings', authMiddleware, userRateLimit, wilayaSettingsRoutes); // Wilaya delivery settings routes
     this.app.use('/api/v1/admin', adminRoutes); // Admin management routes (auth middleware included in routes)

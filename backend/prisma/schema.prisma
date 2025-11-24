@@ -39,6 +39,7 @@ model User {
   // Ticket system relations
   reportedTickets  Ticket[] @relation("ReportedTickets")
   assignedTickets  Ticket[] @relation("AssignedTickets")
+  qualityReviewedTickets Ticket[] @relation("QualityReviewer")
   sentTicketMessages TicketMessage[] @relation("SentTicketMessages")
   collectedSurveys CustomerSatisfactionSurvey[] @relation("CollectedSurveys")
 
@@ -307,6 +308,7 @@ enum UserRole {
   COORDINATEUR
   AGENT_SUIVI
   AGENT_CALL_CENTER
+  QUALITY_AGENT
 }
 
 enum AgentAvailability {
@@ -514,6 +516,15 @@ model Ticket {
   status      TicketStatus   @default(OPEN)
   description String
   
+  // Quality Control Fields
+  qualityReviewStage  QualityReviewStage?
+  qualitySeverity     QualitySeverity?
+  qualityDecision     QualityDecision?
+  qualityReviewerId   String?
+  qualityReviewedAt   DateTime?
+  qualityMetrics      Json?  // Flexible metrics tracking
+  qualityNotes        String? @db.Text
+  
   // Metadata
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
@@ -524,6 +535,7 @@ model Ticket {
   order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   reporter    User          @relation("ReportedTickets", fields: [reporterId], references: [id])
   assignee    User?         @relation("AssignedTickets", fields: [assigneeId], references: [id])
+  qualityReviewer User?     @relation("QualityReviewer", fields: [qualityReviewerId], references: [id])
   messages    TicketMessage[]
   
   @@index([orderId])
@@ -531,6 +543,10 @@ model Ticket {
   @@index([assigneeId])
   @@index([status])
   @@index([priority])
+  @@index([qualityReviewStage])
+  @@index([qualitySeverity])
+  @@index([qualityDecision])
+  @@index([qualityReviewerId])
   @@map("tickets")
 }
 
@@ -578,6 +594,28 @@ enum TicketStatus {
   RESOLVED
   CLOSED
 }
+// Quality Control Enums
+enum QualityReviewStage {
+  INITIAL_REVIEW
+  INSPECTION
+  DECISION
+  RESOLUTION
+}
+
+enum QualitySeverity {
+  MINOR
+  MODERATE
+  MAJOR
+  CRITICAL
+}
+
+enum QualityDecision {
+  APPROVED
+  REJECTED
+  ESCALATED
+  PENDING
+}
+
 
 // Note Types Management Model
 model NoteType {

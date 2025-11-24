@@ -110,6 +110,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else if (userData.role === 'TEAM_MANAGER') {
           console.log('👔 Redirecting team manager to orders');
           router.push('/admin/orders');
+        } else if (userData.role === 'QUALITY_AGENT') {
+          console.log('🔍 Redirecting to quality agent dashboard');
+          router.push('/quality-agent');
         } else if (userData.role === 'AGENT_SUIVI' || userData.role === 'AGENT_CALL_CENTER') {
           console.log('👤 Redirecting to agent portal');
           router.push('/agent');

@@ -1,0 +1,3 @@
+[migration]
+name = "add_quality_agent_role"
+description = "Add QUALITY_AGENT role and quality control fields to tickets"

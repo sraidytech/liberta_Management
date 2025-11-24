@@ -88,7 +88,8 @@ export default function OnlineUsersWidget() {
       'TEAM_MANAGER': language === 'fr' ? 'Manager' : 'Manager',
       'COORDINATEUR': language === 'fr' ? 'Coordinateur' : 'Coordinator',
       'AGENT_SUIVI': language === 'fr' ? 'Agent Suivi' : 'Follow-up Agent',
-      'AGENT_CALL_CENTER': language === 'fr' ? 'Agent Call' : 'Call Center Agent'
+      'AGENT_CALL_CENTER': language === 'fr' ? 'Agent Call' : 'Call Center Agent',
+      'QUALITY_AGENT': language === 'fr' ? 'Agent Qualité' : 'Quality Agent'
     };
     return labels[role as keyof typeof labels] || role;
   };
@@ -99,7 +100,8 @@ export default function OnlineUsersWidget() {
       'TEAM_MANAGER': 'bg-purple-100 text-purple-800',
       'COORDINATEUR': 'bg-blue-100 text-blue-800',
       'AGENT_SUIVI': 'bg-green-100 text-green-800',
-      'AGENT_CALL_CENTER': 'bg-orange-100 text-orange-800'
+      'AGENT_CALL_CENTER': 'bg-orange-100 text-orange-800',
+      'QUALITY_AGENT': 'bg-indigo-100 text-indigo-800'
     };
     return colors[role as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
