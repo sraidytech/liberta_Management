@@ -481,10 +481,17 @@ export default function StoresPage() {
   };
 
   const handleLinkShippingAccount = async (storeId: string, shippingAccountId: string) => {
+    console.log('🔗 Linking shipping account:', { storeId, shippingAccountId });
+    
     try {
       const token = localStorage.getItem('token');
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/v1/stores/${storeId}/shipping-account`, {
+      const url = `${apiUrl}/api/v1/stores/${storeId}/shipping-account`;
+      
+      console.log('📡 Making request to:', url);
+      console.log('📦 Request body:', { shippingAccountId });
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -493,16 +500,61 @@ export default function StoresPage() {
         body: JSON.stringify({ shippingAccountId })
       });
 
+      console.log('📨 Response status:', response.status);
+      
       if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Link successful:', result);
+        
+        // Refresh stores to show updated data
         await fetchStores();
-        alert('Shipping account linked successfully!');
+        
+        // Show success message with details
+        const linkedAccount = shippingAccounts.find(acc => acc.id === shippingAccountId);
+        alert(`✅ Success!\n\nStore linked to: ${linkedAccount?.name}\nCompany: ${linkedAccount?.company.name}\n\nOrders from this store will now sync shipping status.`);
       } else {
         const error = await response.json();
-        alert(error.message || 'Failed to link shipping account');
+        console.error('❌ Link failed:', error);
+        alert(`❌ Failed to link shipping account:\n\n${error.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error linking shipping account:', error);
-      alert('Failed to link shipping account');
+      console.error('❌ Error linking shipping account:', error);
+      alert('❌ Failed to link shipping account: Network error or server unavailable');
+    }
+    
+    // VERIFICATION: Double-check the link was saved
+    try {
+      console.log('🔍 Verifying link was saved to database...');
+      const token = localStorage.getItem('token');
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const verifyResponse = await fetch(`${apiUrl}/api/v1/stores/${storeId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (verifyResponse.ok) {
+        const storeData = await verifyResponse.json();
+        const store = storeData.data;
+        
+        if (store.shippingAccountId === shippingAccountId) {
+          console.log('✅ VERIFIED: Link saved successfully in database');
+          console.log('📊 Store data:', {
+            storeId: store.id,
+            storeName: store.storeName,
+            shippingAccountId: store.shippingAccountId,
+            shippingAccount: store.shippingAccount?.name
+          });
+        } else {
+          console.error('⚠️ WARNING: Link may not have been saved!');
+          console.error('Expected shippingAccountId:', shippingAccountId);
+          console.error('Actual shippingAccountId:', store.shippingAccountId);
+          alert('⚠️ Warning: Link may not have been saved. Please check the database.');
+        }
+      }
+    } catch (verifyError) {
+      console.error('⚠️ Could not verify link:', verifyError);
     }
   };
 
@@ -916,18 +968,45 @@ export default function StoresPage() {
                       <span className="font-medium">Base URL:</span> {store.baseUrl}
                     </div>
 
-                    {store.shippingAccount && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700">🚚 Shipping:</span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          store.shippingAccount.company.slug === 'maystro' ? 'bg-blue-100 text-blue-800' :
-                          store.shippingAccount.company.slug === 'guepex' ? 'bg-green-100 text-green-800' :
-                          'bg-purple-100 text-purple-800'
-                        }`}>
-                          {store.shippingAccount.name}
-                        </span>
-                      </div>
-                    )}
+                    {/* Shipping Account Status - ENHANCED */}
+                    <div className="mt-3 p-3 rounded-lg border-2 border-dashed">
+                      {store.shippingAccount ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700">🚚 Shipping Account:</span>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            store.shippingAccount.company.slug === 'maystro' ? 'bg-blue-100 text-blue-800' :
+                            store.shippingAccount.company.slug === 'guepex' ? 'bg-green-100 text-green-800' :
+                            'bg-purple-100 text-purple-800'
+                          }`}>
+                            {store.shippingAccount.name} ({store.shippingAccount.company.name})
+                          </span>
+                          <span className="text-xs text-green-600 font-medium">✓ Linked</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-red-600">⚠️ No Shipping Account Linked</span>
+                            <span className="text-xs text-gray-500">(Orders from this store cannot sync shipping status)</span>
+                          </div>
+                          <select
+                            className="px-3 py-1 border rounded-md text-sm"
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                handleLinkShippingAccount(store.id, e.target.value);
+                              }
+                            }}
+                            defaultValue=""
+                          >
+                            <option value="">Select Shipping Account...</option>
+                            {shippingAccounts.filter(acc => acc.isActive).map((account) => (
+                              <option key={account.id} value={account.id}>
+                                {account.name} ({account.company.name})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="flex gap-2 ml-4">
