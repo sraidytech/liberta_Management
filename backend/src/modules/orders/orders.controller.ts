@@ -1857,22 +1857,62 @@ export class OrdersController {
   }
 
   /**
-   * Sync shipping status from Maystro
+   * Sync shipping status using new shipping-sync service
+   * Supports multiple shipping providers (Maystro, Guepex, etc.)
    */
   async syncShippingStatus(req: Request, res: Response) {
     try {
-      const { orderReferences } = req.body;
+      const { limit = 15000 } = req.body;
 
-      const maystroService = getMaystroService(redis);
-      const result = await maystroService.syncShippingStatus(orderReferences);
+      console.log(`🔄 Starting shipping status sync for last ${limit} orders...`);
+
+      // Get orders with tracking numbers and shipping accounts
+      const ordersToSync = await prisma.order.findMany({
+        where: {
+          trackingNumber: { not: null },
+          shippingAccountId: { not: null },
+          shippingStatus: { not: 'LIVRÉ' }
+        },
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, reference: true, trackingNumber: true }
+      });
+
+      console.log(`📦 Found ${ordersToSync.length} orders to sync`);
+
+      if (ordersToSync.length === 0) {
+        return res.json({
+          success: true,
+          data: { synced: 0, failed: 0, total: 0 },
+          message: 'No orders found to sync (need tracking number + shipping account)'
+        });
+      }
+
+      // Use ShippingSyncService to sync orders
+      const { ShippingSyncService } = await import('../../services/shipping-sync.service');
+      const shippingSyncService = new ShippingSyncService(redis);
+
+      const results = await shippingSyncService.syncMultipleOrders(
+        ordersToSync.map(o => o.id)
+      );
+
+      const synced = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+
+      console.log(`✅ Sync complete: ${synced} synced, ${failed} failed`);
 
       res.json({
         success: true,
-        data: result,
-        message: `Shipping status sync completed: ${result.updated} updated, ${result.errors} errors`
+        data: {
+          total: ordersToSync.length,
+          synced,
+          failed,
+          details: results.slice(0, 10) // Show first 10 results
+        },
+        message: `Shipping status sync completed: ${synced} synced, ${failed} failed out of ${ordersToSync.length} orders`
       });
     } catch (error) {
-      console.error('Sync shipping status error:', error);
+      console.error('❌ Sync shipping status error:', error);
       res.status(500).json({
         success: false,
         error: {

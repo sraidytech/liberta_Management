@@ -14,6 +14,7 @@ interface ApiResponse {
 
 export function DatabaseManagementSettings() {
   const [loading, setLoading] = useState<string | null>(null);
+  const [shippingSyncLimit, setShippingSyncLimit] = useState<number>(15000);
   const [results, setResults] = useState<{ [key: string]: ApiResponse | null }>({
     deleteOrders: null,
     syncStores: null,
@@ -146,6 +147,10 @@ export function DatabaseManagementSettings() {
   };
 
   const handleSyncShippingStatus = async () => {
+    if (!confirm(`Sync shipping status for the last ${shippingSyncLimit.toLocaleString()} orders with tracking numbers?`)) {
+      return;
+    }
+    
     setLoading('syncShipping');
     setResults(prev => ({ ...prev, syncShipping: null }));
     
@@ -157,17 +162,17 @@ export function DatabaseManagementSettings() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({})
+        body: JSON.stringify({ limit: shippingSyncLimit })
       });
       
       const result = await response.json();
       setResults(prev => ({ ...prev, syncShipping: result }));
     } catch (error) {
-      setResults(prev => ({ 
-        ...prev, 
-        syncShipping: { 
-          success: false, 
-          message: error instanceof Error ? error.message : 'Unknown error' 
+      setResults(prev => ({
+        ...prev,
+        syncShipping: {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error'
         }
       }));
     } finally {
@@ -323,24 +328,65 @@ export function DatabaseManagementSettings() {
           <Truck className="h-5 w-5 text-purple-600" />
           Shipping Status Synchronization
         </h3>
-        <p className="text-gray-600 mb-4">Synchronize shipping status updates from Maystro delivery service for the last 40,000 orders with tracking numbers.</p>
-        <Button
-          onClick={handleSyncShippingStatus}
-          disabled={loading === 'syncShipping'}
-          className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700"
-        >
-          {loading === 'syncShipping' ? (
-            <>
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-              Syncing Shipping...
-            </>
-          ) : (
-            <>
-              <Truck className="mr-2 h-4 w-4" />
-              Sync Shipping Status
-            </>
-          )}
-        </Button>
+        <p className="text-gray-600 mb-4">
+          Synchronize shipping status updates from shipping providers (Maystro, Guepex, etc.) for orders with tracking numbers.
+        </p>
+        
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <label htmlFor="shippingSyncLimit" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+              Number of orders:
+            </label>
+            <input
+              id="shippingSyncLimit"
+              type="number"
+              min="100"
+              max="100000"
+              step="1000"
+              value={shippingSyncLimit}
+              onChange={(e) => setShippingSyncLimit(parseInt(e.target.value) || 15000)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-32"
+            />
+            <span className="text-sm text-gray-500">
+              (Latest orders with tracking numbers)
+            </span>
+          </div>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={handleSyncShippingStatus}
+              disabled={loading === 'syncShipping'}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {loading === 'syncShipping' ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Syncing {shippingSyncLimit.toLocaleString()} Orders...
+                </>
+              ) : (
+                <>
+                  <Truck className="mr-2 h-4 w-4" />
+                  Sync Last {shippingSyncLimit.toLocaleString()} Orders
+                </>
+              )}
+            </Button>
+            
+            <Button
+              onClick={() => setShippingSyncLimit(15000)}
+              variant="outline"
+              disabled={loading === 'syncShipping'}
+              className="text-gray-600"
+            >
+              Reset to 15,000
+            </Button>
+          </div>
+          
+          <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-md p-3">
+            <strong>ℹ️ Info:</strong> This will sync the most recent {shippingSyncLimit.toLocaleString()} orders that have tracking numbers and are not yet delivered.
+            Orders are synced from their assigned shipping accounts (Maystro, Guepex, etc.).
+          </div>
+        </div>
+        
         {renderResult('syncShipping', results.syncShipping)}
       </Card>
 
