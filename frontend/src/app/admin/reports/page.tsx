@@ -9,7 +9,11 @@ import SalesReports from '@/components/admin/reports/sales-reports';
 import AgentReports from '@/components/admin/reports/agent-reports';
 import CommuneAnalytics from '@/components/admin/reports/commune-analytics';
 import CustomerAnalysis from '@/components/admin/reports/customer-analysis';
+import SatisfactionReports from '@/components/admin/reports/satisfaction-reports';
+import TicketReports from '@/components/admin/reports/ticket-reports';
 import { useReportsLazy } from '@/hooks/useReportsLazy';
+import { useSatisfactionAnalytics } from '@/hooks/useSatisfactionAnalytics';
+import { useTicketAnalytics } from '@/hooks/useTicketAnalytics';
 import {
   BarChart3,
   TrendingUp,
@@ -22,7 +26,9 @@ import {
   CheckCircle,
   Info,
   XCircle,
-  Truck
+  Truck,
+  Star,
+  MessageSquare
 } from 'lucide-react';
 
 // Tooltip Component
@@ -63,7 +69,7 @@ function Tooltip({ content, children }: TooltipProps) {
 
 export default function ReportsPage() {
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'sales' | 'agents' | 'geographic' | 'customers'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'agents' | 'geographic' | 'customers' | 'satisfaction' | 'tickets'>('sales');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [selectedWilaya, setSelectedWilaya] = useState<string | null>(null);
   const [communeLoading, setCommuneLoading] = useState(false);
@@ -92,6 +98,10 @@ export default function ReportsPage() {
     exportData,
     fetchCommuneData
   } = useReportsLazy(filters, activeTab);
+
+  // Satisfaction and Ticket analytics hooks
+  const satisfactionAnalytics = useSatisfactionAnalytics(filters);
+  const ticketAnalytics = useTicketAnalytics(filters);
 
   // Auto-refresh functionality with Page Visibility API
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -301,6 +311,32 @@ export default function ReportsPage() {
                 <div className="flex items-center space-x-2">
                   <UserCheck className="w-5 h-5" />
                   <span>{language === 'fr' ? 'Analyse Clients' : 'Customer Analytics'}</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('satisfaction')}
+                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'satisfaction'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <Star className="w-5 h-5" />
+                  <span>{language === 'fr' ? 'Satisfaction Client' : 'Customer Satisfaction'}</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('tickets')}
+                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'tickets'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <MessageSquare className="w-5 h-5" />
+                  <span>{language === 'fr' ? 'Système de Tickets' : 'Ticket System'}</span>
                 </div>
               </button>
             </nav>
@@ -619,6 +655,20 @@ export default function ReportsPage() {
               <CustomerAnalysis
                 data={customerData}
                 loading={loading}
+                filters={filters}
+              />
+            )}
+            {activeTab === 'satisfaction' && (
+              <SatisfactionReports
+                data={satisfactionAnalytics.data}
+                loading={satisfactionAnalytics.loading}
+                filters={filters}
+              />
+            )}
+            {activeTab === 'tickets' && (
+              <TicketReports
+                data={ticketAnalytics.data}
+                loading={ticketAnalytics.loading}
                 filters={filters}
               />
             )}

@@ -29,10 +29,12 @@ import activityLogsRoutes from '@/modules/activity-logs/activity-logs.routes';
 import schedulerRoutes from '@/modules/scheduler/scheduler.routes';
 import productAssignmentRoutes from '@/modules/product-assignments/product-assignments.routes';
 import ticketRoutes from '@/modules/tickets/tickets.routes';
+import ticketAnalyticsRoutes from '@/modules/tickets/ticket-analytics.routes';
 import noteTypesRoutes from '@/modules/note-types/note-types.routes';
 import wilayaSettingsRoutes from '@/modules/wilaya-settings/wilaya-settings.routes';
 import adminRoutes from '@/modules/admin/admin.routes';
 import satisfactionSurveysRoutes from '@/modules/satisfaction-surveys/satisfaction-surveys.routes';
+import satisfactionAnalyticsRoutes from '@/modules/satisfaction/satisfaction-analytics.routes';
 import { createShippingRoutes } from '@/modules/shipping/shipping.routes';
 import qualityRoutes from '@/modules/quality/quality.routes';
 
@@ -132,11 +134,13 @@ class App {
     this.app.use('/api/v1/scheduler', schedulerRoutes); // Scheduler routes for background job management
     this.app.use('/api/v1/product-assignments', productAssignmentRoutes); // Product assignment routes have their own auth middleware
     this.app.use('/api/v1/tickets', authMiddleware, userRateLimit, ticketRoutes); // Ticket system routes with rate limiting
+    this.app.use('/api/v1/ticket-analytics', authMiddleware, userRateLimit, ticketAnalyticsRoutes); // Ticket analytics routes
     this.app.use('/api/v1/quality', qualityRoutes); // Quality control routes (auth middleware included in routes)
     this.app.use('/api/v1/note-types', authMiddleware, userRateLimit, noteTypesRoutes); // Note types management routes
     this.app.use('/api/v1/wilaya-settings', authMiddleware, userRateLimit, wilayaSettingsRoutes); // Wilaya delivery settings routes
     this.app.use('/api/v1/admin', adminRoutes); // Admin management routes (auth middleware included in routes)
     this.app.use('/api/v1/satisfaction-surveys', authMiddleware, userRateLimit, satisfactionSurveysRoutes); // Customer satisfaction surveys routes
+    this.app.use('/api/v1/satisfaction-analytics', authMiddleware, userRateLimit, satisfactionAnalyticsRoutes); // Satisfaction analytics routes
     this.app.use('/api/v1/shipping', createShippingRoutes(redis)); // Shipping companies and accounts management routes
 
     // Root route

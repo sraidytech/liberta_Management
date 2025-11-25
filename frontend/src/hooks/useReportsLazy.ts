@@ -265,13 +265,15 @@ interface CustomerData {
   };
 }
 
-type TabType = 'sales' | 'agents' | 'geographic' | 'customers';
+type TabType = 'sales' | 'agents' | 'geographic' | 'customers' | 'satisfaction' | 'tickets';
 
 interface TabLoadingState {
   sales: boolean;
   agents: boolean;
   geographic: boolean;
   customers: boolean;
+  satisfaction: boolean;
+  tickets: boolean;
 }
 
 interface TabDataState {
@@ -288,7 +290,9 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     sales: false,
     agents: false,
     geographic: false,
-    customers: false
+    customers: false,
+    satisfaction: false,
+    tickets: false
   });
 
   // Separate data states for each tab
@@ -663,6 +667,10 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
         case 'customers':
           fetchCustomerData(true);
           break;
+        case 'satisfaction':
+        case 'tickets':
+          // These tabs use their own hooks, no fetch needed here
+          break;
       }
     }
   }, [filters, activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
@@ -682,6 +690,10 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       case 'customers':
         fetchCustomerData(false);
         break;
+      case 'satisfaction':
+      case 'tickets':
+        // These tabs use their own hooks, no fetch needed here
+        break;
     }
   }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
 
@@ -699,6 +711,10 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
         break;
       case 'customers':
         await fetchCustomerData(true);
+        break;
+      case 'satisfaction':
+      case 'tickets':
+        // These tabs use their own hooks, no refresh needed here
         break;
     }
   }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
