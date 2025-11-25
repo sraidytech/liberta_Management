@@ -11,6 +11,7 @@ import CommuneAnalytics from '@/components/admin/reports/commune-analytics';
 import CustomerAnalysis from '@/components/admin/reports/customer-analysis';
 import SatisfactionReports from '@/components/admin/reports/satisfaction-reports';
 import TicketReports from '@/components/admin/reports/ticket-reports';
+import ProductAnalytics from '@/components/admin/reports/product-analytics';
 import { useReportsLazy } from '@/hooks/useReportsLazy';
 import { useSatisfactionAnalytics } from '@/hooks/useSatisfactionAnalytics';
 import { useTicketAnalytics } from '@/hooks/useTicketAnalytics';
@@ -28,7 +29,8 @@ import {
   XCircle,
   Truck,
   Star,
-  MessageSquare
+  MessageSquare,
+  Package
 } from 'lucide-react';
 
 // Tooltip Component
@@ -69,7 +71,7 @@ function Tooltip({ content, children }: TooltipProps) {
 
 export default function ReportsPage() {
   const { language } = useLanguage();
-  const [activeTab, setActiveTab] = useState<'sales' | 'agents' | 'geographic' | 'customers' | 'satisfaction' | 'tickets'>('sales');
+  const [activeTab, setActiveTab] = useState<'sales' | 'agents' | 'geographic' | 'customers' | 'satisfaction' | 'tickets' | 'products'>('sales');
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [selectedWilaya, setSelectedWilaya] = useState<string | null>(null);
   const [communeLoading, setCommuneLoading] = useState(false);
@@ -92,6 +94,7 @@ export default function ReportsPage() {
     geographicData,
     communeData,
     customerData,
+    productData,
     loading,
     error,
     refreshData,
@@ -337,6 +340,19 @@ export default function ReportsPage() {
                 <div className="flex items-center space-x-2">
                   <MessageSquare className="w-5 h-5" />
                   <span>{language === 'fr' ? 'Système de Tickets' : 'Ticket System'}</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('products')}
+                className={`py-4 px-2 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'products'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <div className="flex items-center space-x-2">
+                  <Package className="w-5 h-5" />
+                  <span>{language === 'fr' ? 'Analyse Produits' : 'Product Analytics'}</span>
                 </div>
               </button>
             </nav>
@@ -669,6 +685,13 @@ export default function ReportsPage() {
               <TicketReports
                 data={ticketAnalytics.data}
                 loading={ticketAnalytics.loading}
+                filters={filters}
+              />
+            )}
+            {activeTab === 'products' && (
+              <ProductAnalytics
+                data={productData}
+                loading={loading}
                 filters={filters}
               />
             )}

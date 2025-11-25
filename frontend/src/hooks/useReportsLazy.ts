@@ -265,7 +265,7 @@ interface CustomerData {
   };
 }
 
-type TabType = 'sales' | 'agents' | 'geographic' | 'customers' | 'satisfaction' | 'tickets';
+type TabType = 'sales' | 'agents' | 'geographic' | 'customers' | 'satisfaction' | 'tickets' | 'products';
 
 interface TabLoadingState {
   sales: boolean;
@@ -274,6 +274,7 @@ interface TabLoadingState {
   customers: boolean;
   satisfaction: boolean;
   tickets: boolean;
+  products: boolean;
 }
 
 interface TabDataState {
@@ -282,6 +283,7 @@ interface TabDataState {
   agentNotes: AgentNotesData | null;
   geographic: GeographicData | null;
   customers: CustomerData | null;
+  products: any | null;
 }
 
 export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
@@ -292,7 +294,8 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     geographic: false,
     customers: false,
     satisfaction: false,
-    tickets: false
+    tickets: false,
+    products: false
   });
 
   // Separate data states for each tab
@@ -301,7 +304,8 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     agents: null,
     agentNotes: null,
     geographic: null,
-    customers: null
+    customers: null,
+    products: null
   });
 
   const [communeData, setCommuneData] = useState<CommuneData | null>(null);
@@ -585,6 +589,70 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     }
   }, [getDateRange]);
 
+  const fetchProductData = useCallback(async (forceRefresh = false) => {
+    // Skip if already loaded and not forcing refresh
+    if (!forceRefresh && loadedTabsRef.current.has('products')) return;
+
+    setTabLoading(prev => ({ ...prev, products: true }));
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const { startDate, endDate } = getDateRange();
+      const currentFilters = filtersRef.current;
+      const params = new URLSearchParams({
+        startDate,
+        endDate,
+        ...(currentFilters.storeId && { storeId: currentFilters.storeId }),
+        ...(currentFilters.wilaya && { wilaya: currentFilters.wilaya })
+      });
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      
+      // Add timeout for long-running requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+      
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/analytics/products?${params}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          setTabData(prev => ({ ...prev, products: result.data }));
+          loadedTabsRef.current.add('products');
+        } else {
+          throw new Error(result.error?.message || 'Failed to fetch product data');
+        }
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error('Request timeout - Product analytics is taking too long. Try selecting a shorter date range.');
+        }
+        throw fetchError;
+      }
+    } catch (err) {
+      console.error('Error fetching product data:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+    } finally {
+      setTabLoading(prev => ({ ...prev, products: false }));
+    }
+  }, [getDateRange]);
+
   const fetchCommuneData = useCallback(async (wilaya: string) => {
     try {
       const token = localStorage.getItem('token');
@@ -647,7 +715,8 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
         agents: null,
         agentNotes: null,
         geographic: null,
-        customers: null
+        customers: null,
+        products: null
       });
       
       // Update previous filters
@@ -667,13 +736,16 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
         case 'customers':
           fetchCustomerData(true);
           break;
+        case 'products':
+          fetchProductData(true);
+          break;
         case 'satisfaction':
         case 'tickets':
           // These tabs use their own hooks, no fetch needed here
           break;
       }
     }
-  }, [filters, activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
+  }, [filters, activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData, fetchProductData]);
 
   // LAZY LOADING: Only fetch data when the active tab changes (if not already loaded)
   useEffect(() => {
@@ -690,12 +762,15 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       case 'customers':
         fetchCustomerData(false);
         break;
+      case 'products':
+        fetchProductData(false);
+        break;
       case 'satisfaction':
       case 'tickets':
         // These tabs use their own hooks, no fetch needed here
         break;
     }
-  }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
+  }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData, fetchProductData]);
 
   const refreshData = useCallback(async () => {
     // Force refresh the currently active tab
@@ -712,12 +787,15 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
       case 'customers':
         await fetchCustomerData(true);
         break;
+      case 'products':
+        await fetchProductData(true);
+        break;
       case 'satisfaction':
       case 'tickets':
         // These tabs use their own hooks, no refresh needed here
         break;
     }
-  }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData]);
+  }, [activeTab, fetchSalesData, fetchAgentData, fetchGeographicData, fetchCustomerData, fetchProductData]);
 
   const exportData = useCallback(async (format: 'pdf' | 'excel' | 'csv', type: TabType) => {
     try {
@@ -778,6 +856,7 @@ export const useReportsLazy = (filters: ReportFilters, activeTab: TabType) => {
     geographicData: tabData.geographic,
     communeData,
     customerData: tabData.customers,
+    productData: tabData.products,
     loading: tabLoading[activeTab], // Only show loading for active tab
     error,
     refreshData,

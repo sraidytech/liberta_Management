@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AnalyticsController } from './analytics.controller';
 import { productionAnalyticsController } from './analytics-production-optimized.controller';
+import { productAnalyticsController } from './product-analytics.controller';
 import { requireAdmin, requireManager } from '@/common/middleware/auth';
 
 const router = Router();
@@ -69,6 +70,11 @@ router.get('/customers/returning', requireManager as any, async (req, res) => {
 
 router.get('/customers/export', requireManager as any, async (req, res) => {
   await analyticsController.exportCustomerData(req, res);
+});
+
+// Product analytics (Admin and Team Manager)
+router.get('/products', requireManager as any, async (req, res) => {
+  await productAnalyticsController.getProductAnalytics(req, res);
 });
 
 export default router;
