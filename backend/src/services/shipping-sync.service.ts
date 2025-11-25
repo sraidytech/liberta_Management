@@ -269,6 +269,115 @@ export class ShippingSyncService {
   }
 
   /**
+   * Sync tracking numbers from Maystro for orders that don't have them yet
+   * This is critical for new orders to get their tracking numbers from Maystro API
+   */
+  async syncMaystroTrackingNumbers(limit: number = 10000): Promise<{
+    total: number;
+    updated: number;
+    failed: number;
+    details: Array<{ reference: string; status: string; error?: string }>;
+  }> {
+    try {
+      console.log(`🔄 Starting Maystro tracking number sync...`);
+
+      // Get all Maystro shipping accounts
+      const maystroAccounts = await prisma.shippingAccount.findMany({
+        where: {
+          company: {
+            slug: 'maystro'
+          },
+          isActive: true
+        },
+        include: {
+          company: true
+        }
+      });
+
+      if (maystroAccounts.length === 0) {
+        console.log(`⚠️ No active Maystro shipping accounts found`);
+        return {
+          total: 0,
+          updated: 0,
+          failed: 0,
+          details: []
+        };
+      }
+
+      console.log(`📡 Found ${maystroAccounts.length} active Maystro account(s)`);
+
+      let totalUpdated = 0;
+      let totalFailed = 0;
+      const allDetails: Array<{ reference: string; status: string; error?: string }> = [];
+
+      // Process each Maystro account
+      for (const account of maystroAccounts) {
+        try {
+          console.log(`🔄 Syncing tracking numbers for account: ${account.name}`);
+
+          // Create Maystro provider for this account
+          const provider = ShippingProviderFactory.createProvider(
+            account.company.slug,
+            account.credentials as any,
+            this.redis,
+            account.baseUrl || undefined
+          );
+
+          // Check if provider has syncTrackingNumbers method (Maystro-specific)
+          if ('syncTrackingNumbers' in provider && typeof (provider as any).syncTrackingNumbers === 'function') {
+            const result = await (provider as any).syncTrackingNumbers(undefined, limit);
+            
+            totalUpdated += result.updated;
+            totalFailed += result.errors;
+            allDetails.push(...result.details);
+
+            console.log(`✅ Account ${account.name}: ${result.updated} updated, ${result.errors} errors`);
+
+            // Update account statistics
+            await prisma.shippingAccount.update({
+              where: { id: account.id },
+              data: {
+                requestCount: { increment: 1 },
+                successCount: { increment: result.updated > 0 ? 1 : 0 },
+                errorCount: { increment: result.errors > 0 ? 1 : 0 },
+                lastUsed: new Date()
+              }
+            });
+          } else {
+            console.warn(`⚠️ Provider for ${account.name} doesn't support tracking number sync`);
+          }
+
+        } catch (error: any) {
+          console.error(`❌ Error syncing tracking numbers for account ${account.name}:`, error);
+          totalFailed++;
+          
+          // Update error count
+          await prisma.shippingAccount.update({
+            where: { id: account.id },
+            data: {
+              requestCount: { increment: 1 },
+              errorCount: { increment: 1 }
+            }
+          });
+        }
+      }
+
+      console.log(`🎉 Maystro tracking number sync complete: ${totalUpdated} updated, ${totalFailed} failed`);
+
+      return {
+        total: totalUpdated + totalFailed,
+        updated: totalUpdated,
+        failed: totalFailed,
+        details: allDetails
+      };
+
+    } catch (error: any) {
+      console.error('Error syncing Maystro tracking numbers:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get shipping provider for an order
    */
   async getProviderForOrder(orderId: string): Promise<IShippingProvider | null> {

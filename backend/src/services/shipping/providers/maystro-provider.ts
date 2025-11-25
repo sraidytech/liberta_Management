@@ -85,12 +85,38 @@ export class MaystroProvider implements IShippingProvider {
     return await this.maystroService.getOrderByReference(reference);
   }
 
+  /**
+   * Sync order statuses - This calls the full sync that includes tracking number fetch
+   * @param orderIds - Array of order references to sync
+   * @returns Sync results with updated count
+   */
   async syncOrderStatuses(orderIds: string[]): Promise<{
     updated: number;
     errors: number;
     details: Array<{ reference: string; status: string; error?: string }>;
   }> {
     return await this.maystroService.syncShippingStatus(orderIds);
+  }
+
+  /**
+   * Fetch and update tracking numbers from Maystro API
+   * This is the critical method that fetches orders from Maystro and updates tracking numbers
+   * @param storeIdentifier - Optional store identifier to filter orders
+   * @param maxOrders - Maximum number of orders to sync (default: 10000)
+   * @returns Sync results
+   */
+  async syncTrackingNumbers(storeIdentifier?: string, maxOrders: number = 10000): Promise<{
+    updated: number;
+    errors: number;
+    details: Array<{ reference: string; status: string; error?: string }>;
+  }> {
+    console.log(`🔄 [MaystroProvider] Starting tracking number sync for ${storeIdentifier || 'ALL STORES'}...`);
+    
+    // Call the full sync method which fetches from Maystro API and updates tracking numbers
+    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier);
+    
+    console.log(`✅ [MaystroProvider] Tracking number sync complete: ${result.updated} updated, ${result.errors} errors`);
+    return result;
   }
 
   async testConnection(): Promise<boolean> {

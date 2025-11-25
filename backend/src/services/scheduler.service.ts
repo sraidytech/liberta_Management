@@ -602,7 +602,17 @@ export class SchedulerService {
       console.log(`   - Expected Duration: 30-120 seconds`);
       console.log(`─────────────────────────────────────────────────────────────`);
 
-      // Run the NEW multi-company sync
+      // STEP 1: Sync tracking numbers from Maystro first (critical for new orders)
+      console.log(`\n🔄 STEP 1: Syncing tracking numbers from Maystro...`);
+      try {
+        const trackingResults = await this.shippingSyncService.syncMaystroTrackingNumbers(10000);
+        console.log(`✅ Tracking number sync: ${trackingResults.updated} updated, ${trackingResults.failed} failed`);
+      } catch (trackingError) {
+        console.warn(`⚠️ Tracking number sync failed (non-critical):`, trackingError);
+      }
+
+      // STEP 2: Run the NEW multi-company sync for status updates
+      console.log(`\n🔄 STEP 2: Syncing shipping statuses...`);
       const syncResults = await this.shippingSyncService.syncAllPendingOrders(500);
       
       // Log results
