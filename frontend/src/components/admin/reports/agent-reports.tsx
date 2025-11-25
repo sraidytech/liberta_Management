@@ -215,27 +215,11 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
   const chartData = useMemo(() => {
     if (!data) return null;
 
-    // Top performers by quality score
+    // ALL agents ranked by delivery rate (successRate)
     const topPerformers = [...data.agentPerformance]
-      .sort((a, b) => b.qualityScore - a.qualityScore)
-      .slice(0, 5);
+      .sort((a, b) => b.successRate - a.successRate); // Sort by delivery rate, show ALL agents
 
-    // Quality score distribution
-    const qualityRanges = [
-      { range: '0-25%', count: 0, color: '#EF4444' },
-      { range: '26-50%', count: 0, color: '#F59E0B' },
-      { range: '51-75%', count: 0, color: '#3B82F6' },
-      { range: '76-100%', count: 0, color: '#10B981' }
-    ];
-
-    data.agentPerformance.forEach(agent => {
-      if (agent.qualityScore <= 25) qualityRanges[0].count++;
-      else if (agent.qualityScore <= 50) qualityRanges[1].count++;
-      else if (agent.qualityScore <= 75) qualityRanges[2].count++;
-      else qualityRanges[3].count++;
-    });
-
-    return { topPerformers, qualityRanges };
+    return { topPerformers };
   }, [data]);
 
   if (loading) {
@@ -310,8 +294,8 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
                   {language === 'fr' ? 'Score Qualité Moy.' : 'Avg Quality Score'}
                 </p>
                 <Tooltip content={language === 'fr' ?
-                  'Score de qualité = (Commandes livrées avec notes / Commandes avec notes) × 100. Basé uniquement sur les commandes ayant au moins une note de l\'agent ET statut LIVRÉ' :
-                  'Quality Score = (Delivered Orders with Notes / Orders with Notes) × 100. Based only on orders with at least one agent note AND LIVRÉ status'}>
+                  'Score de Qualité = (Commandes Livrées avec Notes d\'Agent / Total Commandes Livrées) × 100\n\nCe score mesure la qualité de documentation des livraisons réussies. Il indique le pourcentage de commandes livrées (statut LIVRÉ) qui ont été correctement documentées avec des notes par l\'agent.' :
+                  'Quality Score = (Delivered Orders with Agent Notes / Total Delivered Orders) × 100\n\nThis score measures the documentation quality of successful deliveries. It indicates the percentage of delivered orders (LIVRÉ status) that were properly documented with agent notes.'}>
                   <Info className="w-4 h-4 text-emerald-200 hover:text-white cursor-help" />
                 </Tooltip>
               </div>
@@ -517,110 +501,56 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
         </div>
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Top Performers */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">
-                {language === 'fr' ? 'Top Performers' : 'Top Performers'}
-              </h3>
-              <p className="text-gray-600">
-                {language === 'fr' ? 'Meilleurs taux de succès' : 'Best success rates'}
-              </p>
-            </div>
-            <Award className="w-8 h-8 text-gray-400" />
+      {/* All Agents Ranked by Delivery Rate */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 mb-1">
+              {language === 'fr' ? 'Tous les Agents - Classés par Taux de Livraison' : 'All Agents - Ranked by Delivery Rate'}
+            </h3>
+            <p className="text-gray-600">
+              {language === 'fr' ? 'Performance de livraison de tous les agents' : 'Delivery performance of all agents'}
+            </p>
           </div>
-
-          <div className="space-y-4">
-            {chartData && chartData.topPerformers.map((agent, index) => {
-              const performance = getPerformanceLevel(agent.successRate);
-              return (
-                <div key={agent.id} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl hover:from-blue-50 hover:to-blue-100 transition-all">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                      {index + 1}
-                    </div>
-                    <div className="relative">
-                      <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-lg">{agent.name?.[0] || 'A'}</span>
-                      </div>
-                      <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-1">
-                      <p className="font-bold text-gray-900 truncate">{agent.name}</p>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${performance.bg} ${performance.color}`}>
-                        {performance.level}
-                      </span>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      {agent.agentCode} • {agent.totalOrders} {language === 'fr' ? 'commandes' : 'orders'}
-                    </p>
-                  </div>
-                  
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-emerald-600">{agent.successRate.toFixed(1)}%</p>
-                    <p className="text-sm text-gray-600">{formatCurrency(agent.totalRevenue)}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <Award className="w-8 h-8 text-gray-400" />
         </div>
 
-        {/* Quality Score Distribution */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold text-gray-900 mb-1">
-                {language === 'fr' ? 'Distribution des Scores Qualité' : 'Quality Score Distribution'}
-              </h3>
-              <p className="text-gray-600">
-                {language === 'fr' ? 'Répartition des performances' : 'Performance distribution'}
-              </p>
-            </div>
-            <BarChart3 className="w-8 h-8 text-gray-400" />
-          </div>
-
-          <div className="space-y-4">
-            {chartData && chartData.qualityRanges.map((range, index) => {
-              const maxCount = Math.max(...chartData.qualityRanges.map(r => r.count));
-              const percentage = maxCount > 0 ? (range.count / maxCount) * 100 : 0;
-
-              return (
-                <div key={range.range} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: range.color }}
-                      ></div>
-                      <span className="font-medium text-gray-900">{range.range}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-bold text-gray-900">{range.count}</span>
-                      <span className="text-sm text-gray-600 ml-1">
-                        {language === 'fr' ? 'agents' : 'agents'}
-                      </span>
-                    </div>
+        <div className="space-y-4 max-h-[600px] overflow-y-auto">
+          {chartData && chartData.topPerformers.map((agent, index) => {
+            const performance = getPerformanceLevel(agent.successRate);
+            return (
+              <div key={agent.id} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl hover:from-blue-50 hover:to-blue-100 transition-all">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                    {index + 1}
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div
-                      className="h-3 rounded-full transition-all duration-500"
-                      style={{
-                        width: `${percentage}%`,
-                        backgroundColor: range.color
-                      }}
-                    ></div>
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+                      <span className="text-white font-bold text-lg">{agent.name?.[0] || 'A'}</span>
+                    </div>
+                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <p className="font-bold text-gray-900 truncate">{agent.name}</p>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${performance.bg} ${performance.color}`}>
+                      {performance.level}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    {agent.agentCode} • {agent.totalOrders} {language === 'fr' ? 'commandes' : 'orders'}
+                  </p>
+                </div>
+                
+                <div className="text-right">
+                  <p className="text-2xl font-bold text-emerald-600">{agent.successRate.toFixed(1)}%</p>
+                  <p className="text-sm text-gray-600">{formatCurrency(agent.totalRevenue)}</p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -630,18 +560,18 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xl font-bold text-gray-900 mb-1">
-                {language === 'fr' ? 'Performance Détaillée' : 'Detailed Performance'}
+                {language === 'fr' ? 'Performance Détaillée - Tous les Agents' : 'Detailed Performance - All Agents'}
               </h3>
               <p className="text-gray-600">
-                {language === 'fr' ? 'Métriques complètes par agent' : 'Complete metrics per agent'}
+                {language === 'fr' ? 'Métriques complètes pour tous les agents' : 'Complete metrics for all agents'}
               </p>
             </div>
             <User className="w-8 h-8 text-gray-400" />
           </div>
         </div>
 
-        <div className="space-y-4">
-          {data.agentPerformance.slice(0, 5).map((agent) => {
+        <div className="space-y-4 p-6 max-h-[800px] overflow-y-auto">
+          {data.agentPerformance.map((agent) => {
             const performance = getPerformanceLevel(agent.successRate);
             return (
               <div key={agent.id} className="p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
@@ -880,53 +810,56 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
           </div>
         </div>
 
-        {/* Top Quality Performers */}
+        {/* All Agents by Delivery Rate */}
         <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-lg font-bold text-gray-900 mb-1">
-                {language === 'fr' ? 'Meilleurs Performers Qualité' : 'Top Quality Performers'}
+                {language === 'fr' ? 'Tous les Agents par Taux de Livraison' : 'All Agents by Delivery Rate'}
               </h4>
               <p className="text-gray-600">
-                {language === 'fr' ? 'Classés par score de qualité' : 'Ranked by quality score'}
+                {language === 'fr' ? 'Classés par taux de livraison' : 'Ranked by delivery rate'}
               </p>
             </div>
-            <Zap className="w-8 h-8 text-gray-400" />
+            <Truck className="w-8 h-8 text-gray-400" />
           </div>
 
-          <div className="space-y-4">
-            {chartData && chartData.topPerformers.slice(0, 5).map((agent, index) => (
-              <div key={agent.id} className="flex items-center space-x-4 p-4 bg-white rounded-xl hover:shadow-md transition-all">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
-                    {index + 1}
-                  </div>
-                  <div className="relative">
-                    <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
-                      <span className="text-white font-bold">{agent.name?.[0] || 'A'}</span>
+          <div className="space-y-4 max-h-[600px] overflow-y-auto">
+            {chartData && chartData.topPerformers.map((agent, index) => {
+              const performance = getPerformanceLevel(agent.successRate);
+              return (
+                <div key={agent.id} className="flex items-center space-x-4 p-4 bg-white rounded-xl hover:shadow-md transition-all">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-green-500 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {index + 1}
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
+                    <div className="relative">
+                      <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white font-bold">{agent.name?.[0] || 'A'}</span>
+                      </div>
+                      <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-1">
+                      <p className="font-bold text-gray-900 truncate">{agent.name}</p>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${performance.bg} ${performance.color}`}>
+                        {performance.level}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {agent.agentCode} • {agent.completedOrders}/{agent.totalOrders} {language === 'fr' ? 'livrées' : 'delivered'}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-xl font-bold text-emerald-600">{agent.successRate.toFixed(1)}%</p>
+                    <p className="text-xs text-gray-600">{language === 'fr' ? 'taux de livraison' : 'delivery rate'}</p>
                   </div>
                 </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <p className="font-bold text-gray-900 truncate">{agent.name}</p>
-                    <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-600">
-                      {language === 'fr' ? 'Qualité' : 'Quality'}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    {agent.agentCode} • {agent.totalOrders} {language === 'fr' ? 'commandes' : 'orders'}
-                  </p>
-                </div>
-
-                <div className="text-right">
-                  <p className="text-xl font-bold text-purple-600">{Math.min(agent.qualityScore, 100).toFixed(1)}%</p>
-                  <p className="text-xs text-gray-600">{language === 'fr' ? 'score qualité' : 'quality score'}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1198,127 +1131,6 @@ export default function AgentReports({ data, agentNotesData, loading, filters }:
               </div>
             </div>
 
-            {/* Detailed Agent Notes Performance Table */}
-            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <div className="flex items-center space-x-2 mb-1">
-                    <h4 className="text-lg font-bold text-gray-900">
-                      {language === 'fr' ? 'Performance Détaillée des Notes' : 'Detailed Notes Performance'}
-                    </h4>
-                    <Tooltip content={language === 'fr' ?
-                      'Tableau détaillé des métriques de notes pour chaque agent: total, qualité, temps de réponse, longueur moyenne' :
-                      'Detailed table of note metrics for each agent: total, quality, response time, average length'}>
-                      <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" />
-                    </Tooltip>
-                  </div>
-                  <p className="text-gray-600">
-                    {language === 'fr' ? 'Métriques complètes par agent' : 'Complete metrics per agent'}
-                  </p>
-                </div>
-                <User className="w-8 h-8 text-gray-400" />
-              </div>
-
-              <div className="space-y-4">
-                {agentNotesData.agentAnalytics.slice(0, 10).map((agent) => (
-                  <div key={agent.id} className="p-4 bg-white rounded-xl hover:shadow-md transition-all">
-                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-4 items-center">
-                      {/* Agent Info */}
-                      <div className="lg:col-span-1">
-                        <div className="flex items-center space-x-3">
-                          <div className="relative">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                              <span className="text-white font-bold text-sm">{agent.name?.[0] || 'A'}</span>
-                            </div>
-                            <div className={`absolute -bottom-1 -right-1 w-3 h-3 ${getAvailabilityColor(agent.availability)} rounded-full border-2 border-white`}></div>
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{agent.name}</p>
-                            <p className="text-sm text-gray-600">{agent.agentCode}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Notes Stats */}
-                      <div className="lg:col-span-1">
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-600 mb-1">
-                            {language === 'fr' ? 'Notes Totales' : 'Total Notes'}
-                          </p>
-                          <p className="text-lg font-bold text-gray-900">{agent.totalNotes}</p>
-                          <p className="text-xs text-gray-600">
-                            {agent.notesPerDay.toFixed(1)} {language === 'fr' ? '/jour' : '/day'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Quality Score */}
-                      <div className="lg:col-span-1">
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-600 mb-1">
-                            {language === 'fr' ? 'Score Qualité' : 'Quality Score'}
-                          </p>
-                          <div className="text-lg font-bold text-purple-600 mb-2">
-                            {agent.noteQualityScore.toFixed(1)}%
-                          </div>
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-600">
-                            #{agent.productivityRank}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Response Time */}
-                      <div className="lg:col-span-1">
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-600 mb-1">
-                            {language === 'fr' ? 'Temps Réponse' : 'Response Time'}
-                          </p>
-                          <p className="font-bold text-gray-900 text-sm">
-                            {agent.averageTimeToFirstNote.toFixed(1)}h
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {language === 'fr' ? 'première note' : 'first note'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Note Length */}
-                      <div className="lg:col-span-1">
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-600 mb-1">
-                            {language === 'fr' ? 'Long. Moyenne' : 'Avg Length'}
-                          </p>
-                          <p className="font-bold text-gray-900 text-sm">
-                            {agent.averageNoteLength.toFixed(0)}
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {language === 'fr' ? 'caractères' : 'characters'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Activity Days */}
-                      <div className="lg:col-span-1">
-                        <div className="text-center">
-                          <p className="text-xs font-medium text-gray-600 mb-1">
-                            {language === 'fr' ? 'Jours Actifs' : 'Active Days'}
-                          </p>
-                          <div className="flex items-center justify-center space-x-1 mb-1">
-                            <Activity className="w-3 h-3 text-gray-400" />
-                            <span className="text-sm font-bold text-gray-900">
-                              {agent.activeDaysWithNotes}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-600">
-                            {language === 'fr' ? 'avec notes' : 'with notes'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       )}

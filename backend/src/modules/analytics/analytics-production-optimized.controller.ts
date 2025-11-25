@@ -183,7 +183,6 @@ export class ProductionOptimizedAnalyticsController {
     const summary = {
       totalAgents: agentResults.length,
       activeAgents: agentResults.filter(a => a.availability !== 'OFFLINE').length,
-      // Removed averageUtilization - replaced with quality metrics
       averageQualityScore: agentResults.length > 0
         ? agentResults.reduce((sum, a) => sum + (a.qualityScore || 0), 0) / agentResults.length
         : 0,
@@ -197,6 +196,13 @@ export class ProductionOptimizedAnalyticsController {
         : 0,
       averageNoteCompletionRate: agentResults.length > 0
         ? agentResults.reduce((sum, a) => sum + (a.noteCompletionRate || 0), 0) / agentResults.length
+        : 0,
+      // Key Statistics (matching Geographic Analytics pattern)
+      deliveredOrders: agentResults.reduce((sum, a) => sum + a.completedOrders, 0),
+      cancelledOrders: agentResults.reduce((sum, a) => sum + a.cancelledOrders, 0),
+      deliveryRate: agentResults.reduce((sum, a) => sum + a.totalOrders, 0) > 0
+        ? (agentResults.reduce((sum, a) => sum + a.completedOrders, 0) /
+           agentResults.reduce((sum, a) => sum + a.totalOrders, 0)) * 100
         : 0
     };
 
@@ -240,6 +246,7 @@ export class ProductionOptimizedAnalyticsController {
         select: {
           id: true,
           status: true,
+          shippingStatus: true, // Added to match Geographic Analytics pattern
           total: true
         },
         take: 5000 // Limit to prevent memory issues
@@ -261,42 +268,55 @@ export class ProductionOptimizedAnalyticsController {
         take: 2000 // Limit to prevent memory issues
       });
 
-      // Calculate metrics
+      // Calculate metrics - FIXED to match Geographic Analytics pattern
       const totalOrders = orders.length;
-      const completedOrders = orders.filter(o => o.status === 'DELIVERED').length;
+      
+      // Use shippingStatus === 'LIVRÉ' as primary indicator (matches Geographic Analytics)
+      const completedOrders = orders.filter(o =>
+        o.shippingStatus === 'LIVRÉ' || o.status === OrderStatus.DELIVERED
+      ).length;
+      
       const cancelledOrders = orders.filter(o => o.status === 'CANCELLED').length;
       const confirmedOrders = orders.filter(o => o.status === 'CONFIRMED').length;
+      
+      // Revenue only from delivered orders (matches Geographic Analytics)
       const totalRevenue = orders
-        .filter(o => o.status === 'DELIVERED')
+        .filter(o => o.shippingStatus === 'LIVRÉ' || o.status === OrderStatus.DELIVERED)
         .reduce((sum, o) => sum + o.total, 0);
+      
       const totalActivities = activities.length;
       const totalDuration = activities.reduce((sum, a) => sum + (a.duration || 0), 0);
 
+      // Delivery rate (primary performance metric)
       const successRate = totalOrders > 0 ? (completedOrders / totalOrders) * 100 : 0;
       const cancellationRate = totalOrders > 0 ? (cancelledOrders / totalOrders) * 100 : 0;
       const confirmationRate = totalOrders > 0 ? (confirmedOrders / totalOrders) * 100 : 0;
 
-      // Calculate quality metrics
-      const noteCompletionRate = totalOrders > 0 ? (totalActivities / totalOrders) * 100 : 0;
-      const orderSuccessWithNotesRate = totalOrders > 0 ?
-        (completedOrders > 0 && totalActivities > 0 ? (Math.min(completedOrders, totalActivities) / totalOrders) * 100 : 0) : 0;
+      // IMPROVED Quality Score: Measures documentation quality of delivered orders
+      // Formula: (Delivered Orders with Agent Notes / Total Delivered Orders) × 100
+      const deliveredOrdersWithNotes = completedOrders > 0 && totalActivities > 0
+        ? Math.min(completedOrders, totalActivities)
+        : 0;
+      const qualityScore = completedOrders > 0
+        ? (deliveredOrdersWithNotes / completedOrders) * 100
+        : 0;
       
-      // Activity consistency (simplified - based on activities vs orders ratio)
+      // Note completion rate (for reference)
+      const noteCompletionRate = totalOrders > 0 ? (totalActivities / totalOrders) * 100 : 0;
+      
+      // Activity consistency (based on activities vs orders ratio)
       const activityConsistency = totalOrders > 0 ? Math.min((totalActivities / totalOrders) * 100, 100) : 0;
       
-      // Goal achievement rate (based on success rate vs target of 80%)
+      // Goal achievement rate (based on delivery rate vs target of 80%)
       const targetSuccessRate = 80;
       const goalAchievementRate = Math.min((successRate / targetSuccessRate) * 100, 100);
       
-      // Quality score calculation (weighted average)
-      const qualityScore = (
-        (successRate * 0.3) + // 30% weight for success rate
-        (noteCompletionRate * 0.25) + // 25% weight for note completion
-        (orderSuccessWithNotesRate * 0.25) + // 25% weight for orders with notes delivered
-        (activityConsistency * 0.2) // 20% weight for activity consistency
-      );
+      // Order success with notes rate
+      const orderSuccessWithNotesRate = totalOrders > 0 && deliveredOrdersWithNotes > 0
+        ? (deliveredOrdersWithNotes / totalOrders) * 100
+        : 0;
       
-      // Response time (simplified - average time between order assignment and first activity)
+      // Response time (average activity duration)
       const avgResponseTime = totalOrders > 0 && totalActivities > 0 ?
         (totalDuration / totalActivities) / 60 : 0; // Convert to hours
 

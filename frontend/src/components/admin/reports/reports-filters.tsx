@@ -1,17 +1,23 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useLanguage } from '@/lib/language-context';
-import { 
-  Calendar, 
-  Filter, 
-  Store, 
-  Users, 
-  MapPin, 
+import {
+  Calendar,
+  Filter,
+  Store,
+  Users,
+  MapPin,
   DollarSign,
   X,
   ChevronDown
 } from 'lucide-react';
+
+interface Agent {
+  id: string;
+  name: string;
+  agentCode: string;
+}
 
 interface ReportFilters {
   dateRange: string;
@@ -33,10 +39,52 @@ interface ReportsFiltersProps {
 export default function ReportsFilters({ filters, onFiltersChange }: ReportsFiltersProps) {
   const { language } = useLanguage();
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
   const [localCustomDates, setLocalCustomDates] = useState({
     startDate: filters.startDate,
     endDate: filters.endDate
   });
+
+  // Fetch agents list - ONLY AGENT_SUIVI (follow-up agents)
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        setLoadingAgents(true);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${apiUrl}/api/v1/users`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            // Filter to only include AGENT_SUIVI (follow-up agents)
+            const followUpAgents = result.data
+              .filter((user: any) => user.role === 'AGENT_SUIVI')
+              .map((user: any) => ({
+                id: user.id,
+                name: user.name,
+                agentCode: user.agentCode || user.id
+              }));
+            setAgents(followUpAgents);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching agents:', error);
+      } finally {
+        setLoadingAgents(false);
+      }
+    };
+
+    fetchAgents();
+  }, []);
 
   const dateRangeOptions = [
     { value: 'today', label: language === 'fr' ? 'Aujourd\'hui' : 'Today' },
@@ -255,19 +303,30 @@ export default function ReportsFilters({ filters, onFiltersChange }: ReportsFilt
         {/* Advanced Filters */}
         {showAdvanced && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-4 bg-gray-50 rounded-xl border border-gray-200">
-            {/* Agent Filter */}
+            {/* Agent Filter - Dropdown */}
             <div>
               <label className="flex items-center space-x-2 text-sm font-semibold text-gray-700 mb-3">
                 <Users className="w-4 h-4" />
                 <span>{language === 'fr' ? 'Agent' : 'Agent'}</span>
               </label>
-              <input
-                type="text"
-                placeholder={language === 'fr' ? 'Code agent ou nom' : 'Agent code or name'}
+              <select
                 value={filters.agentId}
                 onChange={(e) => handleFilterChange('agentId', e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-              />
+                disabled={loadingAgents}
+                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
+              >
+                <option value="">
+                  {loadingAgents
+                    ? (language === 'fr' ? 'Chargement...' : 'Loading...')
+                    : (language === 'fr' ? 'Tous les agents' : 'All agents')
+                  }
+                </option>
+                {agents.map(agent => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.agentCode} - {agent.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Wilaya Filter */}
@@ -325,6 +384,11 @@ export default function ReportsFilters({ filters, onFiltersChange }: ReportsFilt
               {filters.storeId && (
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                   {language === 'fr' ? 'Magasin:' : 'Store:'} {filters.storeId}
+                </span>
+              )}
+              {filters.agentId && (
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                  {language === 'fr' ? 'Agent:' : 'Agent:'} {agents.find(a => a.id === filters.agentId)?.name || filters.agentId}
                 </span>
               )}
               {filters.status && (

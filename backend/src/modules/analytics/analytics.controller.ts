@@ -933,7 +933,7 @@ export class AnalyticsController {
         const salesReport = {
           summary: {
             totalRevenue,
-            totalOrders: totalDeliveredOrders,
+            totalOrders: totalAllOrders, // FIXED: Show ALL orders, not just delivered
             averageOrderValue: totalDeliveredOrders > 0 ? totalRevenue / totalDeliveredOrders : 0,
             // Key Statistics for frontend
             deliveredOrders: totalDeliveredOrdersActual,
