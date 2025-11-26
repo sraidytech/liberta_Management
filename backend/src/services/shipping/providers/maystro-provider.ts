@@ -100,20 +100,35 @@ export class MaystroProvider implements IShippingProvider {
 
   /**
    * Fetch and update tracking numbers from Maystro API
-   * This is the critical method that fetches orders from Maystro and updates tracking numbers
+   * 🔒 FIXED: Now properly filters orders by shippingAccountId to prevent data corruption
    * @param storeIdentifier - Optional store identifier to filter orders
    * @param maxOrders - Maximum number of orders to sync (default: 10000)
+   * @param shippingAccountId - The shipping account ID to filter orders (CRITICAL for preventing cross-contamination)
    * @returns Sync results
    */
-  async syncTrackingNumbers(storeIdentifier?: string, maxOrders: number = 10000): Promise<{
+  async syncTrackingNumbers(storeIdentifier?: string, maxOrders: number = 10000, shippingAccountId?: string): Promise<{
     updated: number;
     errors: number;
     details: Array<{ reference: string; status: string; error?: string }>;
   }> {
     console.log(`🔄 [MaystroProvider] Starting tracking number sync for ${storeIdentifier || 'ALL STORES'}...`);
     
-    // Call the full sync method which fetches from Maystro API and updates tracking numbers
-    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier);
+    // 🔒 CRITICAL: Use provided shippingAccountId or get from credentials
+    const accountId = shippingAccountId || (this.maystroService as any).apiInstances?.[0]?.config?.id;
+    
+    if (!accountId) {
+      console.error(`❌ [MaystroProvider] Cannot determine shipping account ID - ABORTING to prevent data corruption!`);
+      return {
+        updated: 0,
+        errors: 1,
+        details: [{ reference: 'N/A', status: 'ERROR', error: 'Missing shipping account ID - sync aborted for safety' }]
+      };
+    }
+    
+    console.log(`🔒 [MaystroProvider] Filtering orders for shipping account: ${accountId}`);
+    
+    // Call the full sync method with shippingAccountId filter to prevent cross-contamination
+    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier, accountId);
     
     console.log(`✅ [MaystroProvider] Tracking number sync complete: ${result.updated} updated, ${result.errors} errors`);
     return result;

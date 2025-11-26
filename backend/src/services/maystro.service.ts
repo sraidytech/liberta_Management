@@ -429,8 +429,9 @@ export class MaystroService {
 
   /**
    * Sync shipping status for orders from ALL STORES - OPTIMIZED APPROACH
+   * 🔒 FIXED: Now supports filtering by shippingAccountId to prevent cross-contamination
    */
-  async syncShippingStatus(orderReferences?: string[], storeIdentifier?: string): Promise<{
+  async syncShippingStatus(orderReferences?: string[], storeIdentifier?: string, shippingAccountId?: string): Promise<{
     updated: number;
     errors: number;
     details: Array<{ reference: string; status: string; error?: string }>;
@@ -474,6 +475,12 @@ export class MaystroService {
         if (storeIdentifier) {
           whereClause.storeIdentifier = storeIdentifier;
         }
+        
+        // 🔒 CRITICAL FIX: Filter by shippingAccountId to only sync orders for THIS Maystro account
+        if (shippingAccountId) {
+          whereClause.shippingAccountId = shippingAccountId;
+          console.log(`🔒 Filtering orders by shippingAccountId: ${shippingAccountId}`);
+        }
 
         ordersToSync = await prisma.order.findMany({
           select: {
@@ -481,7 +488,8 @@ export class MaystroService {
             reference: true,
             shippingStatus: true,
             maystroOrderId: true,
-            storeIdentifier: true
+            storeIdentifier: true,
+            shippingAccountId: true
           },
           where: whereClause,
           orderBy: {

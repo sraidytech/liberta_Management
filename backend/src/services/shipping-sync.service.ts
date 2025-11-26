@@ -313,7 +313,7 @@ export class ShippingSyncService {
       // Process each Maystro account
       for (const account of maystroAccounts) {
         try {
-          console.log(`🔄 Syncing tracking numbers for account: ${account.name}`);
+          console.log(`🔄 Syncing tracking numbers for account: ${account.name} (ID: ${account.id})`);
 
           // Create Maystro provider for this account
           const provider = ShippingProviderFactory.createProvider(
@@ -325,7 +325,8 @@ export class ShippingSyncService {
 
           // Check if provider has syncTrackingNumbers method (Maystro-specific)
           if ('syncTrackingNumbers' in provider && typeof (provider as any).syncTrackingNumbers === 'function') {
-            const result = await (provider as any).syncTrackingNumbers(undefined, limit);
+            // 🔒 CRITICAL FIX: Pass shippingAccountId to prevent cross-contamination
+            const result = await (provider as any).syncTrackingNumbers(undefined, limit, account.id);
             
             totalUpdated += result.updated;
             totalFailed += result.errors;
