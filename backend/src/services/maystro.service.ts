@@ -435,7 +435,7 @@ export class MaystroService {
     orderReferences?: string[],
     storeIdentifier?: string,
     shippingAccountId?: string,
-    maxOrders: number = 1000
+    maxOrders: number = 10000
   ): Promise<{
     updated: number;
     errors: number;
