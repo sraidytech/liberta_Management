@@ -126,9 +126,10 @@ export class MaystroProvider implements IShippingProvider {
     }
     
     console.log(`🔒 [MaystroProvider] Filtering orders for shipping account: ${shippingAccountId}`);
+    console.log(`📊 [MaystroProvider] Max orders to sync: ${maxOrders}`);
     
-    // Call the full sync method with shippingAccountId filter to prevent cross-contamination
-    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier, shippingAccountId);
+    // Call the full sync method with shippingAccountId filter AND maxOrders to prevent cross-contamination
+    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier, shippingAccountId, maxOrders);
     
     console.log(`✅ [MaystroProvider] Tracking number sync complete: ${result.updated} updated, ${result.errors} errors`);
     return result;

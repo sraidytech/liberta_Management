@@ -431,7 +431,12 @@ export class MaystroService {
    * Sync shipping status for orders from ALL STORES - OPTIMIZED APPROACH
    * 🔒 FIXED: Now supports filtering by shippingAccountId to prevent cross-contamination
    */
-  async syncShippingStatus(orderReferences?: string[], storeIdentifier?: string, shippingAccountId?: string): Promise<{
+  async syncShippingStatus(
+    orderReferences?: string[],
+    storeIdentifier?: string,
+    shippingAccountId?: string,
+    maxOrders: number = 1000
+  ): Promise<{
     updated: number;
     errors: number;
     details: Array<{ reference: string; status: string; error?: string }>;
@@ -442,10 +447,17 @@ export class MaystroService {
       details: [] as Array<{ reference: string; status: string; error?: string }>
     };
 
+    // 🔍 DEBUG: Log ALL parameters
+    console.log(`🔍 [syncShippingStatus] Parameters:`);
+    console.log(`   orderReferences: ${orderReferences ? orderReferences.length : 'undefined'}`);
+    console.log(`   storeIdentifier: ${storeIdentifier || 'undefined'}`);
+    console.log(`   shippingAccountId: ${shippingAccountId || 'undefined'}`);
+    console.log(`   maxOrders: ${maxOrders}`);
+
     try {
-      // Step 1: Fetch all orders from Maystro API first
-      console.log('🔄 Fetching orders from Maystro API for all stores...');
-      const maystroOrders = await this.fetchAllOrders(10000); // Fetch 10000 orders from Maystro
+      // Step 1: Fetch orders from Maystro API (use maxOrders parameter)
+      console.log(`🔄 Fetching ${maxOrders} orders from Maystro API...`);
+      const maystroOrders = await this.fetchAllOrders(maxOrders);
       
       // Step 2: Create a Map for fast lookup
       const orderMap = new Map(maystroOrders.map(order => [order.external_order_id, order]));
@@ -456,30 +468,45 @@ export class MaystroService {
 
       if (orderReferences && orderReferences.length > 0) {
         // Sync specific orders
+        const whereClause: any = {
+          reference: { in: orderReferences }
+        };
+        
+        if (storeIdentifier) {
+          whereClause.storeIdentifier = storeIdentifier;
+        }
+        
+        // 🔒 CRITICAL: Filter by shippingAccountId
+        if (shippingAccountId) {
+          whereClause.shippingAccountId = shippingAccountId;
+          console.log(`🔒 Filtering specific orders by shippingAccountId: ${shippingAccountId}`);
+        }
+        
         ordersToSync = await prisma.order.findMany({
-          where: {
-            reference: { in: orderReferences },
-            ...(storeIdentifier && { storeIdentifier })
-          },
+          where: whereClause,
           select: {
             id: true,
             reference: true,
             shippingStatus: true,
             maystroOrderId: true,
-            storeIdentifier: true
+            storeIdentifier: true,
+            shippingAccountId: true
           }
         });
       } else {
-        // Sync latest orders from ALL STORES
+        // Sync latest orders
         const whereClause: any = {};
+        
         if (storeIdentifier) {
           whereClause.storeIdentifier = storeIdentifier;
         }
         
-        // 🔒 CRITICAL FIX: Filter by shippingAccountId to only sync orders for THIS Maystro account
+        // 🔒 CRITICAL FIX: Filter by shippingAccountId to prevent cross-contamination
         if (shippingAccountId) {
           whereClause.shippingAccountId = shippingAccountId;
           console.log(`🔒 Filtering orders by shippingAccountId: ${shippingAccountId}`);
+        } else {
+          console.warn(`⚠️  WARNING: No shippingAccountId - may cause cross-contamination!`);
         }
 
         ordersToSync = await prisma.order.findMany({
@@ -493,9 +520,9 @@ export class MaystroService {
           },
           where: whereClause,
           orderBy: {
-            createdAt: 'desc' // Get newest orders first
+            createdAt: 'desc'
           },
-          take: 40000 // Limit to latest 40,000 orders
+          take: maxOrders // Use maxOrders parameter instead of hardcoded 40000
         });
       }
 
