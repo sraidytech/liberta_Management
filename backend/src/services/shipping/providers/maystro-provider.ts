@@ -113,22 +113,22 @@ export class MaystroProvider implements IShippingProvider {
   }> {
     console.log(`🔄 [MaystroProvider] Starting tracking number sync for ${storeIdentifier || 'ALL STORES'}...`);
     
-    // 🔒 CRITICAL: Use provided shippingAccountId or get from credentials
-    const accountId = shippingAccountId || (this.maystroService as any).apiInstances?.[0]?.config?.id;
-    
-    if (!accountId) {
-      console.error(`❌ [MaystroProvider] Cannot determine shipping account ID - ABORTING to prevent data corruption!`);
+    // 🔒 CRITICAL FIX: shippingAccountId MUST be provided - it's the database ID, not API config ID!
+    if (!shippingAccountId) {
+      console.error(`❌ [MaystroProvider] shippingAccountId is REQUIRED - ABORTING to prevent data corruption!`);
+      console.error(`   This must be the database shipping account ID (e.g., cmiaexiem001tsd1h7dbcgv3p)`);
+      console.error(`   NOT the Maystro API config ID!`);
       return {
         updated: 0,
         errors: 1,
-        details: [{ reference: 'N/A', status: 'ERROR', error: 'Missing shipping account ID - sync aborted for safety' }]
+        details: [{ reference: 'N/A', status: 'ERROR', error: 'Missing shippingAccountId parameter - sync aborted for safety' }]
       };
     }
     
-    console.log(`🔒 [MaystroProvider] Filtering orders for shipping account: ${accountId}`);
+    console.log(`🔒 [MaystroProvider] Filtering orders for shipping account: ${shippingAccountId}`);
     
     // Call the full sync method with shippingAccountId filter to prevent cross-contamination
-    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier, accountId);
+    const result = await this.maystroService.syncShippingStatus(undefined, storeIdentifier, shippingAccountId);
     
     console.log(`✅ [MaystroProvider] Tracking number sync complete: ${result.updated} updated, ${result.errors} errors`);
     return result;
