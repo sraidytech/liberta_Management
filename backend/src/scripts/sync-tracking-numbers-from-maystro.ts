@@ -39,7 +39,7 @@ async function syncTrackingNumbers() {
 
     // Step 2: Fetch orders from Maystro API
     console.log('📡 Fetching orders from Maystro API...');
-    const maystroOrders = await maystroService.fetchAllOrders(10000); // Fetch 10,000 orders
+    const maystroOrders = await maystroService.fetchAllOrders(40000); // Fetch 10,000 orders
     console.log(`✅ Fetched ${maystroOrders.length} orders from Maystro\n`);
 
     // Step 3: Create lookup map by reference (external_order_id)
