@@ -5,6 +5,7 @@ import { EcoManagerService } from '@/services/ecomanager.service';
 import { getMaystroService } from '@/services/maystro.service';
 import { productAssignmentService } from '@/services/product-assignment.service';
 import { deliveryDelayService } from '@/services/delivery-delay.service';
+import { deductionService } from '@/modules/stock/deduction.service';
 
 import { prisma } from '../../config/database';
 const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
@@ -661,6 +662,19 @@ export class OrdersController {
             message: `Order ${existingOrder.reference} status changed to ${status}`
           }
         });
+      }
+
+      // 🆕 STOCK MANAGEMENT: Auto-deduct stock on status change
+      try {
+        await deductionService.processOrderStatusChange(
+          updatedOrder,
+          existingOrder.status,
+          status
+        );
+      } catch (stockError) {
+        console.error('❌ Stock deduction error:', stockError);
+        // Don't fail the order update if stock deduction fails
+        // The error is logged and can be handled manually
       }
 
       res.json({

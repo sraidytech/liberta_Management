@@ -35,6 +35,7 @@ model User {
   productConfirmationRates AgentProductConfirmationRate[] @relation("AgentProductConfirmationRates")
   activityLogs     ActivityLog[] @relation("UserActivityLogs")
   productAssignments UserProductAssignment[] @relation("UserProductAssignments")
+  stockMovements     StockMovement[] @relation("StockMovements")
   
   // Ticket system relations
   reportedTickets  Ticket[] @relation("ReportedTickets")
@@ -149,6 +150,10 @@ model Order {
   shippingAccountId   String?
   shippingAccount     ShippingAccount? @relation(fields: [shippingAccountId], references: [id])
 
+  // Stock management fields
+  stockDeducted       Boolean   @default(false)
+  stockDeductedAt     DateTime?
+
   // Timestamps
   orderDate DateTime @default(now())
   createdAt DateTime @default(now())
@@ -161,6 +166,7 @@ model Order {
   webhookEvents WebhookEvent[]
   tickets       Ticket[]
   satisfactionSurveys CustomerSatisfactionSurvey[]
+  stockMovements StockMovement[]
 
   @@map("orders")
 }
@@ -309,6 +315,7 @@ enum UserRole {
   AGENT_SUIVI
   AGENT_CALL_CENTER
   QUALITY_AGENT
+  STOCK_MANAGEMENT_AGENT
 }
 
 enum AgentAvailability {
@@ -680,4 +687,236 @@ model CustomerSatisfactionSurvey {
   @@index([createdAt])
   @@index([isLatest])
   @@map("customer_satisfaction_surveys")
+}
+
+// ============================================
+// STOCK MANAGEMENT MODELS
+// ============================================
+
+// Product Master Table (auto-created from OrderItems)
+model Product {
+  id                String   @id @default(cuid())
+  sku               String   @unique
+  name              String
+  description       String?
+  category          String?
+  unit              String   @default("piece") // piece, box, kg, etc.
+  
+  // Stock settings
+  minThreshold      Int      @default(100)
+  reorderPoint      Int?
+  
+  // Tracking
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  lots              Lot[]
+  stockLevels       StockLevel[]
+  stockMovements    StockMovement[]
+  
+  @@index([sku])
+  @@index([isActive])
+  @@map("products")
+}
+
+// Warehouse/Location Model (single warehouse initially)
+model Warehouse {
+  id                String   @id @default(cuid())
+  code              String   @unique
+  name              String
+  address           String?
+  isActive          Boolean  @default(true)
+  isPrimary         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  lots              Lot[]
+  stockMovements    StockMovement[]
+  stockLevels       StockLevel[]
+  stockAlerts       StockAlert[]
+  
+  @@map("warehouses")
+}
+
+// Lot Model (batches from production)
+model Lot {
+  id                String   @id @default(cuid())
+  lotNumber         String   @unique
+  productId         String
+  warehouseId       String
+  
+  // Quantities
+  initialQuantity   Int
+  currentQuantity   Int
+  reservedQuantity  Int      @default(0)
+  
+  // Dates
+  productionDate    DateTime
+  expiryDate        DateTime?
+  receivedDate      DateTime @default(now())
+  
+  // Cost tracking
+  unitCost          Float?
+  totalCost         Float?
+  
+  // Optional fields
+  supplierInfo      String?
+  qualityStatus     String?  // PENDING, APPROVED, REJECTED
+  notes             String?  @db.Text
+  
+  // Tracking
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  product           Product     @relation(fields: [productId], references: [id])
+  warehouse         Warehouse   @relation(fields: [warehouseId], references: [id])
+  movements         StockMovement[]
+  
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([expiryDate])
+  @@index([isActive])
+  @@map("lots")
+}
+
+// Stock Movement Model (all transactions)
+model StockMovement {
+  id                String            @id @default(cuid())
+  movementType      StockMovementType
+  
+  // References
+  productId         String
+  lotId             String?
+  warehouseId       String
+  orderId           String?
+  userId            String
+  
+  // Movement details
+  quantity          Int
+  unitCost          Float?
+  totalCost         Float?
+  
+  // Before/After snapshots
+  quantityBefore    Int
+  quantityAfter     Int
+  
+  // Additional info
+  reference         String?  // Order reference, transfer ID, etc.
+  reason            String?
+  notes             String?  @db.Text
+  
+  // Tracking
+  createdAt         DateTime @default(now())
+  
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id])
+  lot               Lot?      @relation(fields: [lotId], references: [id])
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id])
+  order             Order?    @relation(fields: [orderId], references: [id])
+  user              User      @relation("StockMovements", fields: [userId], references: [id])
+  
+  @@index([movementType])
+  @@index([productId])
+  @@index([lotId])
+  @@index([warehouseId])
+  @@index([orderId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}
+
+// Stock Level Model (current inventory per product/warehouse)
+model StockLevel {
+  id                String   @id @default(cuid())
+  productId         String
+  warehouseId       String
+  
+  // Quantities
+  totalQuantity     Int      @default(0)
+  availableQuantity Int      @default(0)
+  reservedQuantity  Int      @default(0)
+  
+  // Shipped vs Sold tracking
+  totalShipped      Int      @default(0)
+  totalSold         Int      @default(0)
+  
+  // Valuation
+  averageCost       Float?
+  totalValue        Float?
+  
+  // Tracking
+  lastMovementAt    DateTime?
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  product           Product   @relation(fields: [productId], references: [id])
+  warehouse         Warehouse @relation(fields: [warehouseId], references: [id])
+  
+  @@unique([productId, warehouseId])
+  @@index([productId])
+  @@index([warehouseId])
+  @@map("stock_levels")
+}
+
+// Stock Alert Model (low stock notifications)
+model StockAlert {
+  id                String      @id @default(cuid())
+  productId         String
+  warehouseId       String
+  alertType         StockAlertType
+  severity          AlertSeverity
+  
+  // Alert details
+  currentQuantity   Int
+  threshold         Int
+  message           String
+  
+  // Status
+  isResolved        Boolean     @default(false)
+  resolvedAt        DateTime?
+  resolvedBy        String?
+  
+  // Tracking
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relations
+  warehouse         Warehouse   @relation(fields: [warehouseId], references: [id])
+  
+  @@index([productId])
+  @@index([warehouseId])
+  @@index([alertType])
+  @@index([isResolved])
+  @@index([createdAt])
+  @@map("stock_alerts")
+}
+
+// Stock Management Enums
+enum StockMovementType {
+  IN              // Lot received from production
+  OUT             // Deducted when order delivered
+  ADJUSTMENT      // Manual correction
+  RETURN          // Customer return
+  TRANSFER        // Between warehouses
+}
+
+enum StockAlertType {
+  LOW_STOCK
+  OUT_OF_STOCK
+  EXPIRING_SOON
+  EXPIRED
+  NEGATIVE_STOCK
+  MISSING_SKU
+  INSUFFICIENT_STOCK
+}
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
 }

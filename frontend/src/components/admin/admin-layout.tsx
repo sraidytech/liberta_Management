@@ -29,7 +29,8 @@ import {
   Key,
   Activity,
   Package,
-  MessageSquare
+  MessageSquare,
+  Warehouse
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -103,6 +104,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/product-assignments',
       active: pathname === '/admin/product-assignments',
       roles: ['ADMIN', 'TEAM_MANAGER'] // Admin and Team Manager
+    },
+    {
+      name: language === 'fr' ? 'Gestion de Stock' : 'Stock Management',
+      icon: Warehouse,
+      href: '/admin/stock',
+      active: pathname?.startsWith('/admin/stock'),
+      roles: ['ADMIN', 'TEAM_MANAGER', 'STOCK_MANAGEMENT_AGENT'] // Admin, Team Manager, and Stock Agent
     },
     {
       name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',

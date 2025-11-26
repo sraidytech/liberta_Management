@@ -34,6 +34,12 @@ export default function DashboardPage() {
       } else if (user.role === 'TEAM_MANAGER') {
         console.log('👔 Redirecting team manager to orders');
         router.push('/admin/orders');
+      } else if (user.role === 'STOCK_MANAGEMENT_AGENT') {
+        console.log('📦 Redirecting stock agent to stock management');
+        router.push('/admin/stock');
+      } else if (user.role === 'QUALITY_AGENT') {
+        console.log('✅ Redirecting quality agent to quality panel');
+        router.push('/quality-agent');
       } else if (user.role === 'COORDINATEUR') {
         console.log('🎯 Redirecting coordinateur to coordinateur panel');
         router.push('/coordinateur');

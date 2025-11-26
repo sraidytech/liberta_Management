@@ -1,0 +1,4 @@
+[migration]
+name = "add_stock_management_system"
+description = "Add complete stock management system with products, warehouses, lots, movements, stock levels, and alerts"
+timestamp = 2025-07-26T00:00:00Z
