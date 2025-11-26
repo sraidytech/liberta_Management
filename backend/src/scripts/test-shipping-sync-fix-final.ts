@@ -13,10 +13,20 @@ import { Redis } from 'ioredis';
 import { ShippingSyncService } from '../services/shipping-sync.service';
 
 const prisma = new PrismaClient();
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD,
+
+// Use Redis URL from environment (works in Docker and local)
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+console.log(`🔗 Connecting to Redis: ${redisUrl.replace(/:[^:]*@/, ':****@')}`);
+
+const redis = new Redis(redisUrl, {
+  maxRetriesPerRequest: 3,
+  retryStrategy: (times) => {
+    if (times > 3) {
+      console.error('❌ Redis connection failed after 3 retries');
+      return null;
+    }
+    return Math.min(times * 100, 2000);
+  }
 });
 
 interface TestResult {
