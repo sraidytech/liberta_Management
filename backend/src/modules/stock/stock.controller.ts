@@ -7,6 +7,7 @@ import { alertService } from './alert.service';
 import { reportService } from './report.service';
 import { warehouseService } from './warehouse.service';
 import { productSyncService } from './product-sync.service';
+import { analyticsService } from './analytics.service';
 
 export class StockController {
   // ============================================
@@ -812,6 +813,222 @@ export class StockController {
         error: { message: error.message }
       });
     }
+  }
+
+  // ============================================
+  // ANALYTICS
+  // ============================================
+
+  async getOverviewAnalytics(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, warehouseId, categoryId } = req.query;
+
+      const data = await analyticsService.getOverviewAnalytics({
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        warehouseId: warehouseId as string,
+        categoryId: categoryId as string
+      });
+
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error: any) {
+      console.error('Error fetching overview analytics:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message }
+      });
+    }
+  }
+
+  async getMovementAnalytics(req: Request, res: Response) {
+    try {
+      const { startDate, endDate, warehouseId, productId } = req.query;
+
+      const data = await analyticsService.getMovementAnalytics({
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        warehouseId: warehouseId as string,
+        productId: productId as string
+      });
+
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error: any) {
+      console.error('Error fetching movement analytics:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message }
+      });
+    }
+  }
+
+  async getHealthAnalytics(req: Request, res: Response) {
+    try {
+      const { warehouseId } = req.query;
+
+      const data = await analyticsService.getHealthAnalytics({
+        warehouseId: warehouseId as string
+      });
+
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error: any) {
+      console.error('Error fetching health analytics:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message }
+      });
+    }
+  }
+
+  async getWarehouseAnalytics(req: Request, res: Response) {
+    try {
+      const { startDate, endDate } = req.query;
+
+      const data = await analyticsService.getWarehouseAnalytics({
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined
+      });
+
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error: any) {
+      console.error('Error fetching warehouse analytics:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message }
+      });
+    }
+  }
+
+  async exportAnalytics(req: Request, res: Response) {
+    try {
+      const { type, startDate, endDate, warehouseId, format } = req.query;
+
+      const filters = {
+        startDate: startDate ? new Date(startDate as string) : undefined,
+        endDate: endDate ? new Date(endDate as string) : undefined,
+        warehouseId: warehouseId as string
+      };
+
+      let data: any;
+      switch (type) {
+        case 'overview':
+          data = await analyticsService.getOverviewAnalytics(filters);
+          break;
+        case 'movements':
+          data = await analyticsService.getMovementAnalytics(filters);
+          break;
+        case 'health':
+          data = await analyticsService.getHealthAnalytics(filters);
+          break;
+        case 'warehouses':
+          data = await analyticsService.getWarehouseAnalytics(filters);
+          break;
+        default:
+          return res.status(400).json({
+            success: false,
+            error: { message: 'Invalid analytics type' }
+          });
+      }
+
+      // Convert to CSV if requested
+      if (format === 'csv') {
+        const csv = this.convertToCSV(data, type as string);
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename="analytics-${type}-${new Date().toISOString().split('T')[0]}.csv"`);
+        return res.send(csv);
+      }
+
+      res.json({
+        success: true,
+        data
+      });
+    } catch (error: any) {
+      console.error('Error exporting analytics:', error);
+      res.status(500).json({
+        success: false,
+        error: { message: error.message }
+      });
+    }
+  }
+
+  private convertToCSV(data: any, type: string): string {
+    let csv = '';
+    
+    switch (type) {
+      case 'overview':
+        csv = 'Metric,Value\n';
+        csv += `Total Value,${data.totalValue}\n`;
+        csv += `Total Products,${data.totalProducts}\n`;
+        csv += `Total Lots,${data.totalLots}\n`;
+        csv += `Avg Turnover Rate,${data.avgTurnoverRate}\n`;
+        csv += '\nValue History\nDate,Value\n';
+        data.valueHistory.forEach((item: any) => {
+          csv += `${item.date},${item.value}\n`;
+        });
+        csv += '\nCategory Distribution\nCategory,Value\n';
+        data.categoryDistribution.forEach((item: any) => {
+          csv += `${item.name},${item.value}\n`;
+        });
+        csv += '\nTop Products\nProduct,Value,Quantity\n';
+        data.topProducts.forEach((item: any) => {
+          csv += `${item.name},${item.value},${item.quantity}\n`;
+        });
+        break;
+        
+      case 'movements':
+        csv = 'Movement Trend\nDate,IN,OUT,Adjustment,Transfer,Return\n';
+        data.trend.forEach((item: any) => {
+          csv += `${item.date},${item.in},${item.out},${item.adjustment},${item.transfer},${item.return}\n`;
+        });
+        csv += '\nType Distribution\nType,Count,Quantity\n';
+        data.typeDistribution.forEach((item: any) => {
+          csv += `${item.type},${item.count},${item.quantity}\n`;
+        });
+        csv += '\nTop Products by Movement\nProduct,IN Quantity,OUT Quantity,Net Change\n';
+        data.topProducts.forEach((item: any) => {
+          csv += `${item.name},${item.inQuantity},${item.outQuantity},${item.netChange}\n`;
+        });
+        break;
+        
+      case 'health':
+        csv = 'Stock Level Distribution\nStatus,Count,Percentage\n';
+        data.levelDistribution.forEach((item: any) => {
+          csv += `${item.status},${item.count},${item.percentage}%\n`;
+        });
+        csv += '\nExpiry Analysis\nRange,Count,Value\n';
+        data.expiryAnalysis.forEach((item: any) => {
+          csv += `${item.range},${item.count},${item.value}\n`;
+        });
+        csv += '\nReorder Recommendations\nProduct,SKU,Current,Reorder Point,To Order,Warehouse\n';
+        data.reorderList.forEach((item: any) => {
+          csv += `${item.productName},${item.sku},${item.current},${item.reorderPoint},${item.toOrder},${item.warehouseName}\n`;
+        });
+        break;
+        
+      case 'warehouses':
+        csv = 'Warehouse Stats\nName,Code,Total Value,Total Quantity,Product Count,Utilization\n';
+        data.stats.forEach((item: any) => {
+          csv += `${item.name},${item.code},${item.totalValue},${item.totalQuantity},${item.productCount},${item.utilization}%\n`;
+        });
+        csv += '\nWarehouse Comparison\nWarehouse,IN Movements,OUT Movements,Net Change\n';
+        data.comparison.forEach((item: any) => {
+          csv += `${item.warehouseName},${item.inMovements},${item.outMovements},${item.netChange}\n`;
+        });
+        break;
+    }
+    
+    return csv;
   }
 }
 

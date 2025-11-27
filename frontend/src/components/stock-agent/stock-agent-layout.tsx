@@ -20,7 +20,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Warehouse,
-  FileText
+  PieChart
 } from 'lucide-react';
 
 interface StockAgentLayoutProps {
@@ -77,8 +77,8 @@ export default function StockAgentLayout({ children }: StockAgentLayoutProps) {
       active: pathname === '/admin/stock/alerts',
     },
     {
-      name: language === 'fr' ? 'Rapports' : 'Reports',
-      icon: FileText,
+      name: language === 'fr' ? 'Analytique' : 'Analytics',
+      icon: PieChart,
       href: '/admin/stock/reports',
       active: pathname === '/admin/stock/reports',
     },

@@ -144,6 +144,41 @@ router.post('/reports/export', requireStockAccess, (req, res) => {
 });
 
 // ============================================
+// ANALYTICS
+// ============================================
+
+// GET /api/v1/stock/analytics/overview
+// Returns: totalValue, totalProducts, totalLots, avgTurnover, valueHistory[]
+router.get('/analytics/overview', requireStockAccess, (req, res) => {
+  stockController.getOverviewAnalytics(req, res);
+});
+
+// GET /api/v1/stock/analytics/movements
+// Query: startDate, endDate, warehouseId, productId
+// Returns: movementTrend[], typeDistribution[], topProducts[]
+router.get('/analytics/movements', requireStockAccess, (req, res) => {
+  stockController.getMovementAnalytics(req, res);
+});
+
+// GET /api/v1/stock/analytics/health
+// Returns: stockLevelDistribution[], expiryAnalysis[], agingAnalysis[], reorderList[]
+router.get('/analytics/health', requireStockAccess, (req, res) => {
+  stockController.getHealthAnalytics(req, res);
+});
+
+// GET /api/v1/stock/analytics/warehouses
+// Returns: warehouseStats[], utilizationData[]
+router.get('/analytics/warehouses', requireStockAccess, (req, res) => {
+  stockController.getWarehouseAnalytics(req, res);
+});
+
+// GET /api/v1/stock/analytics/export
+// Query: type (overview|movements|health|warehouses), format (json|csv)
+router.get('/analytics/export', requireStockAccess, (req, res) => {
+  stockController.exportAnalytics(req, res);
+});
+
+// ============================================
 // WAREHOUSES
 // ============================================
 

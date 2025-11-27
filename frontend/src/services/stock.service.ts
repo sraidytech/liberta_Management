@@ -512,6 +512,109 @@ export const stockService = {
     const json = await response.json();
     return json.data;
   },
+
+  // ============================================
+  // ANALYTICS
+  // ============================================
+
+  getOverviewAnalytics: async (filters?: {
+    startDate?: string;
+    endDate?: string;
+    warehouseId?: string;
+    categoryId?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_URL}/api/v1/stock/analytics/overview?${params}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch overview analytics');
+    const json = await response.json();
+    return json.data;
+  },
+
+  getMovementAnalytics: async (filters?: {
+    startDate?: string;
+    endDate?: string;
+    warehouseId?: string;
+    productId?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_URL}/api/v1/stock/analytics/movements?${params}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch movement analytics');
+    const json = await response.json();
+    return json.data;
+  },
+
+  getHealthAnalytics: async (filters?: {
+    warehouseId?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_URL}/api/v1/stock/analytics/health?${params}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch health analytics');
+    const json = await response.json();
+    return json.data;
+  },
+
+  getWarehouseAnalytics: async (filters?: {
+    startDate?: string;
+    endDate?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_URL}/api/v1/stock/analytics/warehouses?${params}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch warehouse analytics');
+    const json = await response.json();
+    return json.data;
+  },
+
+  exportAnalytics: async (type: string, filters?: {
+    startDate?: string;
+    endDate?: string;
+    warehouseId?: string;
+    format?: 'json' | 'csv';
+  }) => {
+    const params = new URLSearchParams({ type });
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined) params.append(key, String(value));
+      });
+    }
+    const response = await fetch(`${API_URL}/api/v1/stock/analytics/export?${params}`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to export analytics');
+    
+    if (filters?.format === 'csv') {
+      return response.blob();
+    }
+    const json = await response.json();
+    return json.data;
+  },
 };
 
 export default stockService;
