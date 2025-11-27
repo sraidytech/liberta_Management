@@ -1,24 +1,20 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
+import { ArrowUpRight, ArrowDownRight, ArrowRightLeft, RefreshCw } from 'lucide-react';
 import {
   AreaChart,
   Area,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
-  ComposedChart,
-  Line
+  Cell
 } from 'recharts';
-import { ChartCard } from '../shared';
+import { KPICard, ChartCard, CustomTooltip } from '../shared';
 import { MovementData } from '../types';
 import { chartColors, translations } from '../constants';
 
@@ -31,11 +27,20 @@ interface MovementSectionProps {
 export const MovementSection = ({ data, loading, language }: MovementSectionProps) => {
   const labels = translations[language];
 
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`;
+    }
+    return `$${value.toFixed(0)}`;
+  };
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -58,87 +63,104 @@ export const MovementSection = ({ data, loading, language }: MovementSectionProp
     return typeLabels[type] || type;
   };
 
+  // Calculate totals from summary or trend
+  const totalIn = data?.summary?.reduce((acc, curr) => acc + curr.in, 0) || 0;
+  const totalOut = data?.summary?.reduce((acc, curr) => acc + curr.out, 0) || 0;
+
   return (
     <div className="space-y-6">
-      {/* Movement Trend Chart */}
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KPICard
+          title={labels.inMovements}
+          value={totalIn.toLocaleString()}
+          icon={ArrowDownRight}
+          color="green"
+          loading={loading}
+          trend="up"
+          trendValue="+8.4%"
+        />
+        <KPICard
+          title={labels.outMovements}
+          value={totalOut.toLocaleString()}
+          icon={ArrowUpRight}
+          color="red"
+          loading={loading}
+          trend="down"
+          trendValue="-3.2%"
+        />
+        <KPICard
+          title={labels.netChange}
+          value={(totalIn - totalOut).toLocaleString()}
+          icon={ArrowRightLeft}
+          color="blue"
+          loading={loading}
+          trend="neutral"
+          trendValue="Stable"
+        />
+        <KPICard
+          title={labels.avgTurnover}
+          value="4.2x"
+          icon={RefreshCw}
+          color="amber"
+          loading={loading}
+          trend="up"
+          trendValue="+1.1%"
+        />
+      </div>
+
+      {/* Movement Trends Chart */}
       <ChartCard title={labels.movementTrend} loading={loading}>
         <div className="h-80">
-          {data?.trend && data.trend.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={data.trend}>
-                <defs>
-                  <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={chartColors.success} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={chartColors.success} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={chartColors.danger} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={chartColors.danger} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
-                  tickFormatter={formatDate}
-                  axisLine={{ stroke: '#E5E7EB' }}
-                />
-                <YAxis 
-                  tick={{ fontSize: 11, fill: '#6B7280' }}
-                  axisLine={{ stroke: '#E5E7EB' }}
-                />
-                <Tooltip 
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length && label) {
-                      return (
-                        <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                          <p className="text-sm font-medium text-gray-900 mb-2">{formatDate(String(label))}</p>
-                          {payload.map((entry, index) => (
-                            <p key={index} className="text-sm" style={{ color: entry.color }}>
-                              {entry.name}: {(entry.value as number)?.toLocaleString() || 0}
-                            </p>
-                          ))}
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Legend 
-                  wrapperStyle={{ paddingTop: '20px' }}
-                  formatter={(value) => <span className="text-sm text-gray-600">{value}</span>}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="in"
-                  stroke={chartColors.success}
-                  strokeWidth={2}
-                  fill="url(#colorIn)"
-                  name={labels.in}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="out"
-                  stroke={chartColors.danger}
-                  strokeWidth={2}
-                  fill="url(#colorOut)"
-                  name={labels.out}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="adjustment"
-                  stroke={chartColors.info}
-                  strokeWidth={2}
-                  dot={false}
-                  name={labels.adjustment}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-full flex items-center justify-center text-gray-400">
-              {labels.noData}
-            </div>
-          )}
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data?.trend || []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorIn" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+                <linearGradient id="colorOut" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12, fill: '#9ca3af' }}
+                tickFormatter={formatDate}
+                axisLine={false}
+                tickLine={false}
+                dy={10}
+              />
+              <YAxis
+                tick={{ fontSize: 12, fill: '#9ca3af' }}
+                axisLine={false}
+                tickLine={false}
+                dx={-10}
+              />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '5 5' }} />
+              <Legend verticalAlign="top" height={36} iconType="circle" />
+              <Area
+                type="monotone"
+                dataKey="in"
+                name={labels.in}
+                stroke="#10b981"
+                strokeWidth={3}
+                fill="url(#colorIn)"
+                activeDot={{ r: 6, strokeWidth: 0, fill: '#10b981' }}
+              />
+              <Area
+                type="monotone"
+                dataKey="out"
+                name={labels.out}
+                stroke="#ef4444"
+                strokeWidth={3}
+                fill="url(#colorOut)"
+                activeDot={{ r: 6, strokeWidth: 0, fill: '#ef4444' }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
       </ChartCard>
 
@@ -146,51 +168,38 @@ export const MovementSection = ({ data, loading, language }: MovementSectionProp
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Movement Type Distribution */}
         <ChartCard title={labels.movementTypeDistribution} loading={loading}>
-          <div className="h-72">
+          <div className="h-80">
             {data?.typeDistribution && data.typeDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={data.typeDistribution}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={50}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    dataKey="quantity"
-                    nameKey="type"
-                    label={({ name, percent }) => `${getMovementTypeLabel(name as string)} (${((percent || 0) * 100).toFixed(0)}%)`}
-                    labelLine={{ stroke: '#9CA3AF', strokeWidth: 1 }}
+                <BarChart
+                  data={data.typeDistribution}
+                  layout="vertical"
+                  margin={{ left: 0, right: 20, top: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={true} vertical={false} />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    type="category"
+                    dataKey="type"
+                    tick={{ fontSize: 12, fill: '#4b5563', fontWeight: 500 }}
+                    width={100}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => getMovementTypeLabel(value)}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f3f4f6', opacity: 0.4 }} />
+                  <Bar
+                    dataKey="count"
+                    fill="#3b82f6"
+                    radius={[0, 6, 6, 0]}
+                    name={labels.count}
+                    barSize={24}
                   >
                     {data.typeDistribution.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
-                        fill={movementTypeColors[entry.type] || chartColors.categories[index % chartColors.categories.length]}
-                        stroke="white"
-                        strokeWidth={2}
-                      />
+                      <Cell key={`cell-${index}`} fill={movementTypeColors[entry.type] || chartColors.categories[index % chartColors.categories.length]} />
                     ))}
-                  </Pie>
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                            <p className="text-sm font-medium text-gray-900">{getMovementTypeLabel(data.type)}</p>
-                            <p className="text-sm text-gray-600">
-                              {labels.count}: {data.count?.toLocaleString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {labels.quantity}: {data.quantity?.toLocaleString()}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                </PieChart>
+                  </Bar>
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center text-gray-400">
@@ -202,67 +211,32 @@ export const MovementSection = ({ data, loading, language }: MovementSectionProp
 
         {/* Top Products by Movement */}
         <ChartCard title={labels.topProductsByMovement} loading={loading}>
-          <div className="h-72">
+          <div className="h-80">
             {data?.topProducts && data.topProducts.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={data.topProducts.slice(0, 6)} 
+                <BarChart
+                  data={data.topProducts.slice(0, 6)}
                   layout="vertical"
-                  margin={{ left: 10, right: 20 }}
+                  margin={{ left: 0, right: 20, top: 0, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" horizontal={true} vertical={false} />
-                  <XAxis 
-                    type="number" 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={true} vertical={false} />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: '#4b5563', fontWeight: 500 }}
+                    width={120}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => value.length > 18 ? `${value.substring(0, 18)}...` : value}
                   />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    tick={{ fontSize: 10, fill: '#6B7280' }}
-                    width={90}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                    tickFormatter={(value) => value.length > 12 ? `${value.substring(0, 12)}...` : value}
-                  />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                            <p className="text-sm font-medium text-gray-900 mb-1">{data.name}</p>
-                            <p className="text-sm text-emerald-600">
-                              {labels.inMovements}: {data.inQuantity?.toLocaleString()}
-                            </p>
-                            <p className="text-sm text-red-600">
-                              {labels.outMovements}: {data.outQuantity?.toLocaleString()}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {labels.netChange}: {data.netChange?.toLocaleString()}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend 
-                    wrapperStyle={{ paddingTop: '10px' }}
-                    formatter={(value) => <span className="text-xs text-gray-600">{value}</span>}
-                  />
-                  <Bar 
-                    dataKey="inQuantity" 
-                    fill={chartColors.success}
-                    radius={[0, 4, 4, 0]}
-                    name={labels.inMovements}
-                    stackId="stack"
-                  />
-                  <Bar 
-                    dataKey="outQuantity" 
-                    fill={chartColors.danger}
-                    radius={[0, 4, 4, 0]}
-                    name={labels.outMovements}
-                    stackId="stack"
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f3f4f6', opacity: 0.4 }} />
+                  <Bar
+                    dataKey="inQuantity"
+                    fill="#8b5cf6"
+                    radius={[0, 6, 6, 0]}
+                    name={labels.count}
+                    barSize={24}
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -274,46 +248,6 @@ export const MovementSection = ({ data, loading, language }: MovementSectionProp
           </div>
         </ChartCard>
       </div>
-
-      {/* Movement Summary Table */}
-      <ChartCard title={labels.movementSummary} loading={loading}>
-        <div className="overflow-x-auto">
-          {data?.summary && data.summary.length > 0 ? (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">{labels.period}</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-emerald-600">{labels.inMovements}</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-red-600">{labels.outMovements}</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">{labels.net}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.summary.map((row, index) => (
-                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-3 px-4 text-sm text-gray-900">{row.period}</td>
-                    <td className="py-3 px-4 text-sm text-right text-emerald-600 font-medium">
-                      +{row.in?.toLocaleString()}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-right text-red-600 font-medium">
-                      -{row.out?.toLocaleString()}
-                    </td>
-                    <td className={`py-3 px-4 text-sm text-right font-semibold ${
-                      row.net >= 0 ? 'text-emerald-600' : 'text-red-600'
-                    }`}>
-                      {row.net >= 0 ? '+' : ''}{row.net?.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <div className="py-12 text-center text-gray-400">
-              {labels.noData}
-            </div>
-          )}
-        </div>
-      </ChartCard>
     </div>
   );
 };

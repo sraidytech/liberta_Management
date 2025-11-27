@@ -13,8 +13,8 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
+  Legend
 } from 'recharts';
 import { KPICard, ChartCard, CustomTooltip } from '../shared';
 import { OverviewData } from '../types';
@@ -40,9 +40,9 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', { 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -54,15 +54,19 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
           title={labels.totalStockValue}
           value={data ? formatCurrency(data.totalValue || 0) : '$0'}
           icon={DollarSign}
-          color="blue"
+          color="indigo"
           loading={loading}
+          trend="up"
+          trendValue="+12.5%"
         />
         <KPICard
           title={labels.totalProducts}
           value={data?.totalProducts?.toLocaleString() || 0}
           icon={Package}
-          color="green"
+          color="cyan"
           loading={loading}
+          trend="neutral"
+          trendValue="0%"
         />
         <KPICard
           title={labels.totalLots}
@@ -70,6 +74,8 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
           icon={Layers}
           color="purple"
           loading={loading}
+          trend="up"
+          trendValue="+5.2%"
         />
         <KPICard
           title={labels.avgTurnover}
@@ -77,6 +83,8 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
           icon={RefreshCw}
           color="amber"
           loading={loading}
+          trend="down"
+          trendValue="-2.1%"
         />
       </div>
 
@@ -84,47 +92,38 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
       <ChartCard title={labels.stockValueTrend} loading={loading}>
         <div className="h-80">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data?.valueHistory || []}>
+            <AreaChart data={data?.valueHistory || []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={chartColors.primary} stopOpacity={0.3} />
-                  <stop offset="95%" stopColor={chartColors.primary} stopOpacity={0} />
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis 
-                dataKey="date" 
-                tick={{ fontSize: 12, fill: '#6B7280' }}
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 12, fill: '#9ca3af' }}
                 tickFormatter={formatDate}
-                axisLine={{ stroke: '#E5E7EB' }}
+                axisLine={false}
+                tickLine={false}
+                dy={10}
               />
-              <YAxis 
-                tick={{ fontSize: 12, fill: '#6B7280' }}
+              <YAxis
+                tick={{ fontSize: 12, fill: '#9ca3af' }}
                 tickFormatter={(value) => formatCurrency(value)}
-                axisLine={{ stroke: '#E5E7EB' }}
+                axisLine={false}
+                tickLine={false}
+                dx={-10}
               />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length && label) {
-                    return (
-                      <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                        <p className="text-sm font-medium text-gray-900 mb-1">{formatDate(String(label))}</p>
-                        <p className="text-sm text-blue-600">
-                          {labels.value}: {formatCurrency(payload[0].value as number)}
-                        </p>
-                      </div>
-                    );
-                  }
-                  return null;
-                }}
-              />
+              <Tooltip content={<CustomTooltip valuePrefix="$" />} cursor={{ stroke: '#6366f1', strokeWidth: 1, strokeDasharray: '5 5' }} />
               <Area
                 type="monotone"
                 dataKey="value"
-                stroke={chartColors.primary}
-                strokeWidth={2}
+                stroke="#6366f1"
+                strokeWidth={3}
                 fill="url(#colorValue)"
                 name={labels.value}
+                activeDot={{ r: 6, strokeWidth: 0, fill: '#6366f1' }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -135,7 +134,7 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Category Distribution Pie Chart */}
         <ChartCard title={labels.categoryDistribution} loading={loading}>
-          <div className="h-72">
+          <div className="h-80">
             {data?.categoryDistribution && data.categoryDistribution.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -143,38 +142,28 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
                     data={data.categoryDistribution}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={2}
+                    innerRadius={80}
+                    outerRadius={110}
+                    paddingAngle={4}
                     dataKey="value"
                     nameKey="name"
-                    label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
-                    labelLine={{ stroke: '#9CA3AF', strokeWidth: 1 }}
+                    stroke="none"
                   >
                     {data.categoryDistribution.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
+                      <Cell
+                        key={`cell-${index}`}
                         fill={chartColors.categories[index % chartColors.categories.length]}
-                        stroke="white"
-                        strokeWidth={2}
+                        className="stroke-white stroke-2"
                       />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                            <p className="text-sm font-medium text-gray-900">{data.name}</p>
-                            <p className="text-sm text-gray-600">
-                              {labels.value}: {formatCurrency(data.value)}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
+                  <Tooltip content={<CustomTooltip valuePrefix="$" />} />
+                  <Legend
+                    layout="vertical"
+                    verticalAlign="middle"
+                    align="right"
+                    iconType="circle"
+                    formatter={(value) => <span className="text-sm font-medium text-gray-600 ml-2">{value}</span>}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -188,54 +177,43 @@ export const OverviewSection = ({ data, loading, language }: OverviewSectionProp
 
         {/* Top Products by Value Bar Chart */}
         <ChartCard title={labels.topProductsByValue} loading={loading}>
-          <div className="h-72">
+          <div className="h-80">
             {data?.topProducts && data.topProducts.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={data.topProducts.slice(0, 8)} 
+                <BarChart
+                  data={data.topProducts.slice(0, 6)}
                   layout="vertical"
-                  margin={{ left: 20, right: 20 }}
+                  margin={{ left: 0, right: 20, top: 0, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" horizontal={true} vertical={false} />
-                  <XAxis 
-                    type="number" 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={true} vertical={false} />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 11, fill: '#9ca3af' }}
                     tickFormatter={(value) => formatCurrency(value)}
-                    axisLine={{ stroke: '#E5E7EB' }}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <YAxis 
-                    type="category" 
-                    dataKey="name" 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    width={100}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                    tickFormatter={(value) => value.length > 15 ? `${value.substring(0, 15)}...` : value}
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 12, fill: '#4b5563', fontWeight: 500 }}
+                    width={120}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(value) => value.length > 18 ? `${value.substring(0, 18)}...` : value}
                   />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                            <p className="text-sm font-medium text-gray-900 mb-1">{data.name}</p>
-                            <p className="text-sm text-blue-600">
-                              {labels.value}: {formatCurrency(data.value)}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {labels.quantity}: {data.quantity?.toLocaleString()}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar 
-                    dataKey="value" 
-                    fill={chartColors.primary}
-                    radius={[0, 4, 4, 0]}
+                  <Tooltip content={<CustomTooltip valuePrefix="$" />} cursor={{ fill: '#f3f4f6', opacity: 0.4 }} />
+                  <Bar
+                    dataKey="value"
+                    fill="#8b5cf6"
+                    radius={[0, 6, 6, 0]}
                     name={labels.value}
-                  />
+                    barSize={24}
+                  >
+                    {data.topProducts.slice(0, 6).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#8b5cf6' : '#a78bfa'} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (

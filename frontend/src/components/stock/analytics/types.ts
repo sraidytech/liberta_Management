@@ -4,8 +4,6 @@ export interface AnalyticsFilters {
   startDate: string;
   endDate: string;
   warehouseId: string;
-  categoryId: string;
-  productId: string;
 }
 
 export interface OverviewData {

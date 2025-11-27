@@ -2,79 +2,72 @@
 
 import { useState, useEffect } from 'react';
 import AdminLayout from '@/components/admin/admin-layout';
-import StockAgentLayout from '@/components/stock-agent/stock-agent-layout';
-import { Button } from '@/components/ui/button';
-import stockService from '@/services/stock.service';
-import { useLanguage } from '@/lib/language-context';
-import { useAuth } from '@/lib/auth-context';
 import {
-  BarChart3,
-  Download,
-  Filter,
+  BarChart2,
+  TrendingUp,
   Activity,
-  AlertTriangle,
   Warehouse,
-  ChevronDown
+  Calendar,
+  Filter
 } from 'lucide-react';
+import { AnalyticsFilters } from '@/components/stock/analytics/AnalyticsFilters';
+import OverviewSection from '@/components/stock/analytics/sections/OverviewSection';
+import MovementSection from '@/components/stock/analytics/sections/MovementSection';
+import HealthSection from '@/components/stock/analytics/sections/HealthSection';
+import WarehouseSection from '@/components/stock/analytics/sections/WarehouseSection';
+import { stockService } from '@/services/stock.service';
 import {
-  AnalyticsFilters,
-  OverviewSection,
-  MovementSection,
-  HealthSection,
-  WarehouseSection,
-  translations
-} from '@/components/stock/analytics';
-import type {
-  AnalyticsFilters as FiltersType,
+  AnalyticsFilters as FilterType,
   OverviewData,
   MovementData,
   HealthData,
   WarehouseData,
-  Warehouse as WarehouseType,
-  TabType
+  TabType,
+  Warehouse as WarehouseType
 } from '@/components/stock/analytics/types';
+import { translations, datePresets } from '@/components/stock/analytics/constants';
 
 export default function AnalyticsPage() {
-  const { language } = useLanguage();
-  const { user, isLoading: authLoading } = useAuth();
-  const labels = translations[language as 'en' | 'fr'];
-
-  // State
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<FiltersType>({
-    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    warehouseId: '',
-    categoryId: '',
-    productId: '',
-  });
+  const [language, setLanguage] = useState<'en' | 'fr'>('en');
 
-  // Data state
+  // Data states
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
   const [movementData, setMovementData] = useState<MovementData | null>(null);
   const [healthData, setHealthData] = useState<HealthData | null>(null);
   const [warehouseData, setWarehouseData] = useState<WarehouseData | null>(null);
-  const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
 
-  // Fetch warehouses and categories on mount
+  // Metadata states
+  const [warehouses, setWarehouses] = useState<WarehouseType[]>([]);
+
+  // Filters state
+  const [filters, setFilters] = useState<FilterType>({
+    startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    endDate: new Date().toISOString(),
+    warehouseId: '',
+  });
+
+  const labels = translations[language];
+
+  const tabs = [
+    { key: 'overview', label: labels.overview, icon: BarChart2 },
+    { key: 'movements', label: labels.movements, icon: TrendingUp },
+    { key: 'health', label: labels.health, icon: Activity },
+    { key: 'warehouses', label: labels.warehouses, icon: Warehouse },
+  ];
+
+  // Fetch metadata (warehouses)
   useEffect(() => {
     const fetchMetadata = async () => {
       try {
-        const [warehousesRes, productsRes] = await Promise.all([
-          stockService.getWarehouses(),
-          stockService.getProducts({ limit: 1000 })
-        ]);
-        setWarehouses(warehousesRes || []);
-        
-        // Extract unique categories
-        const cats = new Set<string>();
-        (productsRes?.products || []).forEach((p: any) => {
-          if (p.category) cats.add(p.category);
-        });
-        setCategories(Array.from(cats));
+        const warehousesRes = await stockService.getWarehouses();
+
+        // Handle warehouses response
+        if (Array.isArray(warehousesRes)) {
+          setWarehouses(warehousesRes);
+        }
       } catch (error) {
         console.error('Error fetching metadata:', error);
       }
@@ -82,137 +75,106 @@ export default function AnalyticsPage() {
     fetchMetadata();
   }, []);
 
-  // Fetch data based on active tab
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const filterParams = {
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          warehouseId: filters.warehouseId || undefined,
-        };
+    fetchData();
+  }, [activeTab, filters]);
 
-        switch (activeTab) {
-          case 'overview':
-            const overview = await stockService.getOverviewAnalytics(filterParams);
-            setOverviewData(overview);
-            break;
-          case 'movements':
-            const movements = await stockService.getMovementAnalytics(filterParams);
-            setMovementData(movements);
-            break;
-          case 'health':
-            const health = await stockService.getHealthAnalytics({
-              warehouseId: filters.warehouseId || undefined
-            });
-            setHealthData(health);
-            break;
-          case 'warehouses':
-            const warehouse = await stockService.getWarehouseAnalytics(filterParams);
-            setWarehouseData(warehouse);
-            break;
-        }
-      } catch (error) {
-        console.error('Error fetching analytics:', error);
-      } finally {
-        setLoading(false);
-      }
+  // Clean filters - remove empty values and convert to proper format
+  const getCleanFilters = () => {
+    return {
+      startDate: filters.startDate ? filters.startDate.split('T')[0] : undefined,
+      endDate: filters.endDate ? filters.endDate.split('T')[0] : undefined,
+      warehouseId: filters.warehouseId || undefined,
     };
+  };
 
-    if (user) {
-      fetchData();
-    }
-  }, [activeTab, filters, user]);
-
-  // Handle export
-  const handleExport = async (format: 'csv' | 'json' = 'csv') => {
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const blob = await stockService.exportAnalytics(activeTab, {
-        ...filters,
-        format
-      });
+      const cleanFilters = getCleanFilters();
+      console.log('Fetching analytics data with filters:', cleanFilters);
       
-      if (blob instanceof Blob) {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `stock-analytics-${activeTab}-${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
+      switch (activeTab) {
+        case 'overview':
+          const overview = await stockService.getOverviewAnalytics(cleanFilters);
+          console.log('Overview data received:', overview);
+          setOverviewData(overview);
+          break;
+        case 'movements':
+          const movements = await stockService.getMovementAnalytics(cleanFilters);
+          console.log('Movement data received:', movements);
+          setMovementData(movements);
+          break;
+        case 'health':
+          const health = await stockService.getHealthAnalytics({ warehouseId: cleanFilters.warehouseId });
+          console.log('Health data received:', health);
+          setHealthData(health);
+          break;
+        case 'warehouses':
+          const warehousesData = await stockService.getWarehouseAnalytics(cleanFilters);
+          console.log('Warehouse data received:', warehousesData);
+          setWarehouseData(warehousesData);
+          break;
       }
     } catch (error) {
-      console.error('Error exporting:', error);
+      console.error('Error fetching analytics data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Reset filters
-  const resetFilters = () => {
+  const handleResetFilters = () => {
     setFilters({
-      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      endDate: new Date().toISOString().split('T')[0],
+      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      endDate: new Date().toISOString(),
       warehouseId: '',
-      categoryId: '',
-      productId: '',
     });
   };
 
-  if (authLoading || !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto" />
-          <p className="mt-4 text-gray-500">{labels.loading}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const Layout = user.role === 'STOCK_MANAGEMENT_AGENT' ? StockAgentLayout : AdminLayout;
-
-  // Tab configuration
-  const tabs = [
-    { key: 'overview' as TabType, label: labels.overview, icon: BarChart3 },
-    { key: 'movements' as TabType, label: labels.movements, icon: Activity },
-    { key: 'health' as TabType, label: labels.health, icon: AlertTriangle },
-    { key: 'warehouses' as TabType, label: labels.warehouses, icon: Warehouse },
-  ];
-
   return (
-    <Layout>
+    <AdminLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{labels.title}</h1>
-            <p className="text-sm text-gray-500 mt-1">
-              {filters.startDate} → {filters.endDate}
+            <p className="text-sm text-gray-500">
+              {new Date().toLocaleDateString(language === 'fr' ? 'fr-FR' : 'en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
+
+          <div className="flex items-center gap-2">
+            <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 border-gray-200 hover:bg-gray-50"
+              className={`p-2 rounded-lg border ${showFilters
+                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
             >
-              <Filter className="w-4 h-4" />
-              {labels.filters}
-              {(filters.warehouseId || filters.categoryId) && (
-                <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-100 text-blue-700 rounded-full">
-                  {[filters.warehouseId, filters.categoryId].filter(Boolean).length}
-                </span>
-              )}
-              <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-            </Button>
-            <Button
-              onClick={() => handleExport('csv')}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
-            >
-              <Download className="w-4 h-4" />
-              {labels.exportCSV}
-            </Button>
+              <Filter className="w-5 h-5" />
+            </button>
+
+            <div className="flex bg-white rounded-lg border border-gray-200 p-1">
+              <button
+                onClick={() => setLanguage('en')}
+                className={`px-3 py-1 rounded-md text-sm font-medium ${language === 'en' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+              >
+                EN
+              </button>
+              <button
+                onClick={() => setLanguage('fr')}
+                className={`px-3 py-1 rounded-md text-sm font-medium ${language === 'fr' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
+                  }`}
+              >
+                FR
+              </button>
+            </div>
           </div>
         </div>
 
@@ -222,28 +184,33 @@ export default function AnalyticsPage() {
             filters={filters}
             setFilters={setFilters}
             warehouses={warehouses}
-            categories={categories}
-            language={language as 'en' | 'fr'}
-            onReset={resetFilters}
+            language={language}
+            onReset={handleResetFilters}
           />
         )}
 
         {/* Tabs */}
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-1 overflow-x-auto" aria-label="Tabs">
+          <nav className="flex space-x-8" aria-label="Tabs">
             {tabs.map((tab) => {
               const Icon = tab.icon;
+              const isActive = activeTab === tab.key;
               return (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
-                    activeTab === tab.key
-                      ? 'border-blue-600 text-blue-600'
+                  onClick={() => setActiveTab(tab.key as TabType)}
+                  className={`
+                    group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm
+                    ${isActive
+                      ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                    }
+                  `}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className={`
+                    -ml-0.5 mr-2 h-5 w-5
+                    ${isActive ? 'text-blue-500' : 'text-gray-400 group-hover:text-gray-500'}
+                  `} />
                   {tab.label}
                 </button>
               );
@@ -257,32 +224,32 @@ export default function AnalyticsPage() {
             <OverviewSection
               data={overviewData}
               loading={loading}
-              language={language as 'en' | 'fr'}
+              language={language}
             />
           )}
           {activeTab === 'movements' && (
             <MovementSection
               data={movementData}
               loading={loading}
-              language={language as 'en' | 'fr'}
+              language={language}
             />
           )}
           {activeTab === 'health' && (
             <HealthSection
               data={healthData}
               loading={loading}
-              language={language as 'en' | 'fr'}
+              language={language}
             />
           )}
           {activeTab === 'warehouses' && (
             <WarehouseSection
               data={warehouseData}
               loading={loading}
-              language={language as 'en' | 'fr'}
+              language={language}
             />
           )}
         </div>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 }

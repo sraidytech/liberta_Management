@@ -1,19 +1,20 @@
 'use client';
 
-import { AlertTriangle, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { AlertTriangle, CheckCircle, Clock, AlertOctagon } from 'lucide-react';
 import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  Cell
+  CartesianGrid
 } from 'recharts';
-import { ChartCard } from '../shared';
+import { KPICard, ChartCard, CustomTooltip } from '../shared';
 import { HealthData } from '../types';
 import { chartColors, translations } from '../constants';
 
@@ -26,133 +27,138 @@ interface HealthSectionProps {
 export const HealthSection = ({ data, loading, language }: HealthSectionProps) => {
   const labels = translations[language];
 
-  const statusColors: Record<string, string> = {
-    'Out of Stock': chartColors.danger,
-    'Low Stock': chartColors.warning,
-    'Normal': chartColors.success,
-    'Overstock': chartColors.info
+  const stockLevelColors = {
+    LOW_STOCK: chartColors.warning,
+    NORMAL: chartColors.success,
+    OVERSTOCK: chartColors.info,
+    OUT_OF_STOCK: chartColors.danger
   };
 
-  const statusIcons: Record<string, React.ReactNode> = {
-    'Out of Stock': <XCircle className="w-5 h-5 text-red-500" />,
-    'Low Stock': <AlertTriangle className="w-5 h-5 text-amber-500" />,
-    'Normal': <CheckCircle className="w-5 h-5 text-emerald-500" />,
-    'Overstock': <AlertCircle className="w-5 h-5 text-blue-500" />
-  };
-
-  const getStatusLabel = (status: string) => {
-    const statusLabels: Record<string, string> = {
-      'Out of Stock': labels.outOfStock,
-      'Low Stock': labels.lowStock,
-      'Normal': labels.normal,
-      'Overstock': labels.overstock
+  const getStockLevelLabel = (level: string) => {
+    const levelLabels: Record<string, string> = {
+      LOW_STOCK: labels.lowStock,
+      NORMAL: labels.normal,
+      OVERSTOCK: labels.overstock,
+      OUT_OF_STOCK: labels.outOfStock
     };
-    return statusLabels[status] || status;
+    return levelLabels[level] || level;
   };
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(1)}K`;
-    }
-    return `$${value.toFixed(0)}`;
-  };
+  // Calculate expiring soon count
+  const expiringSoonCount = data?.expiryAnalysis?.find(item => item.range === 'Expiring Soon')?.count || 0;
 
   return (
     <div className="space-y-6">
-      {/* Stock Level Distribution Cards */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="p-5 border border-gray-100 animate-pulse">
-              <div className="h-20 bg-gray-200 rounded" />
-            </Card>
-          ))
-        ) : (
-          data?.levelDistribution?.map((item, index) => (
-            <Card 
-              key={index} 
-              className={`p-5 border-l-4 shadow-sm hover:shadow-md transition-shadow`}
-              style={{ borderLeftColor: statusColors[item.status] || chartColors.primary }}
-            >
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    {statusIcons[item.status]}
-                    <span className="text-sm font-medium text-gray-600">
-                      {getStatusLabel(item.status)}
-                    </span>
-                  </div>
-                  <p className="text-3xl font-bold text-gray-900">{item.count}</p>
-                  <p className="text-sm text-gray-500 mt-1">{item.percentage}% of total</p>
-                </div>
-              </div>
-            </Card>
-          ))
-        )}
+        <KPICard
+          title={labels.normal}
+          value={data?.levelDistribution?.find(l => l.status === 'NORMAL')?.count?.toLocaleString() || 0}
+          icon={CheckCircle}
+          color="green"
+          loading={loading}
+        />
+        <KPICard
+          title={labels.lowStock}
+          value={data?.levelDistribution?.find(l => l.status === 'LOW_STOCK')?.count?.toLocaleString() || 0}
+          icon={AlertTriangle}
+          color="amber"
+          loading={loading}
+        />
+        <KPICard
+          title={labels.outOfStock}
+          value={data?.levelDistribution?.find(l => l.status === 'OUT_OF_STOCK')?.count?.toLocaleString() || 0}
+          icon={AlertOctagon}
+          color="red"
+          loading={loading}
+        />
+        <KPICard
+          title={labels.expiringSoon}
+          value={expiringSoonCount.toLocaleString()}
+          icon={Clock}
+          color="purple"
+          loading={loading}
+        />
       </div>
 
-      {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Stock Level Distribution */}
+        <ChartCard title={labels.stockLevelDistribution} loading={loading}>
+          <div className="h-80">
+            {data?.levelDistribution && data.levelDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={data.levelDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={80}
+                    outerRadius={110}
+                    paddingAngle={4}
+                    dataKey="count"
+                    nameKey="status"
+                    stroke="none"
+                  >
+                    {data.levelDistribution.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={stockLevelColors[entry.status as keyof typeof stockLevelColors] || chartColors.categories[index]}
+                        className="stroke-white stroke-2"
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend
+                    layout="vertical"
+                    verticalAlign="middle"
+                    align="right"
+                    iconType="circle"
+                    formatter={(value) => <span className="text-sm font-medium text-gray-600 ml-2">{getStockLevelLabel(value)}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-gray-400">
+                {labels.noData}
+              </div>
+            )}
+          </div>
+        </ChartCard>
+
         {/* Expiry Analysis */}
         <ChartCard title={labels.expiryAnalysis} loading={loading}>
-          <div className="h-72">
+          <div className="h-80">
             {data?.expiryAnalysis && data.expiryAnalysis.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.expiryAnalysis} margin={{ left: 10, right: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis 
-                    dataKey="range" 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
+                <BarChart
+                  data={data.expiryAnalysis}
+                  layout="vertical"
+                  margin={{ left: 0, right: 20, top: 0, bottom: 0 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={true} vertical={false} />
+                  <XAxis type="number" hide />
+                  <YAxis
+                    type="category"
+                    dataKey="range"
+                    tick={{ fontSize: 12, fill: '#4b5563', fontWeight: 500 }}
+                    width={100}
+                    axisLine={false}
+                    tickLine={false}
                   />
-                  <YAxis 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                            <p className="text-sm font-medium text-gray-900 mb-2">{data.range}</p>
-                            <p className="text-sm text-gray-600">
-                              {labels.count}: {data.count}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {labels.value}: {formatCurrency(data.value)}
-                            </p>
-                            {data.products && data.products.length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-gray-100">
-                                <p className="text-xs text-gray-500 mb-1">{labels.products}:</p>
-                                {data.products.slice(0, 3).map((p: any, i: number) => (
-                                  <p key={i} className="text-xs text-gray-600">
-                                    • {p.name} ({p.quantity})
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar 
-                    dataKey="count" 
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: '#f3f4f6', opacity: 0.4 }} />
+                  <Bar
+                    dataKey="count"
+                    radius={[0, 6, 6, 0]}
                     name={labels.count}
-                    radius={[4, 4, 0, 0]}
+                    barSize={32}
                   >
                     {data.expiryAnalysis.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
+                      <Cell
+                        key={`cell-${index}`}
                         fill={
                           entry.range === 'Expired' ? chartColors.danger :
-                          entry.range.includes('7') ? chartColors.warning :
-                          entry.range.includes('30') ? chartColors.orange :
-                          chartColors.info
+                            entry.range === 'Expiring Soon' ? chartColors.warning :
+                              chartColors.success
                         }
                       />
                     ))}
@@ -166,115 +172,43 @@ export const HealthSection = ({ data, loading, language }: HealthSectionProps) =
             )}
           </div>
         </ChartCard>
-
-        {/* Stock Aging Analysis */}
-        <ChartCard title={labels.agingAnalysis} loading={loading}>
-          <div className="h-72">
-            {data?.agingAnalysis && data.agingAnalysis.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.agingAnalysis} margin={{ left: 10, right: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                  <XAxis 
-                    dataKey="range" 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 11, fill: '#6B7280' }}
-                    axisLine={{ stroke: '#E5E7EB' }}
-                  />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-100">
-                            <p className="text-sm font-medium text-gray-900 mb-1">{data.range}</p>
-                            <p className="text-sm text-gray-600">
-                              {labels.count}: {data.count}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              {labels.value}: {formatCurrency(data.value)}
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar 
-                    dataKey="count" 
-                    fill={chartColors.purple}
-                    name={labels.count}
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-full flex items-center justify-center text-gray-400">
-                {labels.noData}
-              </div>
-            )}
-          </div>
-        </ChartCard>
       </div>
 
-      {/* Reorder Recommendations Table */}
+      {/* Reorder Recommendations */}
       <ChartCard title={labels.reorderRecommendations} loading={loading}>
         <div className="overflow-x-auto">
           {data?.reorderList && data.reorderList.length > 0 ? (
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
+                <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">{labels.productName}</th>
                   <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">{labels.sku}</th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">{labels.current}</th>
                   <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">{labels.reorderPoint}</th>
-                  <th className="text-right py-3 px-4 text-sm font-semibold text-gray-700">{labels.toOrder}</th>
-                  <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">{labels.warehouseName}</th>
-                  <th className="text-center py-3 px-4 text-sm font-semibold text-gray-700">Status</th>
+                  <th className="text-right py-3 px-4 text-sm font-semibold text-blue-600">{labels.toOrder}</th>
                 </tr>
               </thead>
               <tbody>
-                {data.reorderList.map((item, index) => {
-                  const urgency = item.current / item.reorderPoint;
-                  const urgencyColor = urgency < 0.25 ? 'bg-red-100 text-red-700' : 
-                                       urgency < 0.5 ? 'bg-amber-100 text-amber-700' : 
-                                       'bg-yellow-100 text-yellow-700';
-                  const urgencyLabel = urgency < 0.25 ? 'Critical' : 
-                                       urgency < 0.5 ? 'Urgent' : 
-                                       'Low';
-                  
-                  return (
-                    <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4 text-sm font-medium text-gray-900">{item.productName}</td>
-                      <td className="py-3 px-4 text-sm text-gray-600 font-mono">{item.sku}</td>
-                      <td className="py-3 px-4 text-sm text-right">
-                        <span className={`font-semibold ${item.current < item.reorderPoint ? 'text-red-600' : 'text-gray-900'}`}>
-                          {item.current?.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-sm text-right text-gray-600">
-                        {item.reorderPoint?.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-right font-semibold text-blue-600">
-                        {item.toOrder?.toLocaleString()}
-                      </td>
-                      <td className="py-3 px-4 text-sm text-gray-600">{item.warehouseName}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${urgencyColor}`}>
-                          {urgencyLabel}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {data.reorderList.map((item, index) => (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <td className="py-3 px-4 text-sm text-gray-900 font-medium">{item.productName}</td>
+                    <td className="py-3 px-4 text-sm text-gray-500">{item.sku}</td>
+                    <td className="py-3 px-4 text-sm text-right text-red-600 font-medium">
+                      {item.current}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-right text-gray-600">
+                      {item.reorderPoint}
+                    </td>
+                    <td className="py-3 px-4 text-sm text-right text-blue-600 font-bold">
+                      {item.toOrder}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           ) : (
-            <div className="py-12 text-center">
-              <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-              <p className="text-gray-500">All products are well stocked!</p>
+            <div className="py-12 text-center text-gray-400">
+              {labels.noData}
             </div>
           )}
         </div>

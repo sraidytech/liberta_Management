@@ -1,18 +1,29 @@
 'use client';
 
-import { useState } from 'react';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { X, Calendar } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { CalendarIcon, X, Filter } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr, enUS } from 'date-fns/locale';
 import { AnalyticsFilters as FiltersType, Warehouse } from './types';
-import { datePresets, translations } from './constants';
+import { translations } from './constants';
 
 interface AnalyticsFiltersProps {
   filters: FiltersType;
   setFilters: (filters: FiltersType) => void;
   warehouses: Warehouse[];
-  categories: string[];
   language: 'en' | 'fr';
   onReset: () => void;
 }
@@ -21,202 +32,126 @@ export const AnalyticsFilters = ({
   filters,
   setFilters,
   warehouses,
-  categories,
   language,
-  onReset
+  onReset,
 }: AnalyticsFiltersProps) => {
   const labels = translations[language];
-  const [selectedPreset, setSelectedPreset] = useState('last30Days');
-  const [showCustomRange, setShowCustomRange] = useState(false);
 
-  const handlePresetSelect = (preset: string) => {
-    if (preset === 'custom') {
-      setShowCustomRange(true);
-      setSelectedPreset('custom');
-      return;
-    }
-
-    setShowCustomRange(false);
-    setSelectedPreset(preset);
-    const endDate = new Date();
-    let startDate = new Date();
-
-    switch (preset) {
-      case 'today':
-        startDate = new Date();
-        break;
-      case 'last7Days':
-        startDate = new Date(endDate.getTime() - 7 * 24 * 60 * 60 * 1000);
-        break;
-      case 'last30Days':
-        startDate = new Date(endDate.getTime() - 30 * 24 * 60 * 60 * 1000);
-        break;
-      case 'last90Days':
-        startDate = new Date(endDate.getTime() - 90 * 24 * 60 * 60 * 1000);
-        break;
-    }
-
+  const handleDateSelect = (date: Date | undefined, type: 'start' | 'end') => {
+    if (!date) return;
     setFilters({
       ...filters,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
+      [type === 'start' ? 'startDate' : 'endDate']: date.toISOString().split('T')[0],
     });
   };
 
-  const handleCustomDateChange = (field: 'startDate' | 'endDate', value: string) => {
-    setFilters({ ...filters, [field]: value });
-    setSelectedPreset('custom');
-    setShowCustomRange(true);
-  };
-
   return (
-    <Card className="p-5 border border-gray-200 bg-gradient-to-br from-gray-50 to-white shadow-sm">
-      <div className="space-y-4">
-        {/* Date Range Section */}
-        <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-blue-600" />
-            {labels.dateRange}
-          </label>
-          
-          {/* Preset Buttons */}
-          <div className="flex flex-wrap gap-2 mb-3">
-            {datePresets.map((preset) => (
-              <button
-                key={preset.key}
-                onClick={() => handlePresetSelect(preset.key)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                  selectedPreset === preset.key
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-                }`}
-              >
-                {labels[preset.key as keyof typeof labels]}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePresetSelect('custom')}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                selectedPreset === 'custom'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-200'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:border-gray-300'
-              }`}
-            >
-              {labels.custom}
-            </button>
-          </div>
-
-          {/* Custom Date Range Inputs */}
-          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 transition-all duration-300 ${
-            showCustomRange || selectedPreset === 'custom' ? 'opacity-100' : 'opacity-50'
-          }`}>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                {labels.from}
-              </label>
-              <Input
-                type="date"
-                value={filters.startDate}
-                onChange={(e) => handleCustomDateChange('startDate', e.target.value)}
-                className="w-full bg-white border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1.5">
-                {labels.to}
-              </label>
-              <Input
-                type="date"
-                value={filters.endDate}
-                onChange={(e) => handleCustomDateChange('endDate', e.target.value)}
-                className="w-full bg-white border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+    <div className="bg-white/60 backdrop-blur-xl border border-white/60 p-5 rounded-2xl shadow-sm space-y-4 mb-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 text-gray-900 font-semibold">
+          <Filter className="w-4 h-4 text-indigo-600" />
+          <h3>{labels.filters}</h3>
         </div>
-
-        {/* Divider */}
-        <div className="border-t border-gray-200" />
-
-        {/* Additional Filters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Warehouse Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {labels.warehouse}
-            </label>
-            <select
-              value={filters.warehouseId}
-              onChange={(e) => setFilters({ ...filters, warehouseId: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm transition-all"
-            >
-              <option value="">{labels.allWarehouses}</option>
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>{w.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Category Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              {labels.category}
-            </label>
-            <select
-              value={filters.categoryId}
-              onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm transition-all"
-            >
-              <option value="">{labels.allCategories}</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Reset Button */}
-          <div className="flex items-end">
-            <Button
-              variant="outline"
-              onClick={onReset}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 border-gray-300 hover:bg-gray-100"
-            >
-              <X className="w-4 h-4" />
-              {labels.reset}
-            </Button>
-          </div>
-        </div>
-
-        {/* Active Filters Summary */}
-        {(filters.warehouseId || filters.categoryId) && (
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <span className="text-xs text-gray-500">Active filters:</span>
-            {filters.warehouseId && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                {warehouses.find(w => w.id === filters.warehouseId)?.name || filters.warehouseId}
-                <button
-                  onClick={() => setFilters({ ...filters, warehouseId: '' })}
-                  className="hover:bg-blue-200 rounded-full p-0.5"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {filters.categoryId && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded-full">
-                {filters.categoryId}
-                <button
-                  onClick={() => setFilters({ ...filters, categoryId: '' })}
-                  className="hover:bg-purple-200 rounded-full p-0.5"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-          </div>
-        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onReset}
+          className="text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full px-3"
+        >
+          <X className="w-4 h-4 mr-1" />
+          {labels.reset}
+        </Button>
       </div>
-    </Card>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Start Date */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-gray-500 ml-1">{labels.startDate}</label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={`w-full justify-start text-left font-normal border-gray-200/60 bg-white/50 hover:bg-white/80 rounded-xl h-11 ${!filters.startDate && 'text-muted-foreground'
+                  }`}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 text-indigo-500" />
+                {filters.startDate ? (
+                  format(new Date(filters.startDate), 'PPP', {
+                    locale: language === 'fr' ? fr : enUS,
+                  })
+                ) : (
+                  <span>{labels.pickDate}</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 rounded-xl border-gray-100 shadow-xl" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.startDate ? new Date(filters.startDate) : undefined}
+                onSelect={(date) => handleDateSelect(date, 'start')}
+                initialFocus
+                className="rounded-xl"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* End Date */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-gray-500 ml-1">{labels.endDate}</label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={`w-full justify-start text-left font-normal border-gray-200/60 bg-white/50 hover:bg-white/80 rounded-xl h-11 ${!filters.endDate && 'text-muted-foreground'
+                  }`}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4 text-indigo-500" />
+                {filters.endDate ? (
+                  format(new Date(filters.endDate), 'PPP', {
+                    locale: language === 'fr' ? fr : enUS,
+                  })
+                ) : (
+                  <span>{labels.pickDate}</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 rounded-xl border-gray-100 shadow-xl" align="start">
+              <Calendar
+                mode="single"
+                selected={filters.endDate ? new Date(filters.endDate) : undefined}
+                onSelect={(date) => handleDateSelect(date, 'end')}
+                initialFocus
+                className="rounded-xl"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Warehouse */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-gray-500 ml-1">{labels.warehouse}</label>
+          <Select
+            value={filters.warehouseId || 'all'}
+            onValueChange={(value) =>
+              setFilters({ ...filters, warehouseId: value === 'all' ? '' : value })
+            }
+          >
+            <SelectTrigger className="w-full border-gray-200/60 bg-white/50 hover:bg-white/80 rounded-xl h-11">
+              <SelectValue placeholder={labels.allWarehouses} />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-gray-100 shadow-xl">
+              <SelectItem value="all">{labels.allWarehouses}</SelectItem>
+              {warehouses.map((w) => (
+                <SelectItem key={w.id} value={w.id}>
+                  {w.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+    </div>
   );
 };
 
