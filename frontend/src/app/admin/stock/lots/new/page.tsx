@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AdminLayout from '@/components/admin/admin-layout';
 import StockAgentLayout from '@/components/stock-agent/stock-agent-layout';
 import { Card } from '@/components/ui/card';
@@ -71,7 +71,8 @@ const t = {
   },
 };
 
-export default function NewLotPage() {
+// Inner component that uses useSearchParams
+function NewLotPageContent() {
   const router = useRouter();
   const { language } = useLanguage();
   const { user, isLoading: authLoading } = useAuth();
@@ -92,20 +93,34 @@ export default function NewLotPage() {
     notes: '',
   });
 
+  const searchParams = useSearchParams();
+  const preselectedProductId = searchParams.get('productId');
+
   useEffect(() => {
     loadData();
   }, []);
 
+  // Pre-select product from URL parameter
+  useEffect(() => {
+    if (preselectedProductId && products.length > 0) {
+      setFormData(prev => ({ ...prev, productId: preselectedProductId }));
+    }
+  }, [preselectedProductId, products]);
+
   const loadData = async () => {
     try {
       const [productsData, warehousesData] = await Promise.all([
-        stockService.getProducts(),
+        stockService.getProductsForDropdown(),
         stockService.getWarehouses(),
       ]);
-      setProducts(productsData);
-      setWarehouses(warehousesData);
+      // Ensure we always have arrays
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
     } catch (error) {
       console.error('Error loading data:', error);
+      // Set empty arrays on error to prevent map errors
+      setProducts([]);
+      setWarehouses([]);
     } finally {
       setDataLoading(false);
     }
@@ -359,5 +374,23 @@ export default function NewLotPage() {
         </Card>
       </div>
     </Layout>
+  );
+}
+
+// Loading fallback component
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
+
+// Default export with Suspense boundary
+export default function NewLotPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <NewLotPageContent />
+    </Suspense>
   );
 }

@@ -19,14 +19,16 @@ interface Lot {
   lotNumber: string;
   productId: string;
   warehouseId: string;
-  quantity: number;
-  availableQuantity: number;
-  costPerUnit?: number;
+  initialQuantity: number;
+  currentQuantity: number;
+  reservedQuantity?: number;
+  unitCost?: number;
   productionDate?: string;
   expiryDate?: string;
   supplierInfo?: string;
   notes?: string;
-  status: string;
+  qualityStatus?: string;
+  isActive?: boolean;
   product?: {
     id: string;
     name: string;
@@ -36,6 +38,7 @@ interface Lot {
   warehouse?: {
     id: string;
     name: string;
+    code?: string;
   };
 }
 
@@ -164,28 +167,36 @@ export default function EditLotPage() {
       setLoading(true);
       const [lotData, productsData, warehousesData] = await Promise.all([
         stockService.getLot(params.id as string),
-        stockService.getProducts(),
+        stockService.getProductsForDropdown(),
         stockService.getWarehouses()
       ]);
 
-      if (lotData) {
-        setLot(lotData);
+      // Extract lot data from response
+      const lot = lotData?.data || lotData;
+      console.log('Loaded lot data:', lot);
+      if (lot) {
+        setLot(lot);
+        // Map backend field names to frontend field names
         setFormData({
-          lotNumber: lotData.lotNumber,
-          productId: lotData.productId,
-          warehouseId: lotData.warehouseId,
-          quantity: lotData.quantity,
-          costPerUnit: lotData.costPerUnit?.toString() || '',
-          productionDate: lotData.productionDate ? new Date(lotData.productionDate).toISOString().split('T')[0] : '',
-          expiryDate: lotData.expiryDate ? new Date(lotData.expiryDate).toISOString().split('T')[0] : '',
-          supplierInfo: lotData.supplierInfo || '',
-          notes: lotData.notes || '',
-          status: lotData.status
+          lotNumber: lot.lotNumber || '',
+          productId: lot.productId || '',
+          warehouseId: lot.warehouseId || '',
+          // Backend uses initialQuantity, frontend form uses quantity
+          quantity: lot.initialQuantity || lot.currentQuantity || 0,
+          // Backend uses unitCost, frontend form uses costPerUnit
+          costPerUnit: lot.unitCost?.toString() || '',
+          productionDate: lot.productionDate ? new Date(lot.productionDate).toISOString().split('T')[0] : '',
+          expiryDate: lot.expiryDate ? new Date(lot.expiryDate).toISOString().split('T')[0] : '',
+          supplierInfo: lot.supplierInfo || '',
+          notes: lot.notes || '',
+          // Backend uses qualityStatus or isActive, map to status
+          status: lot.qualityStatus || (lot.isActive ? 'ACTIVE' : 'DEPLETED')
         });
       }
 
-      setProducts(productsData);
-      setWarehouses(warehousesData);
+      // Ensure we always have arrays
+      setProducts(Array.isArray(productsData) ? productsData : []);
+      setWarehouses(Array.isArray(warehousesData) ? warehousesData : []);
     } catch (error) {
       console.error('Failed to load data:', error);
       alert(text.notFound);
@@ -227,17 +238,23 @@ export default function EditLotPage() {
 
     try {
       setSaving(true);
+      // Map frontend field names to backend field names
       await stockService.updateLot(params.id as string, {
         lotNumber: formData.lotNumber,
         productId: formData.productId,
         warehouseId: formData.warehouseId,
-        quantity: Number(formData.quantity),
-        costPerUnit: formData.costPerUnit ? Number(formData.costPerUnit) : undefined,
+        // Backend expects initialQuantity or currentQuantity
+        initialQuantity: Number(formData.quantity),
+        currentQuantity: Number(formData.quantity),
+        // Backend expects unitCost
+        unitCost: formData.costPerUnit ? Number(formData.costPerUnit) : undefined,
         productionDate: formData.productionDate || undefined,
         expiryDate: formData.expiryDate || undefined,
         supplierInfo: formData.supplierInfo || undefined,
         notes: formData.notes || undefined,
-        status: formData.status
+        // Backend expects qualityStatus or isActive
+        qualityStatus: formData.status,
+        isActive: formData.status === 'ACTIVE'
       });
 
       alert(text.success);
@@ -293,13 +310,13 @@ export default function EditLotPage() {
         {/* Warnings */}
         {lot && (
           <div className="mb-6 space-y-3">
-            {formData.quantity !== lot.quantity && (
+            {formData.quantity !== lot.initialQuantity && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-yellow-900">{text.warning}</p>
                   <p className="text-sm text-yellow-700">
-                    {text.quantityWarning}{lot.availableQuantity} {lot.product?.unit}
+                    {text.quantityWarning}{lot.currentQuantity} {lot.product?.unit}
                   </p>
                 </div>
               </div>
@@ -392,7 +409,7 @@ export default function EditLotPage() {
               </div>
               {lot && (
                 <p className="text-sm text-gray-600 mt-1">
-                  {text.available}: {lot.availableQuantity} {lot.product?.unit}
+                  {text.available}: {lot.currentQuantity} {lot.product?.unit}
                 </p>
               )}
               {errors.quantity && <p className="text-red-500 text-sm mt-1">{errors.quantity}</p>}

@@ -18,7 +18,8 @@ export class StockController {
       const { isActive, category, search, lowStock, page, limit } = req.query;
 
       const result = await productService.getProducts({
-        isActive: isActive === 'true',
+        // Only set isActive filter if explicitly provided, default to true (show active products)
+        isActive: isActive !== undefined ? isActive === 'true' : true,
         category: category as string,
         search: search as string,
         lowStock: lowStock === 'true',
@@ -145,7 +146,8 @@ export class StockController {
       const result = await lotService.getLots({
         productId: productId as string,
         warehouseId: warehouseId as string,
-        isActive: isActive === 'true',
+        // Only filter by isActive if explicitly provided, default to true (show active lots)
+        isActive: isActive !== undefined ? isActive === 'true' : true,
         expiringBefore: expiringBefore ? new Date(expiringBefore as string) : undefined,
         search: search as string,
         page: page ? parseInt(page as string) : undefined,
@@ -338,6 +340,60 @@ export class StockController {
       });
     } catch (error: any) {
       console.error('Error creating adjustment:', error);
+      res.status(400).json({
+        success: false,
+        error: { message: error.message }
+      });
+    }
+  }
+
+  async createMovement(req: Request, res: Response) {
+    try {
+      const userId = (req as any).user?.id;
+      const { productId, warehouseId, type, quantity, reason, reference, lotId } = req.body;
+
+      // Map frontend type to backend movementType
+      const movementType = type || 'ADJUSTMENT';
+
+      // Create movement
+      const movement = await movementService.createMovement({
+        movementType,
+        productId,
+        lotId,
+        warehouseId,
+        userId: userId || 'system',
+        quantity,
+        reason,
+        reference
+      });
+
+      // Update lot if provided
+      if (lotId) {
+        const lot = await lotService.getLotById(lotId);
+        if (lot) {
+          const newQuantity = movementType === 'IN'
+            ? lot.currentQuantity + quantity
+            : lot.currentQuantity - Math.abs(quantity);
+          await lotService.updateLot(lotId, {
+            currentQuantity: Math.max(0, newQuantity)
+          });
+        }
+      }
+
+      // Update stock level
+      await stockLevelService.updateStockLevel(
+        productId,
+        warehouseId,
+        movementType,
+        quantity
+      );
+
+      res.status(201).json({
+        success: true,
+        data: movement
+      });
+    } catch (error: any) {
+      console.error('Error creating movement:', error);
       res.status(400).json({
         success: false,
         error: { message: error.message }

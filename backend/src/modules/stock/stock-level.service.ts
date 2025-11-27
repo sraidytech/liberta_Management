@@ -259,7 +259,9 @@ export class StockLevelService {
       totalProducts,
       totalStockValue,
       allStockLevels,
-      outOfStockCount
+      outOfStockCount,
+      recentMovements,
+      activeAlerts
     ] = await Promise.all([
       prisma.product.count({ where: { isActive: true } }),
       prisma.stockLevel.aggregate({
@@ -278,6 +280,33 @@ export class StockLevelService {
           product: { isActive: true },
           availableQuantity: 0
         }
+      }),
+      // Get recent movements with product info
+      prisma.stockMovement.findMany({
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          product: {
+            select: { name: true, sku: true, unit: true }
+          },
+          warehouse: {
+            select: { name: true }
+          },
+          lot: {
+            select: { lotNumber: true }
+          }
+        }
+      }),
+      // Get active alerts (without product relation since it doesn't exist)
+      prisma.stockAlert.findMany({
+        where: { isResolved: false },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          warehouse: {
+            select: { name: true }
+          }
+        }
       })
     ]);
 
@@ -286,11 +315,62 @@ export class StockLevelService {
       sl => sl.availableQuantity < sl.product.minThreshold && sl.availableQuantity > 0
     ).length;
 
+    // Format recent movements for frontend
+    const formattedMovements = recentMovements.map(m => ({
+      id: m.id,
+      type: m.movementType,
+      movementType: m.movementType,
+      quantity: m.quantity,
+      reason: m.reason,
+      reference: m.reference,
+      createdAt: m.createdAt.toISOString(),
+      product: m.product,
+      warehouse: m.warehouse,
+      lot: m.lot,
+      // Also include flat fields for compatibility
+      productName: m.product?.name,
+      productSku: m.product?.sku,
+      productUnit: m.product?.unit,
+      warehouseName: m.warehouse?.name,
+      lotNumber: m.lot?.lotNumber
+    }));
+
+    // Get product info for alerts (since there's no relation)
+    const alertProductIds = [...new Set(activeAlerts.map(a => a.productId))];
+    const alertProducts = await prisma.product.findMany({
+      where: { id: { in: alertProductIds } },
+      select: { id: true, name: true, sku: true, unit: true }
+    });
+    const productMap = new Map(alertProducts.map(p => [p.id, p]));
+
+    // Format active alerts for frontend
+    const formattedAlerts = activeAlerts.map(a => {
+      const product = productMap.get(a.productId);
+      return {
+        id: a.id,
+        alertType: a.alertType,
+        severity: a.severity,
+        message: a.message,
+        currentQuantity: a.currentQuantity,
+        threshold: a.threshold,
+        createdAt: a.createdAt.toISOString(),
+        product: product ? { name: product.name, sku: product.sku, unit: product.unit } : null,
+        warehouse: a.warehouse,
+        // Also include flat fields for compatibility
+        productName: product?.name || 'Unknown Product',
+        productSku: product?.sku,
+        warehouseName: a.warehouse?.name
+      };
+    });
+
     return {
       totalProducts,
-      totalStockValue: totalStockValue._sum.totalValue || 0,
+      totalValue: totalStockValue._sum.totalValue || 0,
+      totalStockValue: totalStockValue._sum.totalValue || 0, // Keep for backward compatibility
       lowStockCount,
-      outOfStockCount
+      outOfStockCount,
+      recentMovements: formattedMovements,
+      activeAlerts: formattedAlerts
     };
   }
 }

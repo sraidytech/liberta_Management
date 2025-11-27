@@ -39,7 +39,36 @@ export const stockService = {
     });
     if (!response.ok) throw new Error('Failed to fetch products');
     const json = await response.json();
-    return json.data.products || json.data || [];
+    // Return full pagination data if available
+    if (json.data && json.data.products) {
+      return {
+        products: json.data.products,
+        total: json.data.total || json.data.products.length,
+        page: json.data.page || 1,
+        totalPages: json.data.totalPages || 1
+      };
+    }
+    // Fallback for simple array response
+    const products = json.data || [];
+    return {
+      products: Array.isArray(products) ? products : [],
+      total: Array.isArray(products) ? products.length : 0,
+      page: 1,
+      totalPages: 1
+    };
+  },
+
+  // Get all products as a simple array (for dropdowns)
+  getProductsForDropdown: async () => {
+    const response = await fetch(`${API_URL}/api/v1/stock/products?limit=1000`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch products');
+    const json = await response.json();
+    if (json.data && json.data.products) {
+      return json.data.products;
+    }
+    return Array.isArray(json.data) ? json.data : [];
   },
 
   getProduct: async (id: string) => {
@@ -47,7 +76,8 @@ export const stockService = {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch product');
-    return response.json();
+    const json = await response.json();
+    return json.data || json;
   },
 
   createProduct: async (data: {
@@ -94,7 +124,8 @@ export const stockService = {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch warehouses');
-    return response.json();
+    const json = await response.json();
+    return json.data || [];
   },
 
   createWarehouse: async (data: {
@@ -133,7 +164,23 @@ export const stockService = {
     });
     if (!response.ok) throw new Error('Failed to fetch lots');
     const json = await response.json();
-    return json.data.lots || json.data || [];
+    // Return full pagination data if available
+    if (json.data && json.data.lots) {
+      return {
+        lots: json.data.lots,
+        total: json.data.total || json.data.lots.length,
+        page: json.data.page || 1,
+        totalPages: json.data.totalPages || 1
+      };
+    }
+    // Fallback for simple array response
+    const lots = json.data || [];
+    return {
+      lots: Array.isArray(lots) ? lots : [],
+      total: Array.isArray(lots) ? lots.length : 0,
+      page: 1,
+      totalPages: 1
+    };
   },
 
   getLot: async (id: string) => {
@@ -141,7 +188,8 @@ export const stockService = {
       headers: getAuthHeaders(),
     });
     if (!response.ok) throw new Error('Failed to fetch lot');
-    return response.json();
+    const json = await response.json();
+    return json.data || json;
   },
 
   createLot: async (data: {
@@ -153,10 +201,20 @@ export const stockService = {
     expiryDate?: string;
     manufacturingDate?: string;
   }) => {
+    // Map frontend field names to backend field names
+    const backendData = {
+      productId: data.productId,
+      warehouseId: data.warehouseId,
+      lotNumber: data.lotNumber,
+      initialQuantity: data.quantity,
+      unitCost: data.costPerUnit,
+      expiryDate: data.expiryDate,
+      productionDate: data.manufacturingDate,
+    };
     const response = await fetch(`${API_URL}/api/v1/stock/lots`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify(backendData),
     });
     if (!response.ok) throw new Error('Failed to create lot');
     return response.json();
@@ -220,7 +278,23 @@ export const stockService = {
     });
     if (!response.ok) throw new Error('Failed to fetch movements');
     const json = await response.json();
-    return json.data.movements || json.data || [];
+    // Return full pagination data if available
+    if (json.data && json.data.movements) {
+      return {
+        movements: json.data.movements,
+        total: json.data.total || json.data.movements.length,
+        page: json.data.page || 1,
+        totalPages: json.data.totalPages || 1
+      };
+    }
+    // Fallback for simple array response
+    const movements = json.data || [];
+    return {
+      movements: Array.isArray(movements) ? movements : [],
+      total: Array.isArray(movements) ? movements.length : 0,
+      page: 1,
+      totalPages: 1
+    };
   },
 
   getMovement: async (id: string) => {
@@ -267,7 +341,23 @@ export const stockService = {
     });
     if (!response.ok) throw new Error('Failed to fetch alerts');
     const json = await response.json();
-    return json.data.alerts || json.data || [];
+    // Return full pagination data if available
+    if (json.data && json.data.alerts) {
+      return {
+        alerts: json.data.alerts,
+        total: json.data.total || json.data.alerts.length,
+        page: json.data.page || 1,
+        totalPages: json.data.totalPages || 1
+      };
+    }
+    // Fallback for simple array response
+    const alerts = json.data || [];
+    return {
+      alerts: Array.isArray(alerts) ? alerts : [],
+      total: Array.isArray(alerts) ? alerts.length : 0,
+      page: 1,
+      totalPages: 1
+    };
   },
 
   resolveAlert: async (id: string, notes?: string) => {
@@ -391,6 +481,36 @@ export const stockService = {
     });
     if (!response.ok) throw new Error('Failed to export report');
     return response.blob();
+  },
+
+  // Product Sync (Auto-fetch from Order Items)
+  getSyncStats: async () => {
+    const response = await fetch(`${API_URL}/api/v1/stock/sync/stats`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch sync stats');
+    const json = await response.json();
+    return json.data;
+  },
+
+  syncAllOrderItems: async () => {
+    const response = await fetch(`${API_URL}/api/v1/stock/sync/batch`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to sync order items');
+    const json = await response.json();
+    return json.data;
+  },
+
+  syncOrderItems: async (orderId: string) => {
+    const response = await fetch(`${API_URL}/api/v1/stock/sync/orders/${orderId}`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to sync order items');
+    const json = await response.json();
+    return json.data;
   },
 };
 

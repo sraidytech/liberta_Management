@@ -25,8 +25,8 @@ export interface CreateLotDto {
   productId: string;
   warehouseId: string;
   initialQuantity: number;
-  productionDate: Date;
-  expiryDate?: Date;
+  productionDate?: string | Date;
+  expiryDate?: string | Date;
   unitCost?: number;
   supplierInfo?: string;
   qualityStatus?: string;
@@ -35,7 +35,7 @@ export interface CreateLotDto {
 
 export interface UpdateLotDto {
   currentQuantity?: number;
-  expiryDate?: Date;
+  expiryDate?: string | Date;
   unitCost?: number;
   supplierInfo?: string;
   qualityStatus?: string;

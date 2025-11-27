@@ -75,6 +75,10 @@ router.get('/movements', requireStockAccess, (req, res) => {
   stockController.getMovements(req, res);
 });
 
+router.post('/movements', requireStockAccess, (req, res) => {
+  stockController.createMovement(req, res);
+});
+
 router.post('/movements/adjustment', requireStockAccess, (req, res) => {
   stockController.createAdjustment(req, res);
 });
@@ -157,28 +161,28 @@ router.post('/warehouses', requireRole([UserRole.ADMIN]) as any, (req, res) => {
 
 router.put('/warehouses/:id', requireRole([UserRole.ADMIN]) as any, (req, res) => {
   stockController.updateWarehouse(req, res);
+});
+
 // ============================================
 // PRODUCT SYNC ROUTES (Auto-fetch from Order Items)
 // ============================================
 
 // Sync specific order items to products
-router.post('/sync/orders/:orderId', 
+router.post('/sync/orders/:orderId',
   requireStockAccess,
   (req, res) => stockController.syncOrderItems(req, res)
 );
 
 // Batch sync all order items to products
-router.post('/sync/batch', 
+router.post('/sync/batch',
   requireStockAccess,
   (req, res) => stockController.batchSyncAllOrderItems(req, res)
 );
 
 // Get sync statistics
-router.get('/sync/stats', 
+router.get('/sync/stats',
   requireStockAccess,
   (req, res) => stockController.getSyncStats(req, res)
 );
-
-});
 
 export default router;

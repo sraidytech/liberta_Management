@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import stockService from '@/services/stock.service';
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
-import { AlertTriangle, CheckCircle, Info, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const t = {
   en: {
@@ -24,6 +24,13 @@ const t = {
     units: 'units',
     threshold: 'threshold',
     all: 'All',
+    page: 'Page',
+    of: 'of',
+    showing: 'Showing',
+    to: 'to',
+    results: 'results',
+    previous: 'Previous',
+    next: 'Next',
   },
   fr: {
     title: 'Alertes de Stock',
@@ -38,6 +45,13 @@ const t = {
     units: 'unités',
     threshold: 'seuil',
     all: 'Tous',
+    page: 'Page',
+    of: 'sur',
+    showing: 'Affichage de',
+    to: 'à',
+    results: 'résultats',
+    previous: 'Précédent',
+    next: 'Suivant',
   },
 };
 
@@ -62,20 +76,30 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [severityFilter, setSeverityFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     loadAlerts();
     // Auto-refresh every 30 seconds
     const interval = setInterval(loadAlerts, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentPage]);
 
   const loadAlerts = async () => {
     try {
-      const data = await stockService.getAlerts({ resolved: false });
-      setAlerts(data);
+      setLoading(true);
+      const response = await stockService.getAlerts({ resolved: false, page: currentPage, limit: itemsPerPage });
+      setAlerts(response.alerts || []);
+      setTotalItems(response.total || 0);
+      setTotalPages(response.totalPages || 1);
     } catch (error) {
       console.error('Error loading alerts:', error);
+      setAlerts([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -321,6 +345,40 @@ export default function AlertsPage() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Card className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-600">
+                    {t[language].showing} {((currentPage - 1) * itemsPerPage) + 1} {t[language].to} {Math.min(currentPage * itemsPerPage, totalItems)} {t[language].of} {totalItems} {t[language].results}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="w-4 h-4 mr-1" />
+                      {t[language].previous}
+                    </Button>
+                    <span className="text-sm text-gray-600">
+                      {t[language].page} {currentPage} {t[language].of} {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      {t[language].next}
+                      <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              </Card>
             )}
           </div>
         )}

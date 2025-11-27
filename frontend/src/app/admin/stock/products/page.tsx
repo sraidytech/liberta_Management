@@ -10,13 +10,14 @@ import { Input } from '@/components/ui/input';
 import stockService from '@/services/stock.service';
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
-import { Package, Search, Plus, Edit, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Package, Search, Plus, Edit, Trash2, AlertCircle, CheckCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const t = {
   en: {
     title: 'Product Management',
     search: 'Search products...',
     addProduct: 'Add Product',
+    syncFromOrders: 'Sync from Orders',
     sku: 'SKU',
     name: 'Name',
     category: 'Category',
@@ -34,11 +35,23 @@ const t = {
     units: 'units',
     all: 'All',
     filter: 'Filter',
+    page: 'Page',
+    of: 'of',
+    showing: 'Showing',
+    to: 'to',
+    results: 'results',
+    previous: 'Previous',
+    next: 'Next',
+    confirmDelete: 'Are you sure you want to delete this product?',
+    deleteSuccess: 'Product deleted successfully',
+    deleteError: 'Failed to delete product',
+    deleting: 'Deleting...',
   },
   fr: {
     title: 'Gestion des Produits',
     search: 'Rechercher produits...',
     addProduct: 'Ajouter Produit',
+    syncFromOrders: 'Sync depuis Commandes',
     sku: 'SKU',
     name: 'Nom',
     category: 'Catégorie',
@@ -56,6 +69,17 @@ const t = {
     units: 'unités',
     all: 'Tous',
     filter: 'Filtrer',
+    page: 'Page',
+    of: 'sur',
+    showing: 'Affichage de',
+    to: 'à',
+    results: 'résultats',
+    previous: 'Précédent',
+    next: 'Suivant',
+    confirmDelete: 'Êtes-vous sûr de vouloir supprimer ce produit?',
+    deleteSuccess: 'Produit supprimé avec succès',
+    deleteError: 'Échec de la suppression du produit',
+    deleting: 'Suppression...',
   },
 };
 
@@ -65,7 +89,8 @@ interface Product {
   name: string;
   category?: string;
   unit: string;
-  minStockLevel: number;
+  minThreshold: number;
+  minStockLevel?: number; // For backward compatibility
   stockLevels: Array<{
     totalQuantity: number;
   }>;
@@ -77,19 +102,30 @@ export default function ProductsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 25;
 
   useEffect(() => {
     loadProducts();
-  }, []);
+  }, [currentPage]);
 
   const loadProducts = async () => {
     try {
-      const data = await stockService.getProducts();
-      setProducts(data);
+      setLoading(true);
+      const response = await stockService.getProducts({ page: currentPage, limit: itemsPerPage });
+      setProducts(response.products || []);
+      setTotalItems(response.total || 0);
+      setTotalPages(response.totalPages || 1);
     } catch (error) {
       console.error('Error loading products:', error);
+      setProducts([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -97,8 +133,9 @@ export default function ProductsPage() {
 
   const getStockStatus = (product: Product) => {
     const totalStock = product.stockLevels?.reduce((sum, level) => sum + level.totalQuantity, 0) || 0;
+    const minLevel = product.minThreshold || product.minStockLevel || 0;
     if (totalStock === 0) return 'outOfStock';
-    if (totalStock < product.minStockLevel) return 'lowStock';
+    if (totalStock < minLevel) return 'lowStock';
     return 'inStock';
   };
 
@@ -125,6 +162,24 @@ export default function ProductsPage() {
     const matchesStatus = statusFilter === 'all' || status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleDelete = async (productId: string, productName: string) => {
+    if (!confirm(`${t[language].confirmDelete}\n\n${productName}`)) {
+      return;
+    }
+
+    try {
+      setDeleting(productId);
+      await stockService.deleteProduct(productId);
+      alert(t[language].deleteSuccess);
+      loadProducts(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      alert(t[language].deleteError);
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   // Wait for auth to load
   if (authLoading || !user) {
@@ -157,10 +212,20 @@ export default function ProductsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-gray-900">{t[language].title}</h1>
-          <Button onClick={() => router.push('/admin/stock/products/new')} className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="w-4 h-4 mr-2" />
-            {t[language].addProduct}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/admin/stock/sync')}
+              className="border-purple-600 text-purple-600 hover:bg-purple-50"
+            >
+              <RefreshCw className="w-4 h-4 mr-2" />
+              {t[language].syncFromOrders}
+            </Button>
+            <Button onClick={() => router.push('/admin/stock/products/new')} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="w-4 h-4 mr-2" />
+              {t[language].addProduct}
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -265,7 +330,7 @@ export default function ProductsPage() {
                           {totalStock} {product.unit}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {product.minStockLevel} {product.unit}
+                          {product.minThreshold || product.minStockLevel || 0} {product.unit}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(status)}
@@ -283,8 +348,14 @@ export default function ProductsPage() {
                               variant="ghost"
                               size="sm"
                               className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDelete(product.id, product.name)}
+                              disabled={deleting === product.id}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              {deleting === product.id ? (
+                                <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
                             </Button>
                           </div>
                         </td>
@@ -295,6 +366,38 @@ export default function ProductsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="px-6 py-4 border-t flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                {t[language].showing} {((currentPage - 1) * itemsPerPage) + 1} {t[language].to} {Math.min(currentPage * itemsPerPage, totalItems)} {t[language].of} {totalItems} {t[language].results}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  {t[language].previous}
+                </Button>
+                <span className="text-sm text-gray-600">
+                  {t[language].page} {currentPage} {t[language].of} {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  {t[language].next}
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     </Layout>

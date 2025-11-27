@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import stockService from '@/services/stock.service';
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
-import { Package, Plus, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Package, Plus, Calendar, AlertTriangle, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const t = {
   en: {
@@ -32,6 +32,18 @@ const t = {
     expiredText: 'Expired',
     view: 'View',
     all: 'All',
+    page: 'Page',
+    of: 'of',
+    showing: 'Showing',
+    to: 'to',
+    results: 'results',
+    previous: 'Previous',
+    next: 'Next',
+    unitCost: 'Unit Cost',
+    totalCost: 'Total Cost',
+    productionDate: 'Production Date',
+    warehouse: 'Warehouse',
+    remaining: 'remaining',
   },
   fr: {
     title: 'Gestion des Lots',
@@ -52,21 +64,44 @@ const t = {
     expiredText: 'Expiré',
     view: 'Voir',
     all: 'Tous',
+    page: 'Page',
+    of: 'sur',
+    showing: 'Affichage de',
+    to: 'à',
+    results: 'résultats',
+    previous: 'Précédent',
+    next: 'Suivant',
+    unitCost: 'Coût Unitaire',
+    totalCost: 'Coût Total',
+    productionDate: 'Date de Production',
+    warehouse: 'Entrepôt',
+    remaining: 'restant',
   },
 };
 
 interface Lot {
   id: string;
   lotNumber: string;
-  quantity: number;
-  remainingQuantity: number;
+  initialQuantity: number;
+  currentQuantity: number;
+  reservedQuantity: number;
   expiryDate?: string;
-  status: string;
-  product: {
+  productionDate?: string;
+  productSku: string;
+  productName: string;
+  warehouseName: string;
+  unitCost?: number;
+  totalCost?: number;
+  qualityStatus?: string;
+  isActive: boolean;
+  daysUntilExpiry?: number;
+  // For backward compatibility with nested structure
+  product?: {
     name: string;
+    sku: string;
     unit: string;
   };
-  warehouse: {
+  warehouse?: {
     name: string;
   };
 }
@@ -78,17 +113,27 @@ export default function LotsPage() {
   const [lots, setLots] = useState<Lot[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 12;
 
   useEffect(() => {
     loadLots();
-  }, []);
+  }, [currentPage]);
 
   const loadLots = async () => {
     try {
-      const data = await stockService.getLots();
-      setLots(data);
+      setLoading(true);
+      const response = await stockService.getLots({ page: currentPage, limit: itemsPerPage });
+      setLots(response.lots || []);
+      setTotalItems(response.total || 0);
+      setTotalPages(response.totalPages || 1);
     } catch (error) {
       console.error('Error loading lots:', error);
+      setLots([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
@@ -226,69 +271,139 @@ export default function LotsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedLots.map((lot) => (
-              <Card key={lot.id} className="p-6 hover:shadow-lg transition-shadow">
-                <div className="space-y-4">
-                  {/* Lot Header */}
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg">{lot.lotNumber}</h3>
-                      <p className="text-sm text-gray-600">{lot.product.name}</p>
+            {sortedLots.map((lot) => {
+              // Calculate percentage remaining
+              const percentRemaining = lot.initialQuantity > 0
+                ? Math.round((lot.currentQuantity / lot.initialQuantity) * 100)
+                : 0;
+              
+              return (
+                <Card key={lot.id} className="p-6 hover:shadow-lg transition-shadow">
+                  <div className="space-y-4">
+                    {/* Lot Header */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="font-semibold text-lg">{lot.lotNumber}</h3>
+                        <p className="text-sm text-gray-600">{lot.productName || lot.product?.name}</p>
+                        <p className="text-xs text-gray-400">{lot.productSku || lot.product?.sku}</p>
+                      </div>
+                      {getStatusBadge(lot)}
                     </div>
-                    {getStatusBadge(lot)}
-                  </div>
 
-                  {/* Lot Details */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">{t[language].quantity}:</span>
-                      <span className="font-medium">
-                        {lot.remainingQuantity} / {lot.quantity} {lot.product.unit}
-                      </span>
-                    </div>
-                    
-                    {lot.expiryDate && (
+                    {/* Lot Details */}
+                    <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">{t[language].expiry}:</span>
-                        <span className="font-medium flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {new Date(lot.expiryDate).toLocaleDateString()}
+                        <span className="text-gray-600">{t[language].quantity}:</span>
+                        <span className="font-medium">
+                          {lot.currentQuantity} / {lot.initialQuantity} {lot.product?.unit || 'units'}
                         </span>
                       </div>
-                    )}
+                      
+                      {lot.unitCost !== undefined && lot.unitCost !== null && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">{t[language].unitCost}:</span>
+                          <span className="font-medium text-green-600">
+                            {lot.unitCost.toFixed(2)} DZD
+                          </span>
+                        </div>
+                      )}
 
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Warehouse:</span>
-                      <span className="font-medium">{lot.warehouse.name}</span>
+                      {lot.totalCost !== undefined && lot.totalCost !== null && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">{t[language].totalCost}:</span>
+                          <span className="font-medium text-green-600">
+                            {lot.totalCost.toFixed(2)} DZD
+                          </span>
+                        </div>
+                      )}
+
+                      {lot.productionDate && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">{t[language].productionDate}:</span>
+                          <span className="font-medium flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(lot.productionDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {lot.expiryDate && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-600">{t[language].expiry}:</span>
+                          <span className="font-medium flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            {new Date(lot.expiryDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600">{t[language].warehouse}:</span>
+                        <span className="font-medium">{lot.warehouseName || lot.warehouse?.name}</span>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Progress Bar */}
-                  <div className="space-y-1">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all"
-                        style={{ width: `${(lot.remainingQuantity / lot.quantity) * 100}%` }}
-                      />
+                    {/* Progress Bar */}
+                    <div className="space-y-1">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full transition-all"
+                          style={{ width: `${percentRemaining}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 text-right">
+                        {percentRemaining}% {t[language].remaining}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500 text-right">
-                      {Math.round((lot.remainingQuantity / lot.quantity) * 100)}% remaining
-                    </p>
-                  </div>
 
-                  {/* Actions */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => router.push(`/admin/stock/lots/${lot.id}`)}
-                  >
-                    {t[language].view}
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                    {/* Actions */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => router.push(`/admin/stock/lots/${lot.id}`)}
+                    >
+                      {t[language].view}
+                    </Button>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-gray-600">
+                {t[language].showing} {((currentPage - 1) * itemsPerPage) + 1} {t[language].to} {Math.min(currentPage * itemsPerPage, totalItems)} {t[language].of} {totalItems} {t[language].results}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  {t[language].previous}
+                </Button>
+                <span className="text-sm text-gray-600">
+                  {t[language].page} {currentPage} {t[language].of} {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  {t[language].next}
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </Card>
         )}
       </div>
     </Layout>

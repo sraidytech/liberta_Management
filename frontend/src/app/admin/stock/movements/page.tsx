@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import stockService from '@/services/stock.service';
 import { useLanguage } from '@/lib/language-context';
 import { useAuth } from '@/lib/auth-context';
-import { TrendingUp, TrendingDown, RefreshCw, ArrowRightLeft, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, RefreshCw, ArrowRightLeft, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const t = {
   en: {
@@ -29,6 +29,13 @@ const t = {
     all: 'All Types',
     export: 'Export CSV',
     units: 'units',
+    page: 'Page',
+    of: 'of',
+    showing: 'Showing',
+    to: 'to',
+    results: 'results',
+    previous: 'Previous',
+    next: 'Next',
   },
   fr: {
     title: 'Mouvements de Stock',
@@ -47,21 +54,45 @@ const t = {
     all: 'Tous Types',
     export: 'Exporter CSV',
     units: 'unités',
+    page: 'Page',
+    of: 'sur',
+    showing: 'Affichage de',
+    to: 'à',
+    results: 'résultats',
+    previous: 'Précédent',
+    next: 'Suivant',
   },
 };
 
 interface Movement {
   id: string;
-  type: string;
+  movementType?: string;
+  type?: string;
   quantity: number;
   reason?: string;
   reference?: string;
+  notes?: string;
   createdAt: string;
-  product: {
+  // Flat fields from backend
+  productName?: string;
+  productSku?: string;
+  productUnit?: string;
+  warehouseName?: string;
+  lotNumber?: string;
+  userName?: string;
+  // Nested fields (for backward compatibility)
+  product?: {
     name: string;
+    sku?: string;
     unit: string;
   };
-  warehouse: {
+  warehouse?: {
+    name: string;
+  };
+  lot?: {
+    lotNumber: string;
+  };
+  user?: {
     name: string;
   };
 }
@@ -73,21 +104,34 @@ export default function MovementsPage() {
   const [movements, setMovements] = useState<Movement[]>([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     loadMovements();
-  }, []);
+  }, [currentPage]);
 
   const loadMovements = async () => {
     try {
-      const data = await stockService.getMovements();
-      setMovements(data);
+      setLoading(true);
+      const response = await stockService.getMovements({ page: currentPage, limit: itemsPerPage });
+      setMovements(response.movements || []);
+      setTotalItems(response.total || 0);
+      setTotalPages(response.totalPages || 1);
     } catch (error) {
       console.error('Error loading movements:', error);
+      setMovements([]);
+      setTotalItems(0);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
+
+  // Helper to get movement type (backend uses movementType, frontend uses type)
+  const getType = (movement: Movement) => movement.movementType || movement.type || 'ADJUSTMENT';
 
   const getMovementIcon = (type: string) => {
     const icons = {
@@ -114,9 +158,15 @@ export default function MovementsPage() {
     );
   };
 
+  // Helper to get product name (handles both flat and nested structure)
+  const getProductName = (movement: Movement) => movement.productName || movement.product?.name || 'Unknown Product';
+  const getProductUnit = (movement: Movement) => movement.productUnit || movement.product?.unit || 'units';
+  const getWarehouseName = (movement: Movement) => movement.warehouseName || movement.warehouse?.name || 'Unknown';
+
   const filteredMovements = movements.filter(movement => {
     if (typeFilter === 'all') return true;
-    return movement.type === typeFilter;
+    const type = getType(movement);
+    return type === typeFilter;
   });
 
   const handleExport = async () => {
@@ -227,47 +277,92 @@ export default function MovementsPage() {
         ) : (
           <Card>
             <div className="divide-y">
-              {filteredMovements.map((movement) => (
-                <div key={movement.id} className="p-6 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start gap-4">
-                    {/* Icon */}
-                    <div className="flex-shrink-0 mt-1">
-                      {getMovementIcon(movement.type)}
-                    </div>
+              {filteredMovements.map((movement) => {
+                const type = getType(movement);
+                return (
+                  <div key={movement.id} className="p-6 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-start gap-4">
+                      {/* Icon */}
+                      <div className="flex-shrink-0 mt-1">
+                        {getMovementIcon(type)}
+                      </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {getMovementBadge(movement.type)}
-                            <span className="text-sm text-gray-500">
-                              {new Date(movement.createdAt).toLocaleString()}
-                            </span>
-                          </div>
-                          <h3 className="font-semibold text-gray-900">{movement.product.name}</h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {movement.type === 'IN' ? '+' : movement.type === 'OUT' ? '-' : ''}
-                            {movement.quantity} {movement.product.unit}
-                          </p>
-                          {movement.reason && (
-                            <p className="text-sm text-gray-500 mt-1">{movement.reason}</p>
-                          )}
-                          {movement.reference && (
-                            <p className="text-xs text-gray-400 mt-1">
-                              {t[language].reference}: {movement.reference}
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {getMovementBadge(type)}
+                              <span className="text-sm text-gray-500">
+                                {new Date(movement.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <h3 className="font-semibold text-gray-900">{getProductName(movement)}</h3>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {type === 'IN' ? '+' : type === 'OUT' ? '-' : ''}
+                              {movement.quantity} {getProductUnit(movement)}
                             </p>
-                          )}
-                        </div>
-                        <div className="text-right text-sm text-gray-500">
-                          <p>{movement.warehouse.name}</p>
+                            {(movement.reason || movement.notes) && (
+                              <p className="text-sm text-gray-500 mt-1">{movement.reason || movement.notes}</p>
+                            )}
+                            {movement.reference && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                {t[language].reference}: {movement.reference}
+                              </p>
+                            )}
+                            {(movement.lotNumber || movement.lot?.lotNumber) && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                Lot: {movement.lotNumber || movement.lot?.lotNumber}
+                              </p>
+                            )}
+                          </div>
+                          <div className="text-right text-sm text-gray-500">
+                            <p>{getWarehouseName(movement)}</p>
+                            {(movement.userName || movement.user?.name) && (
+                              <p className="text-xs text-gray-400 mt-1">
+                                By: {movement.userName || movement.user?.name}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t flex items-center justify-between">
+                <div className="text-sm text-gray-600">
+                  {t[language].showing} {((currentPage - 1) * itemsPerPage) + 1} {t[language].to} {Math.min(currentPage * itemsPerPage, totalItems)} {t[language].of} {totalItems} {t[language].results}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="w-4 h-4 mr-1" />
+                    {t[language].previous}
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {t[language].page} {currentPage} {t[language].of} {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    {t[language].next}
+                    <ChevronRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
       </div>

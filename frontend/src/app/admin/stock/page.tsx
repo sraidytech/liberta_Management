@@ -80,21 +80,28 @@ const t = {
 interface DashboardStats {
   totalProducts: number;
   totalValue: number;
+  totalStockValue?: number; // backward compatibility
   lowStockCount: number;
   outOfStockCount: number;
   recentMovements: Array<{
     id: string;
-    type: string;
+    type?: string;
+    movementType?: string;
     quantity: number;
-    product: { name: string };
+    product?: { name: string; unit?: string };
+    productName?: string;
+    productUnit?: string;
     createdAt: string;
   }>;
   activeAlerts: Array<{
     id: string;
     severity: string;
+    alertType?: string;
     message: string;
-    product: { name: string };
+    product?: { name: string };
+    productName?: string;
     currentQuantity: number;
+    threshold?: number;
   }>;
 }
 
@@ -137,6 +144,22 @@ export default function StockDashboard() {
     if (diffMins < 60) return `${diffMins}m ${t[language].ago}`;
     if (diffHours < 24) return `${diffHours}h ${t[language].ago}`;
     return `${diffDays}d ${t[language].ago}`;
+  };
+
+  const getMovementType = (movement: DashboardStats['recentMovements'][0]) => {
+    return movement.movementType || movement.type || 'ADJUSTMENT';
+  };
+
+  const getMovementProductName = (movement: DashboardStats['recentMovements'][0]) => {
+    return movement.productName || movement.product?.name || 'Unknown Product';
+  };
+
+  const getMovementProductUnit = (movement: DashboardStats['recentMovements'][0]) => {
+    return movement.productUnit || movement.product?.unit || t[language].units;
+  };
+
+  const getAlertProductName = (alert: DashboardStats['activeAlerts'][0]) => {
+    return alert.productName || alert.product?.name || 'Unknown Product';
   };
 
   const getMovementIcon = (type: string) => {
@@ -240,7 +263,7 @@ export default function StockDashboard() {
               <div>
                 <p className="text-sm text-gray-600">{t[language].totalValue}</p>
                 <p className="text-3xl font-bold mt-2">
-                  ${(stats.totalValue || 0).toLocaleString()}
+                  {(stats.totalValue || stats.totalStockValue || 0).toLocaleString()} DZD
                 </p>
               </div>
               <div className="p-4 rounded-full bg-green-50">
@@ -338,25 +361,28 @@ export default function StockDashboard() {
               {!stats.recentMovements || stats.recentMovements.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">{t[language].noMovements}</p>
               ) : (
-                stats.recentMovements.slice(0, 5).map((movement) => (
-                  <div
-                    key={movement.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      {getMovementIcon(movement.type)}
-                      <div>
-                        <p className="font-medium text-sm">{movement.product.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {movement.type === 'IN' ? '+' : '-'}{movement.quantity} {t[language].units}
-                        </p>
+                stats.recentMovements.slice(0, 5).map((movement) => {
+                  const type = getMovementType(movement);
+                  return (
+                    <div
+                      key={movement.id}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        {getMovementIcon(type)}
+                        <div>
+                          <p className="font-medium text-sm">{getMovementProductName(movement)}</p>
+                          <p className="text-xs text-gray-500">
+                            {type === 'IN' ? '+' : type === 'OUT' ? '-' : ''}{movement.quantity} {getMovementProductUnit(movement)}
+                          </p>
+                        </div>
                       </div>
+                      <span className="text-xs text-gray-500">
+                        {formatTimeAgo(movement.createdAt)}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-500">
-                      {formatTimeAgo(movement.createdAt)}
-                    </span>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </Card>
@@ -384,14 +410,15 @@ export default function StockDashboard() {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="font-medium text-sm">{alert.product.name}</p>
+                        <p className="font-medium text-sm">{getAlertProductName(alert)}</p>
                         <p className="text-xs mt-1">{alert.message}</p>
                         <p className="text-xs mt-1">
                           {alert.currentQuantity} {t[language].units}
+                          {alert.threshold && ` / ${alert.threshold}`}
                         </p>
                       </div>
                       <span className="text-xs font-semibold">
-                        {t[language][alert.severity.toLowerCase() as keyof typeof t.en]}
+                        {t[language][alert.severity.toLowerCase() as keyof typeof t.en] || alert.severity}
                       </span>
                     </div>
                   </div>

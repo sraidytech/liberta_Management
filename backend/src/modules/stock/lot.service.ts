@@ -37,6 +37,12 @@ export class LotService {
     // Calculate total cost if unit cost provided
     const totalCost = data.unitCost ? data.unitCost * data.initialQuantity : undefined;
 
+    // Convert date strings to proper Date objects for Prisma
+    // productionDate is required, default to current date if not provided
+    const productionDate = data.productionDate ? new Date(data.productionDate) : new Date();
+    // expiryDate is optional
+    const expiryDate = data.expiryDate ? new Date(data.expiryDate) : undefined;
+
     // Create lot
     const lot = await prisma.lot.create({
       data: {
@@ -45,8 +51,8 @@ export class LotService {
         warehouseId: data.warehouseId,
         initialQuantity: data.initialQuantity,
         currentQuantity: data.initialQuantity,
-        productionDate: data.productionDate,
-        expiryDate: data.expiryDate,
+        productionDate,
+        expiryDate,
         unitCost: data.unitCost,
         totalCost,
         supplierInfo: data.supplierInfo,
@@ -168,10 +174,16 @@ export class LotService {
       totalCost = unitCost ? unitCost * quantity : null;
     }
 
+    // Convert date strings to proper Date objects for Prisma
+    const updateData: any = { ...data };
+    if (data.expiryDate) {
+      updateData.expiryDate = new Date(data.expiryDate);
+    }
+
     const updatedLot = await prisma.lot.update({
       where: { id },
       data: {
-        ...data,
+        ...updateData,
         totalCost,
         updatedAt: new Date()
       },
