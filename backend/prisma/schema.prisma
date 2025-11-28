@@ -43,6 +43,11 @@ model User {
   qualityReviewedTickets Ticket[] @relation("QualityReviewer")
   sentTicketMessages TicketMessage[] @relation("SentTicketMessages")
   collectedSurveys CustomerSatisfactionSurvey[] @relation("CollectedSurveys")
+  
+  // Media Buying relations
+  mediaBuyingEntries    MediaBuyingEntry[] @relation("MediaBuyingEntries")
+  mediaBuyingBudgets    MediaBuyingBudget[] @relation("MediaBuyingBudgets")
+  exchangeRates         ExchangeRate[] @relation("ExchangeRates")
 
   // NextAuth.js fields
   emailVerified DateTime?
@@ -167,6 +172,7 @@ model Order {
   tickets       Ticket[]
   satisfactionSurveys CustomerSatisfactionSurvey[]
   stockMovements StockMovement[]
+  leadConversions LeadConversion[]
 
   @@map("orders")
 }
@@ -316,6 +322,7 @@ enum UserRole {
   AGENT_CALL_CENTER
   QUALITY_AGENT
   STOCK_MANAGEMENT_AGENT
+  MEDIA_BUYER
 }
 
 enum AgentAvailability {
@@ -919,4 +926,190 @@ enum AlertSeverity {
   INFO
   WARNING
   CRITICAL
+}
+
+// ============================================
+// MEDIA BUYING MODELS
+// ============================================
+
+// Ad Source Types (configurable)
+model AdSource {
+  id          String   @id @default(cuid())
+  name        String   @unique  // "Facebook Ads", "Google Ads", etc.
+  slug        String   @unique  // "facebook", "google", etc.
+  icon        String?  // Icon name or URL
+  color       String?  // Hex color for charts
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  entries     MediaBuyingEntry[]
+  budgets     MediaBuyingBudget[]
+  
+  @@map("ad_sources")
+}
+
+// Main Media Buying Entry (daily/date-range records)
+model MediaBuyingEntry {
+  id              String   @id @default(cuid())
+  
+  // Date tracking
+  date            DateTime // Single date entry
+  dateRangeStart  DateTime? // Optional: for date range entries
+  dateRangeEnd    DateTime? // Optional: for date range entries
+  
+  // Source reference
+  sourceId        String
+  source          AdSource @relation(fields: [sourceId], references: [id])
+  
+  // Core metrics (required)
+  totalSpend      Float    // Amount spent (in original currency)
+  totalLeads      Int      // Number of leads generated
+  
+  // Currency handling
+  currency        String   @default("USD") // USD, DZD
+  exchangeRate    Float?   // USD to DZD rate (if currency is USD)
+  spendInDZD      Float?   // Calculated: totalSpend * exchangeRate
+  
+  // Optional associations
+  storeId         String?  // Link to ApiConfiguration (store)
+  productId       String?  // Link to Product
+  
+  // Flexible metadata (all optional metrics)
+  metadata        Json?    // { ctr, cpm, cpa, roas, impressions, clicks, conversions, campaignName, adSetName, adCreativeId, ... }
+  
+  // Tracking
+  createdById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  createdBy       User     @relation("MediaBuyingEntries", fields: [createdById], references: [id])
+  leadConversions LeadConversion[]
+  
+  @@index([date])
+  @@index([sourceId])
+  @@index([storeId])
+  @@index([productId])
+  @@index([createdById])
+  @@index([createdAt])
+  @@map("media_buying_entries")
+}
+
+// Budget Management
+model MediaBuyingBudget {
+  id              String   @id @default(cuid())
+  
+  // Budget period
+  month           Int      // 1-12
+  year            Int      // e.g., 2024
+  
+  // Source (optional - null means global budget)
+  sourceId        String?
+  source          AdSource? @relation(fields: [sourceId], references: [id])
+  
+  // Budget amounts
+  budgetAmount    Float    // Planned budget
+  currency        String   @default("DZD")
+  
+  // Alert settings
+  alertThreshold  Float    @default(80) // Alert when spending reaches X% of budget
+  alertEnabled    Boolean  @default(true)
+  
+  // Tracking
+  createdById     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relations
+  createdBy       User     @relation("MediaBuyingBudgets", fields: [createdById], references: [id])
+  alerts          BudgetAlert[]
+  
+  @@unique([month, year, sourceId])
+  @@index([month, year])
+  @@index([sourceId])
+  @@map("media_buying_budgets")
+}
+
+// Budget Alerts
+model BudgetAlert {
+  id              String   @id @default(cuid())
+  budgetId        String
+  budget          MediaBuyingBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  
+  // Alert details
+  alertType       BudgetAlertType
+  threshold       Float    // Percentage at which alert was triggered
+  currentSpend    Float    // Spend amount when alert was triggered
+  budgetAmount    Float    // Budget amount at time of alert
+  
+  // Status
+  isRead          Boolean  @default(false)
+  readAt          DateTime?
+  readById        String?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([budgetId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("budget_alerts")
+}
+
+// Lead to Order Conversion Tracking
+model LeadConversion {
+  id              String   @id @default(cuid())
+  
+  // Link to media buying entry
+  entryId         String
+  entry           MediaBuyingEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  
+  // Link to order
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id])
+  
+  // Conversion details
+  conversionDate  DateTime @default(now())
+  orderValue      Float?   // Order total at time of conversion
+  
+  // Attribution
+  attributionType String   @default("direct") // direct, assisted, last-click
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([entryId, orderId])
+  @@index([entryId])
+  @@index([orderId])
+  @@index([conversionDate])
+  @@map("lead_conversions")
+}
+
+// Exchange Rate History (for currency conversion)
+model ExchangeRate {
+  id              String   @id @default(cuid())
+  
+  fromCurrency    String   // USD
+  toCurrency      String   // DZD
+  rate            Float    // e.g., 135.50
+  
+  effectiveDate   DateTime
+  
+  // Tracking
+  createdById     String
+  createdAt       DateTime @default(now())
+  
+  createdBy       User     @relation("ExchangeRates", fields: [createdById], references: [id])
+  
+  @@index([fromCurrency, toCurrency])
+  @@index([effectiveDate])
+  @@map("exchange_rates")
+}
+
+// Budget Alert Types
+enum BudgetAlertType {
+  THRESHOLD_WARNING  // Approaching budget limit
+  BUDGET_EXCEEDED    // Budget exceeded
+  DAILY_SPIKE        // Unusual daily spending
 }
