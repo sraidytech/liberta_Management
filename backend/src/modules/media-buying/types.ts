@@ -106,6 +106,20 @@ export interface BudgetFilters {
 }
 
 export interface DashboardStats {
+  // Primary fields expected by frontend
+  totalSpendUSD: number;
+  totalSpendDZD: number;
+  totalLeads: number;
+  avgCostPerLead: number;
+  totalConversions: number;
+  conversionRate: number;
+  avgROAS: number;
+  periodComparison: {
+    spendChange: number;
+    leadsChange: number;
+    cplChange: number;
+  };
+  // Legacy fields for backward compatibility
   totalSpendToday: number;
   totalSpendWeek: number;
   totalSpendMonth: number;
@@ -137,8 +151,6 @@ export interface DashboardStats {
     leads: number;
     cpl: number;
   }>;
-  conversionRate: number;
-  totalConversions: number;
   recentEntries: Array<{
     id: string;
     date: string;
@@ -156,10 +168,14 @@ export interface BudgetStatus {
   year: number;
   sourceId: string | null;
   sourceName: string | null;
-  budgetAmount: number;
-  currentSpend: number;
-  spendPercentage: number;
-  remaining: number;
+  budgetUSD: number;
+  budgetAmount: number; // Legacy field (DZD)
+  spentUSD: number;
+  currentSpend: number; // Legacy field (DZD)
+  remainingUSD: number;
+  remaining: number; // Legacy field (DZD)
+  percentageUsed: number;
+  spendPercentage: number; // Legacy field
   alertThreshold: number;
   isOverBudget: boolean;
   isNearThreshold: boolean;
@@ -169,14 +185,15 @@ export interface AnalyticsBySource {
   sourceId: string;
   sourceName: string;
   sourceColor: string;
-  totalSpend: number;
-  totalSpendInDZD: number;
+  totalSpendUSD: number;
+  totalSpendDZD: number;
   totalLeads: number;
-  averageCPL: number;
-  conversions: number;
-  conversionRate: number;
-  entries: number;
-  trend: Array<{
+  avgCostPerLead: number;
+  percentageOfTotal: number;
+  conversions?: number;
+  conversionRate?: number;
+  entries?: number;
+  trend?: Array<{
     date: string;
     spend: number;
     leads: number;

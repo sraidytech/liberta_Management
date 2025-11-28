@@ -60,9 +60,9 @@ class MediaBuyingService {
 
   async getEntries(filters: EntryFilters) {
     const { startDate, endDate, sourceId, storeId, productId, page = 1, limit = 20 } = filters;
-    
+
     const where: any = {};
-    
+
     if (startDate && endDate) {
       where.date = {
         gte: new Date(startDate),
@@ -73,7 +73,7 @@ class MediaBuyingService {
     } else if (endDate) {
       where.date = { lte: new Date(endDate) };
     }
-    
+
     if (sourceId) where.sourceId = sourceId;
     if (storeId) where.storeId = storeId;
     if (productId) where.productId = productId;
@@ -206,7 +206,7 @@ class MediaBuyingService {
     if (filters.year) where.year = filters.year;
     if (filters.sourceId !== undefined) where.sourceId = filters.sourceId;
 
-    return prisma.mediaBuyingBudget.findMany({
+    const budgets = await prisma.mediaBuyingBudget.findMany({
       where,
       include: {
         source: true,
@@ -216,6 +216,42 @@ class MediaBuyingService {
       },
       orderBy: [{ year: 'desc' }, { month: 'desc' }],
     });
+
+    // Transform budgets to include USD and DZD fields
+    // Get the actual spend to calculate the real exchange rate used
+    const startOfMonth = (month: number, year: number) => new Date(year, month - 1, 1);
+    const endOfMonth = (month: number, year: number) => new Date(year, month, 0, 23, 59, 59);
+    
+    const transformedBudgets = await Promise.all(budgets.map(async (budget) => {
+      // Get entries for this budget period to find the actual exchange rate used
+      const entries = await prisma.mediaBuyingEntry.findMany({
+        where: {
+          date: {
+            gte: startOfMonth(budget.month, budget.year),
+            lte: endOfMonth(budget.month, budget.year),
+          },
+          ...(budget.sourceId && { sourceId: budget.sourceId }),
+        },
+        select: { totalSpend: true, spendInDZD: true, exchangeRate: true },
+        take: 1, // Just need one to get the exchange rate
+      });
+
+      // Calculate exchange rate from entries, or use a reasonable default
+      let exchangeRate = 140; // Default
+      if (entries.length > 0 && entries[0].exchangeRate) {
+        exchangeRate = entries[0].exchangeRate;
+      } else if (entries.length > 0 && entries[0].spendInDZD && entries[0].totalSpend) {
+        exchangeRate = entries[0].spendInDZD / entries[0].totalSpend;
+      }
+
+      return {
+        ...budget,
+        budgetDZD: budget.budgetAmount,
+        budgetUSD: budget.budgetAmount / exchangeRate,
+      };
+    }));
+    
+    return transformedBudgets;
   }
 
   async getBudgetById(id: string) {
@@ -232,12 +268,32 @@ class MediaBuyingService {
   }
 
   async createBudget(data: CreateBudgetDto, userId: string) {
-    return prisma.mediaBuyingBudget.create({
+    // Calculate budgetAmount based on currency
+    // If budgetUSD and exchangeRate are provided, calculate DZD amount
+    let budgetAmount = data.budgetAmount;
+    let budgetUSD = 0;
+    let exchangeRate = 135; // Default
+    
+    if (!budgetAmount && (data as any).budgetUSD && (data as any).exchangeRate) {
+      // Frontend sends budgetUSD and exchangeRate
+      budgetUSD = (data as any).budgetUSD;
+      exchangeRate = (data as any).exchangeRate;
+      budgetAmount = budgetUSD * exchangeRate;
+    } else if (budgetAmount) {
+      // If only budgetAmount provided, calculate USD
+      budgetUSD = budgetAmount / exchangeRate;
+    }
+    
+    if (!budgetAmount) {
+      throw new Error('Budget amount is required. Provide either budgetAmount or budgetUSD with exchangeRate.');
+    }
+
+    const budget = await prisma.mediaBuyingBudget.create({
       data: {
         month: data.month,
         year: data.year,
         sourceId: data.sourceId,
-        budgetAmount: data.budgetAmount,
+        budgetAmount,
         currency: data.currency || 'DZD',
         alertThreshold: data.alertThreshold || 80,
         alertEnabled: data.alertEnabled ?? true,
@@ -247,16 +303,42 @@ class MediaBuyingService {
         source: true,
       },
     });
+
+    // Return with USD and DZD fields
+    return {
+      ...budget,
+      budgetUSD,
+      budgetDZD: budgetAmount,
+    };
   }
 
   async updateBudget(id: string, data: UpdateBudgetDto) {
-    return prisma.mediaBuyingBudget.update({
+    // Handle budgetUSD and exchangeRate from frontend
+    let updateData: any = { ...data };
+    
+    if ((data as any).budgetUSD && (data as any).exchangeRate) {
+      const budgetUSD = (data as any).budgetUSD;
+      const exchangeRate = (data as any).exchangeRate;
+      updateData.budgetAmount = budgetUSD * exchangeRate;
+      delete updateData.budgetUSD;
+      delete updateData.exchangeRate;
+    }
+
+    const budget = await prisma.mediaBuyingBudget.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         source: true,
       },
     });
+
+    // Return with USD and DZD fields
+    const exchangeRate = (data as any).exchangeRate || 135;
+    return {
+      ...budget,
+      budgetUSD: budget.budgetAmount / exchangeRate,
+      budgetDZD: budget.budgetAmount,
+    };
   }
 
   async getBudgetStatus(month?: number, year?: number): Promise<BudgetStatus[]> {
@@ -286,21 +368,38 @@ class MediaBuyingService {
           lte: endOfMonth,
         },
       };
-      
+
       if (budget.sourceId) {
         where.sourceId = budget.sourceId;
       }
 
       const entries = await prisma.mediaBuyingEntry.findMany({
         where,
-        select: { spendInDZD: true, totalSpend: true, currency: true },
+        select: { spendInDZD: true, totalSpend: true, currency: true, exchangeRate: true },
       });
 
-      const currentSpend = entries.reduce((sum, e) => {
+      // Calculate spend in both USD and DZD
+      const currentSpendDZD = entries.reduce((sum, e) => {
         return sum + (e.spendInDZD || e.totalSpend);
       }, 0);
 
-      const spendPercentage = (currentSpend / budget.budgetAmount) * 100;
+      const currentSpendUSD = entries.reduce((sum, e) => {
+        if (e.currency === 'USD') {
+          return sum + e.totalSpend;
+        } else if (e.currency === 'DZD' && e.exchangeRate) {
+          return sum + (e.totalSpend / e.exchangeRate);
+        }
+        return sum + e.totalSpend; // Fallback
+      }, 0);
+
+      // Assume budget is in DZD, convert to USD for display
+      const avgExchangeRate = entries.length > 0
+        ? entries.reduce((sum, e) => sum + (e.exchangeRate || 135), 0) / entries.length
+        : 135;
+      const budgetUSD = budget.budgetAmount / avgExchangeRate;
+
+      const spendPercentage = (currentSpendDZD / budget.budgetAmount) * 100;
+      const percentageUsed = spendPercentage;
 
       statuses.push({
         budgetId: budget.id,
@@ -308,12 +407,16 @@ class MediaBuyingService {
         year: budget.year,
         sourceId: budget.sourceId,
         sourceName: budget.source?.name || null,
+        budgetUSD,
         budgetAmount: budget.budgetAmount,
-        currentSpend,
+        spentUSD: currentSpendUSD,
+        currentSpend: currentSpendDZD,
+        remainingUSD: budgetUSD - currentSpendUSD,
+        remaining: budget.budgetAmount - currentSpendDZD,
+        percentageUsed,
         spendPercentage,
-        remaining: budget.budgetAmount - currentSpend,
         alertThreshold: budget.alertThreshold,
-        isOverBudget: currentSpend > budget.budgetAmount,
+        isOverBudget: currentSpendDZD > budget.budgetAmount,
         isNearThreshold: spendPercentage >= budget.alertThreshold,
       });
     }
@@ -409,7 +512,7 @@ class MediaBuyingService {
 
   async getAlerts(unreadOnly = false) {
     const where = unreadOnly ? { isRead: false } : {};
-    
+
     return prisma.budgetAlert.findMany({
       where,
       include: {
@@ -471,7 +574,7 @@ class MediaBuyingService {
 
   async getConversions(entryId?: string) {
     const where = entryId ? { entryId } : {};
-    
+
     return prisma.leadConversion.findMany({
       where,
       include: {
@@ -563,7 +666,9 @@ class MediaBuyingService {
     const totalLeadsWeek = weekEntries.reduce((sum, e) => sum + e.totalLeads, 0);
     const totalLeadsMonth = entries.reduce((sum, e) => sum + e.totalLeads, 0);
 
-    const averageCPL = totalLeadsMonth > 0 ? totalSpendInDZD / totalLeadsMonth : 0;
+    // Calculate CPL in USD (not DZD!)
+    const averageCPL = totalLeadsMonth > 0 ? totalSpendMonth / totalLeadsMonth : 0;
+    const averageCPLInDZD = totalLeadsMonth > 0 ? totalSpendInDZD / totalLeadsMonth : 0;
 
     // Spend by source
     const sourceMap = new Map<string, { source: any; spend: number; spendInDZD: number; leads: number }>();
@@ -594,10 +699,10 @@ class MediaBuyingService {
     const sourcesWithLeads = spendBySource.filter(s => s.leads > 0);
     const bestPerformingSource = sourcesWithLeads.length > 0
       ? sourcesWithLeads.reduce((best, current) => {
-          const currentCPL = current.spendInDZD / current.leads;
-          const bestCPL = best.spendInDZD / best.leads;
-          return currentCPL < bestCPL ? current : best;
-        })
+        const currentCPL = current.spendInDZD / current.leads;
+        const bestCPL = best.spendInDZD / best.leads;
+        return currentCPL < bestCPL ? current : best;
+      })
       : null;
 
     // Daily trend (last 30 days)
@@ -646,7 +751,44 @@ class MediaBuyingService {
       currency: e.currency,
     }));
 
+    // Calculate period comparison (compare with previous period)
+    const periodLength = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24));
+    const prevRangeEnd = new Date(rangeStart);
+    prevRangeEnd.setDate(prevRangeEnd.getDate() - 1);
+    const prevRangeStart = new Date(prevRangeEnd);
+    prevRangeStart.setDate(prevRangeStart.getDate() - periodLength);
+
+    const prevEntries = await prisma.mediaBuyingEntry.findMany({
+      where: {
+        date: {
+          gte: prevRangeStart,
+          lte: prevRangeEnd,
+        },
+      },
+    });
+
+    const prevTotalSpend = prevEntries.reduce((sum, e) => sum + e.totalSpend, 0);
+    const prevTotalLeads = prevEntries.reduce((sum, e) => sum + e.totalLeads, 0);
+    const prevAvgCPL = prevTotalLeads > 0 ? prevTotalSpend / prevTotalLeads : 0;
+
+    const spendChange = prevTotalSpend > 0 ? ((totalSpendMonth - prevTotalSpend) / prevTotalSpend) * 100 : 0;
+    const leadsChange = prevTotalLeads > 0 ? ((totalLeadsMonth - prevTotalLeads) / prevTotalLeads) * 100 : 0;
+    const cplChange = prevAvgCPL > 0 ? ((averageCPL - prevAvgCPL) / prevAvgCPL) * 100 : 0;
+
     return {
+      totalSpendUSD: totalSpendMonth,
+      totalSpendDZD: totalSpendInDZD,
+      totalLeads: totalLeadsMonth,
+      avgCostPerLead: averageCPL,
+      totalConversions: conversions,
+      conversionRate: conversionRate / 100, // Convert to decimal (0.05 instead of 5%)
+      avgROAS: 0, // TODO: Calculate ROAS when revenue data is available
+      periodComparison: {
+        spendChange,
+        leadsChange,
+        cplChange,
+      },
+      // Legacy fields for backward compatibility
       totalSpendToday,
       totalSpendWeek,
       totalSpendMonth,
@@ -664,8 +806,6 @@ class MediaBuyingService {
       } : null,
       spendBySource,
       dailyTrend,
-      conversionRate,
-      totalConversions: conversions,
       recentEntries,
     };
   }
@@ -731,10 +871,11 @@ class MediaBuyingService {
         sourceId: source.id,
         sourceName: source.name,
         sourceColor: source.color || '#6B7280',
-        totalSpend,
-        totalSpendInDZD,
+        totalSpendUSD: totalSpend,
+        totalSpendDZD: totalSpendInDZD,
         totalLeads,
-        averageCPL: totalLeads > 0 ? totalSpendInDZD / totalLeads : 0,
+        avgCostPerLead: totalLeads > 0 ? totalSpend / totalLeads : 0, // Use USD, not DZD!
+        percentageOfTotal: 0, // Will be calculated after all sources are processed
         conversions,
         conversionRate: totalLeads > 0 ? (conversions / totalLeads) * 100 : 0,
         entries: entries.length,
@@ -742,7 +883,13 @@ class MediaBuyingService {
       });
     }
 
-    return analytics.sort((a, b) => b.totalSpendInDZD - a.totalSpendInDZD);
+    // Calculate percentage of total for each source
+    const totalSpendAllSources = analytics.reduce((sum, a) => sum + a.totalSpendDZD, 0);
+    analytics.forEach(a => {
+      a.percentageOfTotal = totalSpendAllSources > 0 ? (a.totalSpendDZD / totalSpendAllSources) * 100 : 0;
+    });
+
+    return analytics.sort((a, b) => b.totalSpendDZD - a.totalSpendDZD);
   }
 
   async getConversionAnalytics(startDate?: string, endDate?: string): Promise<ConversionAnalytics> {
