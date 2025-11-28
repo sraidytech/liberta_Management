@@ -38,6 +38,7 @@ import satisfactionAnalyticsRoutes from '@/modules/satisfaction/satisfaction-ana
 import { createShippingRoutes } from '@/modules/shipping/shipping.routes';
 import qualityRoutes from '@/modules/quality/quality.routes';
 import stockRoutes from '@/modules/stock/stock.routes';
+import mediaBuyingRoutes from '@/modules/media-buying/media-buying.routes';
 
 // Import middleware
 import { errorHandler } from '@/common/middleware/errorHandler';
@@ -144,6 +145,7 @@ class App {
     this.app.use('/api/v1/satisfaction-analytics', authMiddleware, userRateLimit, satisfactionAnalyticsRoutes); // Satisfaction analytics routes
     this.app.use('/api/v1/shipping', createShippingRoutes(redis)); // Shipping companies and accounts management routes
     this.app.use('/api/v1/stock', stockRoutes); // Stock management routes (auth middleware included in routes)
+    this.app.use('/api/v1/media-buying', mediaBuyingRoutes); // Media buying routes (auth middleware included in routes)
 
     // Root route
     this.app.get('/', (req, res) => {

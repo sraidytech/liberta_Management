@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { StoresController } from './stores.controller';
-import { requireAdmin } from '../../common/middleware/auth';
+import { requireAdmin, requireStoresReadAccess } from '../../common/middleware/auth';
 
 const router = Router();
 
@@ -19,7 +19,8 @@ router.get('/:storeIdentifier/rate-limits', requireAdmin as any, async (req, res
 });
 
 // Store management routes
-router.get('/', requireAdmin as any, async (req, res) => {
+// Allow MEDIA_BUYER to read stores list (for dropdown selection)
+router.get('/', requireStoresReadAccess as any, async (req, res) => {
   await StoresController.getAllStores(req, res);
 });
 

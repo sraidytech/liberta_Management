@@ -35,7 +35,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: 'ADMIN' | 'TEAM_MANAGER' | 'COORDINATEUR' | 'AGENT_SUIVI' | 'AGENT_CALL_CENTER' | 'QUALITY_AGENT' | 'STOCK_MANAGEMENT_AGENT';
+  role: 'ADMIN' | 'TEAM_MANAGER' | 'COORDINATEUR' | 'AGENT_SUIVI' | 'AGENT_CALL_CENTER' | 'QUALITY_AGENT' | 'STOCK_MANAGEMENT_AGENT' | 'MEDIA_BUYER';
   isActive: boolean;
   agentCode?: string;
   maxOrders: number;
@@ -245,7 +245,8 @@ export default function UserManagement() {
       'AGENT_SUIVI': language === 'fr' ? 'Agent de suivi' : 'Follow-up Agent',
       'AGENT_CALL_CENTER': language === 'fr' ? 'Agent centre d\'appels' : 'Call Center Agent',
       'STOCK_MANAGEMENT_AGENT': language === 'fr' ? 'Agent de gestion de stock' : 'Stock Management Agent',
-      'QUALITY_AGENT': language === 'fr' ? 'Agent Qualité' : 'Quality Agent'
+      'QUALITY_AGENT': language === 'fr' ? 'Agent Qualité' : 'Quality Agent',
+      'MEDIA_BUYER': language === 'fr' ? 'Acheteur Media' : 'Media Buyer'
     };
     return labels[role as keyof typeof labels] || role;
   };
@@ -422,6 +423,7 @@ export default function UserManagement() {
               <option value="AGENT_CALL_CENTER">{language === 'fr' ? 'Agents centre d\'appels' : 'Call Center Agents'}</option>
               <option value="STOCK_MANAGEMENT_AGENT">{language === 'fr' ? 'Agents de gestion de stock' : 'Stock Management Agents'}</option>
               <option value="QUALITY_AGENT">{language === 'fr' ? 'Agents Qualité' : 'Quality Agents'}</option>
+              <option value="MEDIA_BUYER">{language === 'fr' ? 'Acheteurs Media' : 'Media Buyers'}</option>
             </select>
           </div>
         </div>
@@ -842,6 +844,7 @@ function CreateUserModal({ isOpen, onClose, onSuccess, language }: {
               <option value="AGENT_CALL_CENTER">{language === 'fr' ? 'Agent centre d\'appels' : 'Call Center Agent'}</option>
               <option value="STOCK_MANAGEMENT_AGENT">{language === 'fr' ? 'Agent de gestion de stock' : 'Stock Management Agent'}</option>
               <option value="QUALITY_AGENT">{language === 'fr' ? 'Agent Qualité' : 'Quality Agent'}</option>
+              <option value="MEDIA_BUYER">{language === 'fr' ? 'Acheteur Media' : 'Media Buyer'}</option>
             </select>
           </div>
 
@@ -1011,6 +1014,7 @@ function EditUserModal({ isOpen, onClose, user, onSuccess, language }: {
                 <option value="AGENT_CALL_CENTER">{language === 'fr' ? 'Agent centre d\'appels' : 'Call Center Agent'}</option>
                 <option value="STOCK_MANAGEMENT_AGENT">{language === 'fr' ? 'Agent de gestion de stock' : 'Stock Management Agent'}</option>
                 <option value="QUALITY_AGENT">{language === 'fr' ? 'Agent Qualité' : 'Quality Agent'}</option>
+                <option value="MEDIA_BUYER">{language === 'fr' ? 'Acheteur Media' : 'Media Buyer'}</option>
               </select>
             </div>
 

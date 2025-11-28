@@ -30,7 +30,8 @@ import {
   Activity,
   Package,
   MessageSquare,
-  Warehouse
+  Warehouse,
+  TrendingUp
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -111,6 +112,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       href: '/admin/stock',
       active: pathname?.startsWith('/admin/stock'),
       roles: ['ADMIN', 'TEAM_MANAGER', 'STOCK_MANAGEMENT_AGENT'] // Admin, Team Manager, and Stock Agent
+    },
+    {
+      name: language === 'fr' ? 'Media Buying' : 'Media Buying',
+      icon: TrendingUp,
+      href: '/admin/media-buying',
+      active: pathname?.startsWith('/admin/media-buying'),
+      roles: ['ADMIN', 'TEAM_MANAGER', 'MEDIA_BUYER'] // Admin, Team Manager, and Media Buyer
     },
     {
       name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',

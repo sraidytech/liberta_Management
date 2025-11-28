@@ -5,14 +5,15 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  Users, 
-  Package, 
-  BarChart3, 
+import {
+  Users,
+  Package,
+  BarChart3,
   ArrowRight,
   Shield,
   UserCheck,
-  Phone
+  Phone,
+  Megaphone
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -43,6 +44,9 @@ export default function DashboardPage() {
       } else if (user.role === 'COORDINATEUR') {
         console.log('🎯 Redirecting coordinateur to coordinateur panel');
         router.push('/coordinateur');
+      } else if (user.role === 'MEDIA_BUYER') {
+        console.log('📊 Redirecting media buyer to media buying dashboard');
+        router.push('/admin/media-buying');
       } else if (user.role === 'AGENT_SUIVI' || user.role === 'AGENT_CALL_CENTER') {
         console.log('👤 Redirecting agent to agent portal');
         router.push('/agent');
@@ -144,6 +148,21 @@ export default function DashboardPage() {
                 <div className="flex-1">
                   <h3 className="font-semibold">Agent Portal</h3>
                   <p className="text-sm text-gray-600">Manage your orders</p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-gray-400" />
+              </div>
+            </Card>
+          )}
+
+          {user?.role === 'MEDIA_BUYER' && (
+            <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/admin/media-buying')}>
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                  <Megaphone className="h-6 w-6 text-purple-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold">Media Buying</h3>
+                  <p className="text-sm text-gray-600">Track ad spend and leads</p>
                 </div>
                 <ArrowRight className="h-5 w-5 text-gray-400" />
               </div>

@@ -144,3 +144,17 @@ export const requireAgent = requireRole([
   UserRole.AGENT_CALL_CENTER,
   UserRole.QUALITY_AGENT,
 ]);
+
+// Media Buyer middleware
+export const requireMediaBuyer = requireRole([
+  UserRole.ADMIN,
+  UserRole.TEAM_MANAGER,
+  UserRole.MEDIA_BUYER,
+]);
+
+// Stores read access (for Media Buyer to see stores list)
+export const requireStoresReadAccess = requireRole([
+  UserRole.ADMIN,
+  UserRole.TEAM_MANAGER,
+  UserRole.MEDIA_BUYER,
+]);
