@@ -7,7 +7,6 @@ import {
   TrendingUp,
   Activity,
   Warehouse,
-  Calendar,
   Filter
 } from 'lucide-react';
 import { AnalyticsFilters } from '@/components/stock/analytics/AnalyticsFilters';
@@ -25,13 +24,14 @@ import {
   TabType,
   Warehouse as WarehouseType
 } from '@/components/stock/analytics/types';
-import { translations, datePresets } from '@/components/stock/analytics/constants';
+import { translations } from '@/components/stock/analytics/constants';
+import { useLanguage } from '@/lib/language-context';
 
 export default function AnalyticsPage() {
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [language, setLanguage] = useState<'en' | 'fr'>('en');
 
   // Data states
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
@@ -148,34 +148,15 @@ export default function AnalyticsPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-lg border ${showFilters
-                ? 'bg-blue-50 border-blue-200 text-blue-600'
-                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-            >
-              <Filter className="w-5 h-5" />
-            </button>
-
-            <div className="flex bg-white rounded-lg border border-gray-200 p-1">
-              <button
-                onClick={() => setLanguage('en')}
-                className={`px-3 py-1 rounded-md text-sm font-medium ${language === 'en' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
-                  }`}
-              >
-                EN
-              </button>
-              <button
-                onClick={() => setLanguage('fr')}
-                className={`px-3 py-1 rounded-md text-sm font-medium ${language === 'fr' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
-                  }`}
-              >
-                FR
-              </button>
-            </div>
-          </div>
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`p-2 rounded-lg border ${showFilters
+              ? 'bg-blue-50 border-blue-200 text-blue-600'
+              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+          >
+            <Filter className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Filters Panel */}
