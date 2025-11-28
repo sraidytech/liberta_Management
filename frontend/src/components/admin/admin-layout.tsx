@@ -31,7 +31,20 @@ import {
   Package,
   MessageSquare,
   Warehouse,
-  TrendingUp
+  TrendingUp,
+  ChevronDown,
+  LayoutDashboard,
+  FileInput,
+  Globe,
+  DollarSign,
+  LineChart,
+  Target,
+  AlertTriangle,
+  Boxes,
+  PackageOpen,
+  ArrowRightLeft,
+  BarChart,
+  RefreshCw
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -44,7 +57,16 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<{ [key: string]: boolean }>({});
   const pathname = usePathname();
+
+  // Toggle submenu expansion
+  const toggleSubmenu = (menuName: string) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuName]: !prev[menuName]
+    }));
+  };
 
   // Don't render if no user
   if (!user) {
@@ -111,14 +133,108 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       icon: Warehouse,
       href: '/admin/stock',
       active: pathname?.startsWith('/admin/stock'),
-      roles: ['ADMIN', 'TEAM_MANAGER', 'STOCK_MANAGEMENT_AGENT'] // Admin, Team Manager, and Stock Agent
+      roles: ['ADMIN', 'TEAM_MANAGER', 'STOCK_MANAGEMENT_AGENT'], // Admin, Team Manager, and Stock Agent
+      submenu: [
+        {
+          name: language === 'fr' ? 'Tableau de Bord' : 'Dashboard',
+          icon: LayoutDashboard,
+          href: '/admin/stock',
+          active: pathname === '/admin/stock'
+        },
+        {
+          name: language === 'fr' ? 'Produits' : 'Products',
+          icon: Boxes,
+          href: '/admin/stock/products',
+          active: pathname?.startsWith('/admin/stock/products')
+        },
+        {
+          name: language === 'fr' ? 'Lots' : 'Lots',
+          icon: PackageOpen,
+          href: '/admin/stock/lots',
+          active: pathname?.startsWith('/admin/stock/lots')
+        },
+        {
+          name: language === 'fr' ? 'Mouvements' : 'Movements',
+          icon: ArrowRightLeft,
+          href: '/admin/stock/movements',
+          active: pathname?.startsWith('/admin/stock/movements')
+        },
+        {
+          name: language === 'fr' ? 'Alertes' : 'Alerts',
+          icon: AlertTriangle,
+          href: '/admin/stock/alerts',
+          active: pathname?.startsWith('/admin/stock/alerts')
+        },
+        {
+          name: language === 'fr' ? 'Rapports' : 'Reports',
+          icon: BarChart,
+          href: '/admin/stock/reports',
+          active: pathname?.startsWith('/admin/stock/reports')
+        },
+        {
+          name: language === 'fr' ? 'Synchronisation' : 'Sync',
+          icon: RefreshCw,
+          href: '/admin/stock/sync',
+          active: pathname?.startsWith('/admin/stock/sync')
+        }
+      ]
     },
     {
       name: language === 'fr' ? 'Media Buying' : 'Media Buying',
       icon: TrendingUp,
       href: '/admin/media-buying',
       active: pathname?.startsWith('/admin/media-buying'),
-      roles: ['ADMIN', 'TEAM_MANAGER', 'MEDIA_BUYER'] // Admin, Team Manager, and Media Buyer
+      roles: ['ADMIN', 'TEAM_MANAGER', 'MEDIA_BUYER'], // Admin, Team Manager, and Media Buyer
+      submenu: [
+        {
+          name: language === 'fr' ? 'Tableau de Bord' : 'Dashboard',
+          icon: LayoutDashboard,
+          href: '/admin/media-buying',
+          active: pathname === '/admin/media-buying'
+        },
+        {
+          name: language === 'fr' ? 'Entrées' : 'Entries',
+          icon: FileInput,
+          href: '/admin/media-buying/entries',
+          active: pathname?.startsWith('/admin/media-buying/entries')
+        },
+        {
+          name: language === 'fr' ? 'Sources' : 'Sources',
+          icon: Globe,
+          href: '/admin/media-buying/sources',
+          active: pathname?.startsWith('/admin/media-buying/sources')
+        },
+        {
+          name: language === 'fr' ? 'Budgets' : 'Budgets',
+          icon: DollarSign,
+          href: '/admin/media-buying/budgets',
+          active: pathname?.startsWith('/admin/media-buying/budgets')
+        },
+        {
+          name: language === 'fr' ? 'Analytiques' : 'Analytics',
+          icon: LineChart,
+          href: '/admin/media-buying/analytics',
+          active: pathname?.startsWith('/admin/media-buying/analytics')
+        },
+        {
+          name: language === 'fr' ? 'Conversions' : 'Conversions',
+          icon: Target,
+          href: '/admin/media-buying/conversions',
+          active: pathname?.startsWith('/admin/media-buying/conversions')
+        },
+        {
+          name: language === 'fr' ? 'Alertes' : 'Alerts',
+          icon: AlertTriangle,
+          href: '/admin/media-buying/alerts',
+          active: pathname?.startsWith('/admin/media-buying/alerts')
+        },
+        {
+          name: language === 'fr' ? 'Paramètres' : 'Settings',
+          icon: Settings,
+          href: '/admin/media-buying/settings',
+          active: pathname?.startsWith('/admin/media-buying/settings')
+        }
+      ]
     },
     {
       name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',
@@ -218,21 +334,71 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-3 py-4 space-y-1">
+          <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
             {sidebarItems.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`group flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  item.active
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                } ${sidebarCollapsed ? 'justify-center' : 'space-x-3'}`}
-                title={sidebarCollapsed ? item.name : undefined}
-              >
-                <item.icon className={`${sidebarCollapsed ? 'w-5 h-5' : 'w-5 h-5'} ${item.active ? 'text-white' : ''}`} />
-                {!sidebarCollapsed && <span>{item.name}</span>}
-              </Link>
+              <div key={item.name}>
+                {/* Main menu item */}
+                {item.submenu ? (
+                  // Item with submenu
+                  <div>
+                    <button
+                      onClick={() => toggleSubmenu(item.name)}
+                      className={`group flex items-center w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                        item.active
+                          ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      } ${sidebarCollapsed ? 'justify-center' : 'justify-between'}`}
+                      title={sidebarCollapsed ? item.name : undefined}
+                    >
+                      <div className={`flex items-center ${sidebarCollapsed ? '' : 'space-x-3'}`}>
+                        <item.icon className={`w-5 h-5 ${item.active ? 'text-white' : ''}`} />
+                        {!sidebarCollapsed && <span>{item.name}</span>}
+                      </div>
+                      {!sidebarCollapsed && (
+                        <ChevronDown
+                          className={`w-4 h-4 transition-transform duration-200 ${
+                            expandedMenus[item.name] ? 'rotate-180' : ''
+                          } ${item.active ? 'text-white' : 'text-gray-400'}`}
+                        />
+                      )}
+                    </button>
+                    
+                    {/* Submenu items */}
+                    {!sidebarCollapsed && expandedMenus[item.name] && (
+                      <div className="mt-1 ml-4 space-y-1 border-l-2 border-gray-200 pl-4">
+                        {item.submenu.map((subItem) => (
+                          <Link
+                            key={subItem.name}
+                            href={subItem.href}
+                            className={`group flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                              subItem.active
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                            }`}
+                          >
+                            <subItem.icon className={`w-4 h-4 mr-3 ${subItem.active ? 'text-blue-700' : 'text-gray-400'}`} />
+                            <span>{subItem.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Regular item without submenu
+                  <Link
+                    href={item.href}
+                    className={`group flex items-center px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                      item.active
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg shadow-blue-500/25'
+                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                    } ${sidebarCollapsed ? 'justify-center' : 'space-x-3'}`}
+                    title={sidebarCollapsed ? item.name : undefined}
+                  >
+                    <item.icon className={`w-5 h-5 ${item.active ? 'text-white' : ''}`} />
+                    {!sidebarCollapsed && <span>{item.name}</span>}
+                  </Link>
+                )}
+              </div>
             ))}
           </nav>
 
