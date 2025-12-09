@@ -71,7 +71,11 @@ export class OrdersController {
         sortOrder = 'desc',
         excludeStatus,
         noteTypes,
-        hasAgentNotes
+        hasAgentNotes,
+        customer,
+        wilaya,
+        minTotal,
+        maxTotal
       } = req.query;
 
       // 🚀 PERFORMANCE: Cache frequently accessed queries
@@ -250,6 +254,35 @@ export class OrdersController {
         }
         if (endDate) {
           where.orderDate.lte = new Date(endDate as string);
+        }
+      }
+
+      // Customer filter (name or phone)
+      if (customer) {
+        where.customer = {
+          OR: [
+            { fullName: { contains: customer as string, mode: 'insensitive' } },
+            { telephone: { contains: customer as string, mode: 'insensitive' } }
+          ]
+        };
+      }
+
+      // Wilaya filter
+      if (wilaya) {
+        where.customer = {
+          ...(where.customer || {}),
+          wilaya: wilaya as string
+        };
+      }
+
+      // Total amount range filter
+      if (minTotal || maxTotal) {
+        where.total = {};
+        if (minTotal) {
+          where.total.gte = parseFloat(minTotal as string);
+        }
+        if (maxTotal) {
+          where.total.lte = parseFloat(maxTotal as string);
         }
       }
 

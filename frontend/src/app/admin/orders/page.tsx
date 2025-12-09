@@ -153,6 +153,7 @@ export default function OrdersPage() {
   const [availableAgents, setAvailableAgents] = useState<any[]>([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [wilayaSettings, setWilayaSettings] = useState<WilayaDeliverySettings[]>([]);
+  const [uniqueWilayas, setUniqueWilayas] = useState<string[]>([]);
   
   // Ultra Modern Features
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
@@ -284,14 +285,18 @@ export default function OrdersPage() {
       });
 
       if (search) params.append('search', search);
-      if (statusFilter) params.append('status', statusFilter);
       
       // 🚀 FIXED: Connect date range filter to backend API (filters by orderDate)
       if (dateRange.start) params.append('startDate', dateRange.start);
       if (dateRange.end) params.append('endDate', dateRange.end);
       
-      // Additional advanced filters
+      // Advanced filters
       if (shippingStatusFilter) params.append('shippingStatus', shippingStatusFilter);
+      if (customerFilter) params.append('customer', customerFilter);
+      if (wilayaFilter) params.append('wilaya', wilayaFilter);
+      if (agentFilter) params.append('assignedAgentId', agentFilter);
+      if (totalRange.min) params.append('minTotal', totalRange.min);
+      if (totalRange.max) params.append('maxTotal', totalRange.max);
 
       const response = await fetch(`${apiUrl}/api/v1/orders?${params}`, {
         headers: {
@@ -305,6 +310,11 @@ export default function OrdersPage() {
         setOrders(orders);
         setTotalPages(data.data.pagination.totalPages);
         setTotalCount(data.data.pagination.totalCount);
+        
+        // Extract unique wilayas from orders
+        const wilayaSet = new Set(orders.map((order: Order) => order.customer.wilaya).filter(Boolean));
+        const wilayas = Array.from(wilayaSet).sort() as string[];
+        setUniqueWilayas(wilayas);
         
         // Fetch ticket counts for all orders
         // 🚀 PROFESSIONAL SOLUTION: Extract ticket counts from orders response
@@ -688,7 +698,6 @@ export default function OrdersPage() {
         setAgentFilter(filters.agentFilter || '');
         setShippingStatusFilter(filters.shippingStatusFilter || '');
         setTotalRange(filters.totalRange || { min: '', max: '' });
-        setStatusFilter(filters.statusFilter || '');
         setSortConfig(filters.sortConfig || { key: 'orderDate', direction: 'desc' });
       } catch (e) {
         console.error('Error loading saved filters:', e);
@@ -741,11 +750,10 @@ export default function OrdersPage() {
       agentFilter,
       shippingStatusFilter,
       totalRange,
-      statusFilter,
       sortConfig
     };
     localStorage.setItem('orderFilters', JSON.stringify(filters));
-  }, [dateRange, customerFilter, wilayaFilter, agentFilter, shippingStatusFilter, totalRange, statusFilter, sortConfig]);
+  }, [dateRange, customerFilter, wilayaFilter, agentFilter, shippingStatusFilter, totalRange, sortConfig]);
 
   // Save pagination settings whenever they change
   useEffect(() => {
@@ -761,7 +769,7 @@ export default function OrdersPage() {
     if (currentPage > 1) {
       setCurrentPage(1);
     }
-  }, [search, statusFilter, dateRange, customerFilter, wilayaFilter, agentFilter, shippingStatusFilter, totalRange]);
+  }, [search, shippingStatusFilter, dateRange, customerFilter, wilayaFilter, agentFilter, totalRange]);
 
   // Save general settings whenever they change
   useEffect(() => {
@@ -864,7 +872,6 @@ export default function OrdersPage() {
           agentFilter,
           shippingStatusFilter,
           totalRange,
-          statusFilter,
           sortConfig
         }
       };
@@ -890,7 +897,6 @@ export default function OrdersPage() {
     setAgentFilter(filters.agentFilter);
     setShippingStatusFilter(filters.shippingStatusFilter);
     setTotalRange(filters.totalRange);
-    setStatusFilter(filters.statusFilter);
     setSortConfig(filters.sortConfig);
     setSortBy(filters.sortConfig.key);
     setSortOrder(filters.sortConfig.direction);
@@ -904,7 +910,6 @@ export default function OrdersPage() {
     setAgentFilter('');
     setShippingStatusFilter('');
     setTotalRange({ min: '', max: '' });
-    setStatusFilter('');
     setSearch('');
     setSortConfig({ key: 'orderDate', direction: 'desc' });
     setSortBy('orderDate');
@@ -914,11 +919,12 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
     fetchStats();
-  }, [currentPage, limit, search, statusFilter, sortBy, sortOrder, dateRange, customerFilter, wilayaFilter, agentFilter, shippingStatusFilter, totalRange]);
+  }, [currentPage, limit, search, shippingStatusFilter, sortBy, sortOrder, dateRange, customerFilter, wilayaFilter, agentFilter, totalRange]);
 
-  // Load wilaya settings on component mount
+  // Load wilaya settings and agents on component mount
   useEffect(() => {
     fetchWilayaSettings();
+    fetchAvailableAgents();
   }, []);
 
   return (
@@ -1040,22 +1046,32 @@ export default function OrdersPage() {
 
               {/* Quick Filters */}
               <div className="flex flex-wrap gap-3">
-                {/* Status Filter */}
+                {/* Shipping Status Filter */}
                 <div className="relative">
                   <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="appearance-none bg-gray-50/50 border border-gray-200/50 rounded-2xl px-4 py-4 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-700 font-medium min-w-[140px]"
+                    value={shippingStatusFilter}
+                    onChange={(e) => setShippingStatusFilter(e.target.value)}
+                    className="appearance-none bg-gray-50/50 border border-gray-200/50 rounded-2xl px-4 py-4 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 text-gray-700 font-medium min-w-[180px]"
                   >
-                    <option value="">All Status</option>
-                    <option value="PENDING">{t('pending')}</option>
-                    <option value="ASSIGNED">{t('assigned')}</option>
-                    <option value="IN_PROGRESS">{t('inProgress')}</option>
-                    <option value="CONFIRMED">{t('confirmed')}</option>
-                    <option value="SHIPPED">{t('shipped')}</option>
-                    <option value="DELIVERED">{t('delivered')}</option>
-                    <option value="CANCELLED">{t('cancelled')}</option>
-                    <option value="RETURNED">{t('returned')}</option>
+                    <option value="">All Shipping Status</option>
+                    <option value="CRÉÉ">CRÉÉ</option>
+                    <option value="DEMANDE DE RAMASSAGE">DEMANDE DE RAMASSAGE</option>
+                    <option value="EN COURS">EN COURS</option>
+                    <option value="EN ATTENTE DE TRANSIT">EN ATTENTE DE TRANSIT</option>
+                    <option value="EN TRANSIT POUR EXPÉDITION">EN TRANSIT POUR EXPÉDITION</option>
+                    <option value="EN TRANSIT POUR RETOUR">EN TRANSIT POUR RETOUR</option>
+                    <option value="EN ATTENTE">EN ATTENTE</option>
+                    <option value="EN RUPTURE DE STOCK">EN RUPTURE DE STOCK</option>
+                    <option value="PRÊT À EXPÉDIER">PRÊT À EXPÉDIER</option>
+                    <option value="ASSIGNÉ">ASSIGNÉ</option>
+                    <option value="EXPÉDIÉ">EXPÉDIÉ</option>
+                    <option value="ALERTÉ">ALERTÉ</option>
+                    <option value="LIVRÉ">LIVRÉ</option>
+                    <option value="REPORTÉ">REPORTÉ</option>
+                    <option value="ANNULÉ">ANNULÉ</option>
+                    <option value="PRÊT À RETOURNER">PRÊT À RETOURNER</option>
+                    <option value="PRIS PAR LE MAGASIN">PRIS PAR LE MAGASIN</option>
+                    <option value="NON REÇU">NON REÇU</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                 </div>
@@ -1106,7 +1122,7 @@ export default function OrdersPage() {
                   <Filter className="w-4 h-4" />
                   <span>Filters</span>
                   {/* Active Filter Indicator */}
-                  {(dateRange.start || dateRange.end || customerFilter || wilayaFilter || agentFilter || shippingStatusFilter) && (
+                  {(dateRange.start || dateRange.end || customerFilter || wilayaFilter || agentFilter || shippingStatusFilter || totalRange.min || totalRange.max) && (
                     <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
                   )}
                 </button>
@@ -1256,13 +1272,19 @@ export default function OrdersPage() {
                       <MapPin className="w-4 h-4" />
                       Wilaya
                     </label>
-                    <input
-                      type="text"
-                      value={wilayaFilter}
-                      onChange={(e) => setWilayaFilter(e.target.value)}
-                      placeholder={t('wilaya')}
-                      className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 placeholder-gray-400"
-                    />
+                    <div className="relative">
+                      <select
+                        value={wilayaFilter}
+                        onChange={(e) => setWilayaFilter(e.target.value)}
+                        className="w-full appearance-none px-3 py-2 pr-8 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200"
+                      >
+                        <option value="">All Wilayas</option>
+                        {uniqueWilayas.map(wilaya => (
+                          <option key={wilaya} value={wilaya}>{wilaya}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
 
                   {/* Agent Filter */}
@@ -1271,13 +1293,21 @@ export default function OrdersPage() {
                       <UserPlus className="w-4 h-4" />
                       Agent
                     </label>
-                    <input
-                      type="text"
-                      value={agentFilter}
-                      onChange={(e) => setAgentFilter(e.target.value)}
-                      placeholder={t('agentNamePlaceholder')}
-                      className="w-full px-3 py-2 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200 placeholder-gray-400"
-                    />
+                    <div className="relative">
+                      <select
+                        value={agentFilter}
+                        onChange={(e) => setAgentFilter(e.target.value)}
+                        className="w-full appearance-none px-3 py-2 pr-8 bg-gray-50/50 border border-gray-200/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500/50 focus:bg-white transition-all duration-200"
+                      >
+                        <option value="">All Agents</option>
+                        {availableAgents.map(agent => (
+                          <option key={agent.id} value={agent.id}>
+                            {agent.name} ({agent.agentCode})
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
                 </div>
 
