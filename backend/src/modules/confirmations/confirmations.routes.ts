@@ -33,4 +33,9 @@ router.get('/list', async (req, res) => {
   await controller.getConfirmationsList(req, res);
 });
 
+// Get list of all stores
+router.get('/stores', async (req, res) => {
+  await controller.getStores(req, res);
+});
+
 export default router;

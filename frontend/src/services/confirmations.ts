@@ -61,6 +61,7 @@ export interface ConfirmatorPerformance {
   confirmatorId: number;
   confirmatorName: string;
   storeIdentifier: string;
+  stores?: string[]; // List of stores (for aggregated view)
   totalOrders: number;
   totalConfirmed: number;
   confirmationRate: number;
@@ -169,11 +170,13 @@ export const confirmationsService = {
    */
   getConfirmatorPerformance: async (params?: {
     storeIdentifier?: string;
+    aggregated?: boolean;
     startDate?: string;
     endDate?: string;
   }): Promise<PerformanceResponse> => {
     const queryParams = new URLSearchParams();
     if (params?.storeIdentifier) queryParams.append('storeIdentifier', params.storeIdentifier);
+    if (params?.aggregated !== undefined) queryParams.append('aggregated', params.aggregated.toString());
     if (params?.startDate) queryParams.append('startDate', params.startDate);
     if (params?.endDate) queryParams.append('endDate', params.endDate);
 
@@ -183,5 +186,17 @@ export const confirmationsService = {
     );
     if (!response.ok) throw new Error('Failed to fetch confirmator performance');
     return response.json();
+  },
+
+  /**
+   * Get list of all stores
+   */
+  getStores: async (): Promise<Array<{ identifier: string; count: number }>> => {
+    const response = await fetch(`${API_URL}/api/v1/confirmations/stores`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new Error('Failed to fetch stores');
+    const data = await response.json();
+    return data.data || [];
   },
 };

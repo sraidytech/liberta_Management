@@ -151,10 +151,14 @@ export class ConfirmationsController {
   /**
    * Get confirmator performance with confirmation rates
    * GET /api/confirmations/performance
+   * Query params:
+   * - storeIdentifier: Filter by specific store
+   * - aggregated: 'true' to aggregate by confirmator across all stores (default: true)
+   * - startDate, endDate: Date range filter
    */
   async getConfirmatorPerformance(req: Request, res: Response): Promise<Response> {
     try {
-      const { storeIdentifier, startDate, endDate } = req.query;
+      const { storeIdentifier, startDate, endDate, aggregated = 'true' } = req.query;
       
       const where: any = {};
       
@@ -168,20 +172,23 @@ export class ConfirmationsController {
         if (endDate) where.createdAt.lte = new Date(endDate as string);
       }
       
-      // Get all confirmations grouped by confirmator
-      const confirmatorData = await prisma.orderConfirmation.groupBy({
-        by: ['confirmatorId', 'confirmatorName', 'storeIdentifier'],
-        where: {
-          ...where,
-          confirmatorId: { not: null }
-        },
-        _count: true
-      });
+      const isAggregated = aggregated === 'true';
       
-      // Calculate confirmation rates for each confirmator
-      const performance = await Promise.all(
-        confirmatorData.map(async (confirmator) => {
-            // Total orders (all orders for this confirmator)
+      if (isAggregated) {
+        // AGGREGATED VIEW: Group by confirmator across all stores
+        const confirmatorData = await prisma.orderConfirmation.groupBy({
+          by: ['confirmatorId', 'confirmatorName'],
+          where: {
+            ...where,
+            confirmatorId: { not: null }
+          },
+          _count: true
+        });
+        
+        // Calculate confirmation rates for each confirmator (aggregated)
+        const performance = await Promise.all(
+          confirmatorData.map(async (confirmator) => {
+            // Total orders across all stores for this confirmator
             const totalOrders = await prisma.orderConfirmation.count({
               where: {
                 ...where,
@@ -189,11 +196,85 @@ export class ConfirmationsController {
               }
             });
             
-            // Confirmed orders (orders with confirmation state = "Confirmé" or similar)
+            // Confirmed orders across all stores
             const confirmed = await prisma.orderConfirmation.count({
               where: {
                 ...where,
                 confirmatorId: confirmator.confirmatorId,
+                confirmationState: { not: null, notIn: ['-', 'N/A', ''] }
+              }
+            });
+            
+            // Get stores this confirmator works in
+            const stores = await prisma.orderConfirmation.groupBy({
+              by: ['storeIdentifier'],
+              where: {
+                ...where,
+                confirmatorId: confirmator.confirmatorId
+              }
+            });
+            
+            // Calculate confirmation rate: (confirmed / total) * 100
+            const confirmationRate = totalOrders > 0
+              ? ((confirmed / totalOrders) * 100)
+              : 0;
+            
+            return {
+              confirmatorId: confirmator.confirmatorId,
+              confirmatorName: confirmator.confirmatorName,
+              storeIdentifier: 'ALL', // Indicates aggregated data
+              stores: stores.map(s => s.storeIdentifier), // List of stores
+              totalOrders,
+              totalConfirmed: confirmed,
+              confirmationRate: parseFloat(confirmationRate.toFixed(2))
+            };
+          })
+        );
+        
+        // Sort by confirmation rate descending
+        performance.sort((a, b) => b.confirmationRate - a.confirmationRate);
+        
+        // Calculate unique confirmators count
+        const uniqueConfirmators = new Set(performance.map(p => p.confirmatorId)).size;
+        
+        return res.json({
+          data: performance,
+          summary: {
+            totalConfirmators: uniqueConfirmators,
+            averageRate: performance.length > 0
+              ? (performance.reduce((sum, p) => sum + p.confirmationRate, 0) / performance.length).toFixed(2)
+              : '0.00'
+          }
+        });
+      } else {
+        // PER-STORE VIEW: Group by confirmator AND store
+        const confirmatorData = await prisma.orderConfirmation.groupBy({
+          by: ['confirmatorId', 'confirmatorName', 'storeIdentifier'],
+          where: {
+            ...where,
+            confirmatorId: { not: null }
+          },
+          _count: true
+        });
+        
+        // Calculate confirmation rates for each confirmator per store
+        const performance = await Promise.all(
+          confirmatorData.map(async (confirmator) => {
+            // Total orders for this confirmator in this store
+            const totalOrders = await prisma.orderConfirmation.count({
+              where: {
+                ...where,
+                confirmatorId: confirmator.confirmatorId,
+                storeIdentifier: confirmator.storeIdentifier
+              }
+            });
+            
+            // Confirmed orders in this store
+            const confirmed = await prisma.orderConfirmation.count({
+              where: {
+                ...where,
+                confirmatorId: confirmator.confirmatorId,
+                storeIdentifier: confirmator.storeIdentifier,
                 confirmationState: { not: null, notIn: ['-', 'N/A', ''] }
               }
             });
@@ -207,25 +288,27 @@ export class ConfirmationsController {
               confirmatorId: confirmator.confirmatorId,
               confirmatorName: confirmator.confirmatorName,
               storeIdentifier: confirmator.storeIdentifier,
+              stores: [confirmator.storeIdentifier],
               totalOrders,
               totalConfirmed: confirmed,
               confirmationRate: parseFloat(confirmationRate.toFixed(2))
             };
           })
-      );
-      
-      // Sort by confirmation rate descending
-      performance.sort((a, b) => b.confirmationRate - a.confirmationRate);
-      
-      return res.json({
-        data: performance,
-        summary: {
-          totalConfirmators: performance.length,
-          averageRate: performance.length > 0
-            ? (performance.reduce((sum, p) => sum + p.confirmationRate, 0) / performance.length).toFixed(2)
-            : '0.00'
-        }
-      });
+        );
+        
+        // Sort by confirmation rate descending
+        performance.sort((a, b) => b.confirmationRate - a.confirmationRate);
+        
+        return res.json({
+          data: performance,
+          summary: {
+            totalConfirmators: performance.length,
+            averageRate: performance.length > 0
+              ? (performance.reduce((sum, p) => sum + p.confirmationRate, 0) / performance.length).toFixed(2)
+              : '0.00'
+          }
+        });
+      }
     } catch (error) {
       console.error('Error fetching confirmator performance:', error);
       return res.status(500).json({ error: 'Internal server error' });
@@ -302,6 +385,34 @@ export class ConfirmationsController {
       });
     } catch (error) {
       console.error('Error fetching confirmations list:', error);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * Get list of all stores with confirmations
+   * GET /api/confirmations/stores
+   */
+  async getStores(req: Request, res: Response): Promise<Response> {
+    try {
+      const stores = await prisma.orderConfirmation.groupBy({
+        by: ['storeIdentifier'],
+        _count: {
+          storeIdentifier: true
+        },
+        orderBy: {
+          storeIdentifier: 'asc'
+        }
+      });
+
+      return res.json({
+        data: stores.map(s => ({
+          identifier: s.storeIdentifier,
+          count: s._count.storeIdentifier
+        }))
+      });
+    } catch (error) {
+      console.error('Error fetching stores:', error);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
