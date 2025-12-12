@@ -173,6 +173,7 @@ model Order {
   satisfactionSurveys CustomerSatisfactionSurvey[]
   stockMovements StockMovement[]
   leadConversions LeadConversion[]
+  confirmation  OrderConfirmation?
 
   @@map("orders")
 }
@@ -1112,4 +1113,72 @@ enum BudgetAlertType {
   THRESHOLD_WARNING  // Approaching budget limit
   BUDGET_EXCEEDED    // Budget exceeded
   DAILY_SPIKE        // Unusual daily spending
+}
+
+// ============================================================================
+// ORDER CONFIRMATION TRACKING SYSTEM
+// Real-time tracking of order confirmations via EcoManager webhooks
+// ============================================================================
+
+// Order Confirmation Model (Current State Only - No History)
+model OrderConfirmation {
+  id                    String   @id @default(cuid())
+  
+  // Link to Order (optional - order might not exist yet)
+  orderId               String?  @unique
+  order                 Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  // EcoManager identifiers
+  ecoManagerOrderId     Int      @unique
+  orderReference        String
+  storeIdentifier       String
+  
+  // Confirmator information
+  confirmatorId         Int?
+  confirmatorName       String?
+  
+  // Confirmation state
+  confirmationState     String?  // e.g., "Confirmed", "Cancelled", "Pending"
+  orderState            String?  // e.g., "Processing", "Shipped", "Delivered"
+  
+  // Timestamps
+  confirmedAt           DateTime?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([ecoManagerOrderId])
+  @@index([storeIdentifier])
+  @@index([confirmatorId])
+  @@index([confirmationState])
+  @@index([confirmedAt])
+  @@map("order_confirmations")
+}
+
+// Webhook Configuration Model (Per-Store Webhook Management)
+model WebhookConfiguration {
+  id                    String   @id @default(cuid())
+  
+  // Store identification
+  storeIdentifier       String   @unique
+  storeName             String
+  
+  // EcoManager webhook details
+  ecoManagerWebhookId   Int?     // Webhook ID from EcoManager
+  webhookSecret         String   // Secret for HMAC verification
+  deliveryUrl           String   // Our webhook endpoint URL
+  
+  // Webhook events subscribed
+  events                String[] // ["OrderCreated", "OrderConfirmationStatusChanged"]
+  
+  // Status
+  isActive              Boolean  @default(true)
+  lastTriggered         DateTime?
+  
+  // Timestamps
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@index([storeIdentifier])
+  @@index([isActive])
+  @@map("webhook_configurations")
 }

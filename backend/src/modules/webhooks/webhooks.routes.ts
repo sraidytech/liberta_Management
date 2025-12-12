@@ -1,25 +1,24 @@
 import { Router } from 'express';
 import { MaystroWebhookController } from './maystro-webhook.controller';
+import { EcoManagerWebhookController } from './ecomanager-webhook.controller';
 import { authMiddleware, requireAdmin } from '@/common/middleware/auth';
 
 const router = Router();
 const maystroWebhookController = new MaystroWebhookController();
+const ecoManagerWebhookController = new EcoManagerWebhookController();
 
 // Public webhook endpoints (no auth required)
 router.post('/maystro', async (req, res) => {
   await maystroWebhookController.handleWebhook(req, res);
 });
 
-// Placeholder for EcoManager webhook
-router.post('/ecomanager', (req, res) => {
-  res.status(501).json({
-    success: false,
-    error: {
-      message: 'EcoManager webhook not implemented yet',
-      code: 'NOT_IMPLEMENTED',
-      statusCode: 501,
-    },
-  });
+// EcoManager webhook endpoints
+router.get('/ecomanager', async (req, res) => {
+  await ecoManagerWebhookController.handleValidation(req, res);
+});
+
+router.post('/ecomanager', async (req, res) => {
+  await ecoManagerWebhookController.handleWebhook(req, res);
 });
 
 // Protected webhook management endpoints

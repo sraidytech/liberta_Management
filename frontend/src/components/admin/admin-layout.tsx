@@ -44,7 +44,8 @@ import {
   PackageOpen,
   ArrowRightLeft,
   BarChart,
-  RefreshCw
+  RefreshCw,
+  CheckCircle
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -235,6 +236,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
           active: pathname?.startsWith('/admin/media-buying/settings')
         }
       ]
+    },
+    {
+      name: language === 'fr' ? 'Confirmations' : 'Confirmations',
+      icon: CheckCircle,
+      href: '/admin/confirmations',
+      active: pathname === '/admin/confirmations',
+      roles: ['ADMIN'] // Admin only
     },
     {
       name: language === 'fr' ? 'Rapports Avancés' : 'Advanced Reports',
